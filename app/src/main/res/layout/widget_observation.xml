@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:background="@drawable/widget_bg">
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="APOPHENIA" android:textColor="#AEB5C2" android:textSize="12sp" android:textStyle="bold" />
+<Button android:id="@+id/widget_weird" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="THAT WAS WEIRD" android:textAllCaps="false" android:textStyle="bold" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+<Button android:id="@+id/widget_observation" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Observation" android:textAllCaps="false" />
+<Button android:id="@+id/widget_open" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Open" android:textAllCaps="false" />
+</LinearLayout></LinearLayout>
