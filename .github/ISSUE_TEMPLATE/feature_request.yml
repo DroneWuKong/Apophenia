@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a focused improvement that preserves the evidence and privacy boundaries
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful change.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Privacy and evidence impact
+      description: Does this add permissions, external services, hardware, data retention, analysis claims, or background work?
+    validations:
+      required: true
+  - type: textarea
+    id: simulation
+    attributes:
+      label: Software-only test path
+      description: How could this be exercised without physical hardware or external data?
+    validations:
+      required: true

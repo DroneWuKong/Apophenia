@@ -1,76 +1,165 @@
 # Apophenia
 
-Apophenia is an Android-first personal observation and context recorder for investigating patterns, coincidences, symptoms, environmental changes, and other things you notice in daily life.
+**Notice now. Understand later.**
 
-The core principle is simple:
+[![Android CI](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml/badge.svg)](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Android 8+](https://img.shields.io/badge/Android-8%2B-3DDC84.svg)](https://developer.android.com/about/versions/oreo)
 
-> **You record the event. The software records the circumstances.**
+Apophenia is an open-source, local-first Android and Garmin observation recorder. Tap once when something stands out; the app preserves the exact timestamp first, then adds whatever phone, environment, and wearable context is available.
 
-## Current scope
+It is designed to investigate patterns without assuming they are meaningful. Observations stay separate from hypotheses, event windows are compared with random control windows, and the app never presents correlation as proof of medical, psychological, paranormal, or causal claims.
+
+<p align="center">
+  <img src="docs/images/apophenia-log.png" alt="Apophenia quick logging screen" width="360">
+  <img src="docs/images/apophenia-settings.png" alt="Apophenia context and privacy settings" width="360">
+</p>
+
+## Why this exists
+
+People are good at noticing unusual moments and bad at reconstructing the surrounding conditions afterward. Apophenia acts like a small personal black box:
+
+1. You record the moment in one tap.
+2. The timestamp is stored immediately.
+3. Optional enrichment runs afterward, so slow hardware or network calls cannot move the event time.
+4. The app compares event context with ordinary randomly sampled context.
+
+The goal is better evidence, not a more confident story.
+
+## What works
 
 - One-tap **THAT WAS WEIRD** logging
-- Observation, coincidence, hypothesis-note, and custom event logging
+- Observation, headache, sinus, light, sound, body sensation, coincidence, hypothesis, and custom entries
 - Home-screen widget and Quick Settings tile
-- Local SQLite event/context store
-- Phone/tablet sensor capture
-- Location and weather/environment enrichment
-- Random control observations for baseline comparison
-- 30-minute rolling pre-event black-box buffer
-- 30-minute post-event capture
-- Correlation/association analysis against controls
-- JSON export
-- Explicit hardware gates and full simulation mode
-- Garmin Epix Pro (Gen 2) Connect IQ companion
-- Direct Garmin watch-to-phone event bridge
-- Watch-side pending-event queue for temporary phone disconnects
-- Optional, permission-gated Health Connect historical context
-- First-run context onboarding plus visible permission and connection status
+- Local SQLite storage and JSON export
+- User-enabled 30-minute rolling pre-event buffer
+- Approximately 30 minutes of labeled post-event context
+- Random control windows using the same capture pipeline
+- Phone sensors, device state, battery, screen, network, and optional location
+- Optional Open-Meteo weather enrichment
+- Optional, read-only Health Connect context
+- Garmin Epix Pro (Gen 2) companion for 42 mm, 47 mm, and 51 mm models
+- Explicit LIVE and SIMULATION modes
+- Association analysis with robust summaries, permutation testing, persistence checks, and multiple-comparison caution
 
-## Repository layout
+No account, advertising SDK, analytics, continuous microphone recording, or camera recording is included.
 
-- `app/` — native Android application
-- `garmin-epix-pro/` — Garmin Connect IQ companion for Epix Pro (Gen 2)
-- `docs/` — architecture, privacy, data model, Garmin integration, validation notes
-- `tools/` — software-only domain tests
-- `.github/workflows/` — Android CI build
+## Project status
 
-## Important boundaries
+Apophenia is a **development preview**, not a Play Store release and not a medical device.
 
-The app is designed to test perceived patterns rather than assume they are real. Raw observations are stored separately from hypotheses and interpretation. Controls are sampled independently so an apparent relationship can be compared with ordinary baseline conditions.
+| Area | Current evidence |
+| --- | --- |
+| Android build | JDK 17 build, unit tests, lint, and debug APK pass locally and in GitHub Actions |
+| Android UI | Two Compose smoke tests pass on an API 36 emulator |
+| Permissions | Location, notifications, weather, and Health Connect flows exercised in an emulator |
+| Garmin app | All three Epix Pro targets compile with Connect IQ SDK 9.2.0 |
+| Garmin queue | Four native Monkey C tests pass in the 47 mm simulator |
+| Physical hardware | Still requires broader phone/watch acceptance testing |
 
-The rolling black-box recorder is user-enabled and bounded. It does not silently auto-start at boot. Simulation mode exercises the same persistence/correlation pipeline without physical hardware.
+See [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md) for the detailed evidence boundary and remaining hardware work.
 
-## Build status
+## Install a development build
 
-The repository includes a Gradle 9.4.1 wrapper and builds with JDK 17. From the repository root:
+1. Open the latest successful [Android workflow run](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml).
+2. Download the `apophenia-debug-apk` artifact and unzip it.
+3. Open `app-debug.apk` on an Android 8.0 or newer phone.
+4. Allow installation from the browser or file manager when Android asks.
+5. Review optional context access inside the app. Basic logging works without location, Health Connect, Garmin, or weather.
+
+GitHub may require you to sign in before downloading an Actions artifact. Debug APK signatures can differ between build machines; if Android rejects an update, export anything you need, uninstall the old debug build, and install the new one.
+
+Use the [install and test guide](docs/INSTALL_AND_TEST.md) for a short acceptance checklist and a safe bug-report template.
+
+## Build the Android app
+
+Requirements:
+
+- JDK 17
+- Android SDK with API 37 installed
+- No Garmin hardware, GPS fix, weather service, or Health Connect data is required for software tests
+
+On Windows:
 
 ```powershell
 ./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug
-```
-
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
-The Android emulator smoke test is:
-
-```powershell
 ./gradlew.bat connectedDebugAndroidTest
 ```
 
-GitHub Actions runs the unit tests, lint, APK build, and an API 36 emulator smoke test on pushes, pull requests, and manual dispatches. It uploads the debug APK as `apophenia-debug-apk`.
+On macOS or Linux:
 
-Validation on 2026-10-02: the unit-test/lint/APK command passed locally with JDK 17, and two Compose UI tests passed on an API 36.1 Android emulator. The emulator validation covered one-tap logging, the optional-context settings surface, native location and notification permission prompts, a successful weather lookup, and the complete Health Connect permission flow. This is software validation, not physical-phone validation.
-
-The Garmin companion uses Connect IQ and the Android side uses Garmin's Connect IQ Companion SDK. Garmin Connect is checked before SDK initialization so a missing companion app produces an in-app status instead of blocking software-only testing.
-
-On Windows with Garmin SDK Manager, the Epix Pro device definitions, Java 17,
-and a development signing key installed, build all three watch sizes with:
-
-```powershell
-./tools/build-garmin.ps1 -KeyPath C:/path/to/developer_key.der
+```bash
+./gradlew testDebugUnitTest lintDebug :app:assembleDebug
+./gradlew connectedDebugAndroidTest
 ```
 
-The command writes `.prg` files and reports SHA-256 hashes under `build/garmin/`.
-Keep the signing key outside this repository.
+The APK is written to:
 
-Validation on 2026-10-02: Connect IQ SDK 9.2.0 compiled all three Epix Pro targets, and all four native Monkey C pending-queue tests passed in the Epix Pro 47 mm simulator. BLE delivery, Garmin Connect behavior, and physical watch sensors remain hardware-validation items.
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
 
-Hardware validation remains separate from software validation. Do not treat simulator or unit-test results as proof of physical sensor/watch behavior.
+## How the capture pipeline works
+
+```text
+tap / widget / tile / Garmin event
+              |
+              v
+     save exact event timestamp
+              |
+              +--> freeze preceding rolling window
+              +--> collect available instant context
+              +--> schedule labeled post-event context
+              +--> store everything locally
+                           |
+                           v
+             compare event windows with controls
+```
+
+Dense samples are grouped by capture window rather than counted as independent evidence. Post-event samples are retained for exploration but excluded as event predictors. Hypotheses are stored separately from raw observations.
+
+Read [ARCHITECTURE.md](docs/ARCHITECTURE.md) and [DATA_MODEL.md](docs/DATA_MODEL.md) for the implementation contract.
+
+## Garmin companion
+
+The Connect IQ app supports:
+
+- `epix2pro42mm`
+- `epix2pro47mm`
+- `epix2pro51mm`
+
+It preserves the watch timestamp, omits unavailable metrics, and keeps a bounded pending-event queue when the phone is disconnected. Build instructions and the hardware acceptance checklist are in [GARMIN_EPIX_PRO.md](docs/GARMIN_EPIX_PRO.md).
+
+## Privacy
+
+Apophenia is local-first. Optional access is explicit and fail-soft:
+
+- phone sensors that Android exposes without runtime permission;
+- location for local context and optional weather lookup;
+- notifications for the user-enabled foreground recorder;
+- read-only Health Connect history;
+- Garmin data delivered through the paired-phone companion path.
+
+You can export or delete local data from Settings. Do not attach real exports, coordinates, or health records to public bug reports. See [PRIVACY.md](docs/PRIVACY.md).
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Data model and statistical boundaries](docs/DATA_MODEL.md)
+- [Install and test guide](docs/INSTALL_AND_TEST.md)
+- [Garmin Epix Pro integration](docs/GARMIN_EPIX_PRO.md)
+- [Privacy and collection boundaries](docs/PRIVACY.md)
+- [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
+- [Roadmap](ROADMAP.md)
+- [Release checklist](docs/RELEASE_CHECKLIST.md)
+- [Reddit launch kit](docs/REDDIT_LAUNCH.md)
+
+## Contributing
+
+Bug reports, device compatibility results, UI feedback, and focused pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md). Please keep observations neutral, preserve the pure-software path, and distinguish simulator evidence from physical-hardware evidence.
+
+## License and disclaimer
+
+The source is available under the [MIT License](LICENSE).
+
+Apophenia is an experimental personal data tool. It does not diagnose, treat, predict, or explain a medical or mental-health condition. Its statistical output is exploratory and may reflect chance, bias, missing data, or confounding factors.

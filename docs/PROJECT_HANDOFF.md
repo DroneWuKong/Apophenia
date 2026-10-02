@@ -90,6 +90,8 @@ Expected APK:
 
 The emulator UI check is `./gradlew connectedDebugAndroidTest`. CI runs it on API 36 and uploads the debug APK.
 
+Public project material is indexed from `README.md`. Installation, architecture, release, contribution, security, and Reddit launch documents are present. Current UI screenshots live under `docs/images/` and contain emulator/demo state only.
+
 Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing key outside the repository:
 
 ```powershell
@@ -117,4 +119,5 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 5. Validate each available physical sensor and confirm unavailable values are omitted.
 6. Validate Health Connect permission and data behavior on supported physical devices.
 7. Validate weather enrichment with real permission/network/location conditions.
-8. Add external observer nodes / Home Assistant / ESP32 ingestion only as later scoped work.
+8. Merge the accepted release commit, publish a pre-release APK with its SHA-256 checksum, and replace the placeholder in `docs/REDDIT_LAUNCH.md`.
+9. Add external observer nodes / Home Assistant / ESP32 ingestion only as later scoped work.
