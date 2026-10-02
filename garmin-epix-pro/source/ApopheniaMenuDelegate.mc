@@ -4,6 +4,7 @@ using Toybox.SensorHistory;
 using Toybox.System;
 using Toybox.Time;
 using Toybox.Lang;
+using Toybox.Math;
 using Toybox.WatchUi as Ui;
 
 class ApopheniaTxListener extends Communications.ConnectionListener {
@@ -47,6 +48,20 @@ module ApopheniaDelivery {
   ApopheniaState.setStatus("Queued - send failed");
  }
 }
+module ApopheniaIdentity {
+ function installId() {
+  var value=Storage.getValue("install_id");
+  if(value==null){value=Time.now().value().format("%d")+"-"+Math.rand().format("%d");Storage.setValue("install_id",value);}
+  return value;
+ }
+ function nextEventId() {
+  var sequence=Storage.getValue("event_sequence");
+  if(sequence==null){sequence=0;}
+  sequence=sequence+1;
+  Storage.setValue("event_sequence",sequence);
+  return installId()+":"+sequence.format("%d");
+ }
+}
 class ApopheniaMenuDelegate extends Ui.Menu2InputDelegate {
  function initialize(){Menu2InputDelegate.initialize();}
  function onSelect(item){var id=item.getId();if(id.equals("retry")){ApopheniaDelivery.flush();return;}sendObservation(labelFor(id),kindFor(id));}
@@ -55,7 +70,7 @@ class ApopheniaMenuDelegate extends Ui.Menu2InputDelegate {
  private function sendObservation(label,kind){
   var metrics={};addLatest(metrics,"garmin_heart_rate_bpm",:heartRate);addLatest(metrics,"garmin_stress",:stress);addLatest(metrics,"garmin_body_battery",:bodyBattery);addLatest(metrics,"garmin_spo2_pct",:oxygen);addLatest(metrics,"garmin_pressure_hpa",:pressure);addLatest(metrics,"garmin_temperature_c",:temperature);
   var settings=System.getDeviceSettings();metrics["garmin_phone_connected"]=settings.phoneConnected?1:0;
-  var packet={"v"=>2,"type"=>"observation","kind"=>kind,"label"=>label,"ts_ms"=>Time.now().value().toLong()*1000l,"metrics"=>metrics};
+  var packet={"v"=>3,"type"=>"observation","event_id"=>ApopheniaIdentity.nextEventId(),"kind"=>kind,"label"=>label,"ts_ms"=>Time.now().value().toLong()*1000l,"metrics"=>metrics};
   ApopheniaDelivery.enqueue(packet);
  }
  private function addLatest(metrics,key,kind){var value=latest(kind);if(value!=null){if(kind==:pressure){value=value/100.0;}metrics[key]=value;}}
