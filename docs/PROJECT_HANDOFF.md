@@ -1,4 +1,4 @@
-# Project handoff — 1 October 2026
+# Project handoff — 2 October 2026
 
 ## Goal
 
@@ -25,6 +25,8 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - 30-minute post-event collection
 - event-vs-control association engine
 - JSON export
+- optional, permission-gated Health Connect reads
+- database schema v3 with observation origin, external-event deduplication, and explicit context phase
 
 ## Garmin Epix Pro (Gen 2)
 
@@ -44,6 +46,8 @@ The watch sends:
 - phone-connected state
 
 A bounded watch-side pending queue preserves events during temporary disconnects.
+
+Watch protocol v3 adds a persistent installation/sequence event ID. Android uses the Garmin origin plus this ID to suppress replay duplicates while retaining the original watch timestamp. Legacy v2 packets remain readable but cannot provide the same replay guarantee.
 
 The Android Garmin bridge uses app id:
 `4f4d0f7b3d6f4b36b3e88b91129c70a2`
@@ -76,22 +80,38 @@ CI workflow: `.github/workflows/android.yml`
 Expected command:
 
 ```bash
-gradle testDebugUnitTest :app:assembleDebug
+./gradlew testDebugUnitTest lintDebug :app:assembleDebug
 ```
 
 Expected APK:
 
 `app/build/outputs/apk/debug/app-debug.apk`
 
-The Garmin watch app still requires Garmin Connect IQ SDK / Monkey C tooling for watch-package compilation.
+The emulator UI check is `./gradlew connectedDebugAndroidTest`. CI runs it on API 36 and uploads the debug APK.
+
+Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing key outside the repository:
+
+```powershell
+./tools/build-garmin.ps1 -KeyPath C:/path/to/developer_key.der
+```
+
+## Validation status — 2026-10-02
+
+- `./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug`: passed locally on JDK 17.
+- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v3 migration, rolling pre/post separation, control grouping, hypothesis separation, JSON export, association statistics, Garmin packet parsing, and the full simulation enrichment/database path.
+- `./gradlew.bat connectedDebugAndroidTest`: passed on an API 36.1 Android emulator; launches Compose, performs **THAT WAS WEIRD**, and verifies the timeline entry.
+- APK produced at `app/build/outputs/apk/debug/app-debug.apk`.
+- Connect IQ SDK 9.2.0: all three Epix Pro targets compiled.
+- Garmin Run No Evil: all four pending-queue tests passed on the Epix Pro 47 mm simulator.
+- None of the above is physical Android or Garmin hardware validation.
 
 ## Next work
 
-1. Run Android CI and repair any compiler/API issues.
-2. Download and physically install the debug APK.
-3. Compile/sideload the Connect IQ watch companion.
-4. Validate watch event → phone event → Garmin metrics.
-5. Validate 30-minute pre-event and post-event windows on a real Android phone.
-6. Add Health Connect as an optional source.
-7. Add external observer nodes / Home Assistant / ESP32 ingestion.
-8. Add event-to-event lag analysis and richer hypothesis management.
+1. Download and physically install the debug APK.
+2. Sideload the compiled Connect IQ watch companion using the owner's Garmin signing key.
+3. Validate watch event → Garmin Connect → phone observation → attached Garmin metrics.
+4. Validate 30-minute pre-event/post-event capture, foreground-service survival, widget, and Quick Settings tile on a real Android phone.
+5. Validate each available physical sensor and confirm unavailable values are omitted.
+6. Validate Health Connect permission and data behavior on supported physical devices.
+7. Validate weather enrichment with real permission/network/location conditions.
+8. Add external observer nodes / Home Assistant / ESP32 ingestion only as later scoped work.
