@@ -3,6 +3,7 @@ using Toybox.Communications;
 using Toybox.SensorHistory;
 using Toybox.System;
 using Toybox.Time;
+using Toybox.Lang;
 using Toybox.WatchUi as Ui;
 
 class ApopheniaTxListener extends Communications.ConnectionListener {
@@ -18,8 +19,8 @@ class ApopheniaMenuDelegate extends Ui.Menu2InputDelegate {
  private function sendObservation(label,kind){
   var metrics={};addLatest(metrics,"garmin_heart_rate_bpm",:heartRate);addLatest(metrics,"garmin_stress",:stress);addLatest(metrics,"garmin_body_battery",:bodyBattery);addLatest(metrics,"garmin_spo2_pct",:oxygen);addLatest(metrics,"garmin_pressure_hpa",:pressure);addLatest(metrics,"garmin_temperature_c",:temperature);
   var settings=System.getDeviceSettings();metrics["garmin_phone_connected"]=settings.phoneConnected?1:0;
-  var packet={"v"=>2,"type"=>"observation","kind"=>kind,"label"=>label,"ts_ms"=>Time.now().value()*1000,"metrics"=>metrics};
-  var queue=Storage.getValue("pending_events");if(queue==null){queue=[];}if(queue.size()>=10){queue=queue.slice(1,null);}queue.add(packet);Storage.setValue("pending_events",queue);
+  var packet={"v"=>2,"type"=>"observation","kind"=>kind,"label"=>label,"ts_ms"=>Time.now().value().toLong()*1000l,"metrics"=>metrics};
+  var stored=Storage.getValue("pending_events");var queue=[] as Lang.Array;if(stored instanceof Lang.Array){queue=stored;}if(queue.size()>=10){queue=queue.slice(1,null);}queue.add(packet);Storage.setValue("pending_events",queue);
   if(!settings.phoneConnected){ApopheniaState.status="Queued - phone offline";return;}
   ApopheniaState.status=queue.size()>1?"Sending queued events…":"Sending…";Communications.transmit(queue,{},new ApopheniaTxListener());
  }
