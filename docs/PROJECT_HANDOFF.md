@@ -10,7 +10,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 
 - Kotlin / Jetpack Compose native Android app
 - package: `com.dronewukong.apophenia`
-- v0.2.0
+- v0.2.1
 - Android min SDK 26
 - explicit hardware/simulation gates
 - local SQLite database
@@ -26,6 +26,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - event-vs-control association engine
 - JSON export
 - optional, permission-gated Health Connect reads
+- first-run context onboarding with visible location, notification, weather, and Health Connect status
 - database schema v3 with observation origin, external-event deduplication, and explicit context phase
 
 ## Garmin Epix Pro (Gen 2)
@@ -99,7 +100,9 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 
 - `./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug`: passed locally on JDK 17.
 - Unit coverage includes observation timestamp preservation and deduplication, v2-to-v3 migration, rolling pre/post separation, control grouping, hypothesis separation, JSON export, association statistics, Garmin packet parsing, and the full simulation enrichment/database path.
-- `./gradlew.bat connectedDebugAndroidTest`: passed on an API 36.1 Android emulator; launches Compose, performs **THAT WAS WEIRD**, and verifies the timeline entry.
+- `./gradlew.bat connectedDebugAndroidTest`: two tests passed on an API 36.1 Android emulator; they cover the refined logging surface, **THAT WAS WEIRD**, the timeline entry, and the optional-context settings surface.
+- Native Android location and notification permission prompts were exercised on the emulator. Weather returned a live Open-Meteo result after location approval.
+- Health Connect's permission controller was exercised end-to-end on the emulator, including the required privacy-rationale declaration, six read permissions, and optional background access. The app returned to a connected state.
 - APK produced at `app/build/outputs/apk/debug/app-debug.apk`.
 - Connect IQ SDK 9.2.0: all three Epix Pro targets compiled.
 - Garmin Run No Evil: all four pending-queue tests passed on the Epix Pro 47 mm simulator.

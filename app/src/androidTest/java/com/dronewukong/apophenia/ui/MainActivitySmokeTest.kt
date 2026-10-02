@@ -2,6 +2,7 @@ package com.dronewukong.apophenia.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,6 +30,9 @@ class MainActivitySmokeTest {
 
     @Test
     fun launchesAndLogsOneTapObservation() {
+        dismissContextIntroIfPresent()
+        compose.onNodeWithText("Observation").assertIsDisplayed()
+        compose.onNodeWithText("Sound / noise").assertIsDisplayed()
         compose.onNodeWithText("THAT WAS WEIRD").assertIsDisplayed().performClick()
         compose.onNodeWithText("Timeline").performClick()
         compose.waitUntil(timeoutMillis = 10_000) {
@@ -36,6 +40,21 @@ class MainActivitySmokeTest {
                 compose.onNodeWithText("That was weird").assertIsDisplayed()
                 true
             }.getOrDefault(false)
+        }
+    }
+
+    @Test
+    fun settingsExposeOptionalContextPermissions() {
+        dismissContextIntroIfPresent()
+        compose.onNodeWithText("Settings").performClick()
+        compose.onNodeWithText("Phone sensors").assertIsDisplayed()
+        compose.onNodeWithText("Location + weather").assertIsDisplayed()
+        compose.onNodeWithText("Health Connect").assertIsDisplayed()
+    }
+
+    private fun dismissContextIntroIfPresent() {
+        if (compose.onAllNodesWithText("Not now").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithText("Not now").performClick()
         }
     }
 }

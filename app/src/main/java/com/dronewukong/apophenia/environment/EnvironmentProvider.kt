@@ -1,10 +1,13 @@
 package com.dronewukong.apophenia.environment
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.os.Build
+import android.os.CancellationSignal
 import androidx.core.content.ContextCompat
 import com.dronewukong.apophenia.data.ContextSample
 import com.dronewukong.apophenia.hardware.HardwareGates
@@ -12,6 +15,8 @@ import com.dronewukong.apophenia.hardware.SimulationContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
 class EnvironmentProvider(private val context: Context) {
     fun collect(observationId: Long?, isControl: Boolean): List<ContextSample> {
@@ -19,7 +24,7 @@ class EnvironmentProvider(private val context: Context) {
             return SimulationContext.environmentSamples(observationId, isControl)
         }
         if (!HardwareGates.locationEnabled) return emptyList()
-        val location = bestLastLocation() ?: return emptyList()
+        val location = bestAvailableLocation() ?: return emptyList()
         val now = System.currentTimeMillis()
         val out = mutableListOf(
             ContextSample(timestampMs=now, observationId=observationId, isControl=isControl, source="location", metric="latitude", value=location.latitude, unit="deg"),
@@ -30,12 +35,29 @@ class EnvironmentProvider(private val context: Context) {
         return out
     }
 
-    private fun bestLastLocation(): Location? {
+    @SuppressLint("MissingPermission")
+    private fun bestAvailableLocation(): Location? {
         val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (!fine && !coarse) return null
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        return lm.getProviders(true).mapNotNull { provider -> runCatching { lm.getLastKnownLocation(provider) }.getOrNull() }.minByOrNull { it.accuracy }
+        val providers = lm.getProviders(true)
+        val cached = providers.mapNotNull { provider -> runCatching { lm.getLastKnownLocation(provider) }.getOrNull() }
+            .maxByOrNull { it.time }
+        if (cached != null && System.currentTimeMillis() - cached.time <= LOCATION_FRESHNESS_MS) return cached
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return cached
+
+        val provider = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+            .firstOrNull { it in providers } ?: return cached
+        val signal = CancellationSignal()
+        val future = CompletableFuture<Location?>()
+        return runCatching {
+            lm.getCurrentLocation(provider, signal, context.mainExecutor) { future.complete(it) }
+            future.get(CURRENT_LOCATION_TIMEOUT_SEC, TimeUnit.SECONDS) ?: cached
+        }.getOrElse {
+            signal.cancel()
+            cached
+        }
     }
 
     private fun fetchWeather(loc: Location, observationId: Long?, isControl: Boolean): List<ContextSample> = runCatching {
@@ -75,4 +97,9 @@ class EnvironmentProvider(private val context: Context) {
             samples
         }
     }.getOrDefault(emptyList())
+
+    companion object {
+        private const val LOCATION_FRESHNESS_MS = 15L * 60L * 1000L
+        private const val CURRENT_LOCATION_TIMEOUT_SEC = 6L
+    }
 }

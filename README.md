@@ -24,6 +24,7 @@ The core principle is simple:
 - Direct Garmin watch-to-phone event bridge
 - Watch-side pending-event queue for temporary phone disconnects
 - Optional, permission-gated Health Connect historical context
+- First-run context onboarding plus visible permission and connection status
 
 ## Repository layout
 
@@ -56,7 +57,7 @@ The Android emulator smoke test is:
 
 GitHub Actions runs the unit tests, lint, APK build, and an API 36 emulator smoke test on pushes, pull requests, and manual dispatches. It uploads the debug APK as `apophenia-debug-apk`.
 
-Validation on 2026-10-02: the unit-test/lint/APK command passed locally with JDK 17, and the Compose launch plus one-tap logging smoke test passed on an API 36.1 Android emulator. This is software validation, not physical-phone validation.
+Validation on 2026-10-02: the unit-test/lint/APK command passed locally with JDK 17, and two Compose UI tests passed on an API 36.1 Android emulator. The emulator validation covered one-tap logging, the optional-context settings surface, native location and notification permission prompts, a successful weather lookup, and the complete Health Connect permission flow. This is software validation, not physical-phone validation.
 
 The Garmin companion uses Connect IQ and the Android side uses Garmin's Connect IQ Companion SDK. Garmin Connect is checked before SDK initialization so a missing companion app produces an in-app status instead of blocking software-only testing.
 

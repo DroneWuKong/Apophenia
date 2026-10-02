@@ -2,6 +2,7 @@ package com.dronewukong.apophenia.health
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.aggregate.AggregateMetric
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ExerciseSessionRecord
@@ -27,11 +28,34 @@ object HealthConnectAccess {
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getReadPermission(OxygenSaturationRecord::class),
-        HealthPermission.getReadPermission(ExerciseSessionRecord::class),
-        HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+        HealthPermission.getReadPermission(ExerciseSessionRecord::class)
     )
 
-    fun sdkStatus(context: Context): Int = HealthConnectClient.getSdkStatus(context, PROVIDER_PACKAGE)
+    fun sdkStatus(context: Context): Int = HealthConnectClient.getSdkStatus(context)
+
+    fun requestablePermissions(context: Context): Set<String> = buildSet {
+        addAll(readPermissions)
+        val client = HealthConnectClient.getOrCreate(context)
+        if (client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) ==
+            HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+        ) {
+            add(HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND)
+        }
+    }
+
+    suspend fun permissionSummary(context: Context): String = when (sdkStatus(context)) {
+        HealthConnectClient.SDK_AVAILABLE -> runCatching {
+            val granted = HealthConnectClient.getOrCreate(context).permissionController.getGrantedPermissions()
+            val count = readPermissions.count { it in granted }
+            when {
+                count == readPermissions.size -> "Connected · $count read permissions"
+                count > 0 -> "Partially connected · $count of ${readPermissions.size}"
+                else -> "Not connected"
+            }
+        }.getOrDefault("Available · access status unavailable")
+        HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> "Update required"
+        else -> "Unavailable on this device"
+    }
 
     fun statusText(context: Context): String = when (sdkStatus(context)) {
         HealthConnectClient.SDK_AVAILABLE -> "Available"
@@ -47,7 +71,7 @@ class HealthConnectProvider(private val context: Context) {
         }
         if (HealthConnectAccess.sdkStatus(context) != HealthConnectClient.SDK_AVAILABLE) return emptyList()
         return runCatching {
-            val client = HealthConnectClient.getOrCreate(context, HealthConnectAccess.PROVIDER_PACKAGE)
+            val client = HealthConnectClient.getOrCreate(context)
             val granted = client.permissionController.getGrantedPermissions()
             val end = Instant.now()
             val recentStart = end.minus(Duration.ofMinutes(30))
