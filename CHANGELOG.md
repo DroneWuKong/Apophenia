@@ -8,11 +8,11 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 
 - Public contribution, security, conduct, installation, architecture, release, and launch documentation.
 - GitHub issue forms, pull-request template, and dependency-update configuration.
-- Current Android UI screenshots and public repository metadata.
+- A five-screen Android emulator gallery and public repository metadata.
 
 ### Changed
 
-- README reworked as a public project landing page.
+- README reworked as a screenshot-led, first-person project story with a clearer try-it path.
 - GitHub Actions upgraded to current supported action majors.
 
 ## [0.2.1] - 2026-10-02

@@ -40,14 +40,19 @@ Alternative titles:
 >
 > I’d especially appreciate feedback on the one-tap flow, permission onboarding, battery behavior on different Android vendors, and whether the analysis language feels appropriately cautious. Please don’t post real location or health exports in public issues.
 
-## Screenshot order
+## Screenshot set
 
-1. `docs/images/apophenia-log.png` — lead image; shows the one-tap idea.
-2. `docs/images/apophenia-settings.png` — shows local-first optional context access.
-3. Optional physical-watch photo only after confirming the pictured build actually runs on that watch.
-4. Optional Patterns screenshot after enough simulated/demo data exists to make the labels understandable.
+These are real captures from the Android debug app running in an emulator:
 
-Do not use a screenshot containing real timestamps, locations, health values, device identifiers, notification content, or observation notes.
+1. `docs/images/apophenia-log.png` — lead image; the one-tap idea is visible immediately.
+2. `docs/images/apophenia-timeline.png` — demo observations and the evidence/type labels.
+3. `docs/images/apophenia-patterns.png` — the honest “insufficient data” state and post-event warning.
+4. `docs/images/apophenia-settings.png` — explicit, optional context access.
+5. `docs/images/apophenia-onboarding.png` — the first-run permission explanation.
+
+Use the first three for a concise gallery. Caption timeline and pattern captures as **emulator demo data**. Add a physical-watch photo only after confirming that the pictured build actually runs on that watch.
+
+Do not use a screenshot containing real locations, health values, device identifiers, notification content, or personal observation notes.
 
 ## Before posting
 
