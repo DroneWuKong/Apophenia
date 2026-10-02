@@ -9,6 +9,9 @@ import com.dronewukong.apophenia.data.ContextSample
 
 class DeviceContextCollector(private val context: Context) {
     fun collect(observationId: Long?, isControl: Boolean): List<ContextSample> {
+        if (HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION) {
+            return SimulationContext.deviceSamples(observationId, isControl)
+        }
         val now = System.currentTimeMillis()
         val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager

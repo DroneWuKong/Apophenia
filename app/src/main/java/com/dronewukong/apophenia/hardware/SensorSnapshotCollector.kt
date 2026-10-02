@@ -61,4 +61,40 @@ object SimulationContext {
             ContextSample(timestampMs=t, observationId=observationId, isControl=isControl, source="simulation", metric="accel_magnitude", value=9.81, unit="m/s2")
         )
     }
+
+    fun deviceSamples(observationId: Long?, isControl: Boolean): List<ContextSample> {
+        val t = System.currentTimeMillis()
+        val phase = ((t / 60_000L) % 60).toDouble()
+        fun sample(metric: String, value: Double, unit: String) = ContextSample(
+            timestampMs = t, observationId = observationId, isControl = isControl,
+            source = "simulation/device", metric = metric, value = value, unit = unit
+        )
+        return listOf(
+            sample("battery_pct", 80.0 - phase / 12.0, "%"),
+            sample("battery_current_ma", -120.0 - phase, "mA"),
+            sample("screen_interactive", 1.0, "bool"),
+            sample("network_type", 2.0, "enum")
+        )
+    }
+
+    fun environmentSamples(observationId: Long?, isControl: Boolean): List<ContextSample> {
+        val t = System.currentTimeMillis()
+        val phase = ((t / 60_000L) % 60).toDouble()
+        fun sample(metric: String, value: Double, unit: String) = ContextSample(
+            timestampMs = t, observationId = observationId, isControl = isControl,
+            source = "simulation/environment", metric = metric, value = value, unit = unit
+        )
+        return listOf(
+            sample("weather_temperature_c", 21.0 + phase / 30.0, "C"),
+            sample("weather_humidity_pct", 45.0 + phase / 10.0, "%"),
+            sample("weather_pressure_hpa", 1008.0 + phase / 20.0, "hPa"),
+            sample("weather_pressure_change_1h", -0.4, "hPa"),
+            sample("weather_pressure_change_3h", -0.9, "hPa"),
+            sample("weather_pressure_change_6h", -1.3, "hPa"),
+            sample("weather_pressure_change_24h", 0.7, "hPa"),
+            sample("weather_wind_kmh", 12.0, "km/h"),
+            sample("weather_precip_mm", 0.0, "mm"),
+            sample("weather_cloud_pct", 35.0, "%")
+        )
+    }
 }

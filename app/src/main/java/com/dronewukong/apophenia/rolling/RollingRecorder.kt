@@ -6,8 +6,11 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.dronewukong.apophenia.R
 import com.dronewukong.apophenia.data.ObservationDb
@@ -22,7 +25,7 @@ import java.util.concurrent.TimeUnit
 object RollingRecorderConfig {
     const val PRE_WINDOW_MS = 30L * 60L * 1000L
     const val POST_WINDOW_MS = 30L * 60L * 1000L
-    const val RETENTION_MS = 50L * 60L * 1000L
+    const val RETENTION_MS = 90L * 60L * 1000L
     const val SENSOR_PERIOD_SEC = 15L
     const val DEVICE_PERIOD_SEC = 60L
 }
@@ -44,7 +47,19 @@ class RollingRecorderService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action ?: ACTION_START) {
             ACTION_STOP -> { RollingRecorderState.setEnabled(this, false); stopSelf(); return START_NOT_STICKY }
-            ACTION_START -> { RollingRecorderState.setEnabled(this, true); startForeground(NOTIFICATION_ID, notification()); startSampling() }
+            ACTION_START -> {
+                val foregroundType = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+                val started = runCatching {
+                    ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(), foregroundType)
+                }.isSuccess
+                if (!started) {
+                    RollingRecorderState.setEnabled(this, false)
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                RollingRecorderState.setEnabled(this, true)
+                startSampling()
+            }
         }
         return START_STICKY
     }
@@ -58,7 +73,9 @@ class RollingRecorderService : Service() {
                 runCatching {
                     val samples = SensorSnapshotCollector(applicationContext).collect(null, false, windowMs = 300)
                         .map { it.copy(source = "buffer/${it.source}", metadata = appendMetadata(it.metadata, "rolling=true")) }
-                    ObservationDb(applicationContext).insertRolling(samples, RollingRecorderConfig.RETENTION_MS)
+                    val db = ObservationDb(applicationContext)
+                    db.insertRolling(samples, RollingRecorderConfig.RETENTION_MS)
+                    db.captureActivePostWindows(System.currentTimeMillis(), RollingRecorderConfig.POST_WINDOW_MS)
                 }
             }, 0, RollingRecorderConfig.SENSOR_PERIOD_SEC, TimeUnit.SECONDS)
         }
@@ -67,7 +84,9 @@ class RollingRecorderService : Service() {
                 runCatching {
                     val samples = DeviceContextCollector(applicationContext).collect(null, false)
                         .map { it.copy(source = "buffer/${it.source}", metadata = appendMetadata(it.metadata, "rolling=true")) }
-                    ObservationDb(applicationContext).insertRolling(samples, RollingRecorderConfig.RETENTION_MS)
+                    val db = ObservationDb(applicationContext)
+                    db.insertRolling(samples, RollingRecorderConfig.RETENTION_MS)
+                    db.captureActivePostWindows(System.currentTimeMillis(), RollingRecorderConfig.POST_WINDOW_MS)
                 }
             }, 0, RollingRecorderConfig.DEVICE_PERIOD_SEC, TimeUnit.SECONDS)
         }
