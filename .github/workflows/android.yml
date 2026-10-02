@@ -13,6 +13,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -22,3 +24,4 @@ jobs:
         with:
           name: apophenia-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
