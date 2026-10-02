@@ -72,4 +72,99 @@ fun ApopheniaScreen(activity: MainActivity) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun PatternsTab(repo:ObservationRepository,refresh:Int){var labels by remember{mutableStateOf<List<Pair<String,Int>>>(emptyList())};var selected by remember{mutableStateOf<String?>(null)};var results by remember{mutableStateOf<List<Pair<String,com.dronewukong.apophenia.correlation.AssociationResult>>>(emptyList())};LaunchedEffect(refresh){labels=withContext(Dispatchers.IO){repo.db().labels()};if(selected==null)selected=labels.firstOrNull()?.first};LaunchedEffect(selected,refresh){val l=selected?:return@LaunchedEffect;results=withContext(Dispatchers.IO){repo.db().metricsForLabel(l).map{m->m to AssociationEngine.compare(repo.db().eventFeatureValues(l,m),repo.db().controlFeatureValues(m))}.sortedByDescending{kotlin.math.abs(it.second.standardizedEffect?:0.0)}}};Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text("Patterns",fontSize=24.sp,fontWeight=FontWeight.SemiBold);Text("Event samples are compared with randomly collected controls. A pattern is evidence to inspect, not proof of cause.",color=MaterialTheme.colorScheme.secondary);if(labels.isEmpty())Text("Log a few events first.")else{var expanded by remember{mutableStateOf(false)};ExposedDropdownMenuBox(expanded=expanded,onExpandedChange={expanded=!expanded}){OutlinedTextField(value=selected.orEmpty(),onValueChange={},readOnly=true,label={Text("Observation")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(expanded)},modifier=Modifier.menuAnchor().fillMaxWidth());ExposedDropdownMenu(expanded=expanded,onDismissRequest={expanded=false}){labels.forEach{(name,count)->DropdownMenuItem(text={Text("$name ($count)")},onClick={selected=name;expanded=false})}}};LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(results){(metric,r)->Card{Column(Modifier.fillMaxWidth().padding(12.dp)){Row{Text(metric.replace('_',' '),fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f));Text(r.strength,fontWeight=FontWeight.Bold)};Text("events ${r.eventCount} · controls ${r.controlCount}",fontSize=12.sp,color=MaterialTheme.colorScheme.secondary);Text(r.summary,fontSize=13.sp,modifier=Modifier.padding(top=4.dp))}}}}}}}
 
-@Composable private fun SettingsTab(activity:MainActivity,repo:ObservationRepository,scope:kotlinx.coroutines.CoroutineScope){var sim by remember{mutableStateOf(HardwareGates.runtimeMode==HardwareGates.RuntimeMode.SIMULATION)};var rolling by remember{mutableStateOf(RollingRecorderState.isEnabled(activity))};var status by remember{mutableStateOf("")};var garminStatus by remember{mutableStateOf(GarminBridge.statusText)};var garminDevice by remember{mutableStateOf(GarminBridge.deviceText)};var rollingSummary by remember{mutableStateOf("No rolling samples yet")};fun refreshRolling(){scope.launch{val s=withContext(Dispatchers.IO){repo.db().rollingStatus()};rollingSummary=if(s.first==0||s.second==null||s.third==null)"No rolling samples yet" else "${s.first} samples · ${"%.1f".format((s.third!!-s.second!!)/60000.0)} min span"}};LaunchedEffect(Unit){refreshRolling()};LazyColumn(Modifier.fillMaxSize().padding(horizontal=20.dp),contentPadding=PaddingValues(vertical=20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text("Settings",fontSize=24.sp,fontWeight=FontWeight.SemiBold)};item{Card{Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Rolling black box",fontWeight=FontWeight.Bold);Text("Keeps a bounded 30-minute pre-event sensor buffer.",fontSize=13.sp,color=MaterialTheme.colorScheme.secondary);Row(verticalAlignment=Alignment.CenterVertically){Switch(checked=rolling,onCheckedChange={enabled->if(enabled)activity.requestNotificationPermission();rolling=enabled;RollingRecorderService.setEnabled(activity,enabled);refreshRolling()});Spacer(Modifier.width(10.dp));Column{Text(if(rolling)"Enabled" else "Off");Text(rollingSummary,fontSize=12.sp,color=MaterialTheme.colorScheme.secondary)}}}};item{Card{Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Garmin Epix Pro (Gen 2)",fontWeight=FontWeight.Bold);Text(garminDevice,fontSize=13.sp);Text(garminStatus,fontSize=12.sp,color=MaterialTheme.colorScheme.secondary);Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={GarminBridge.refresh(activity);garminStatus=GarminBridge.statusText;garminDevice=GarminBridge.deviceText},modifier=Modifier.weight(1f)){Text("Refresh")};Button(onClick={GarminBridge.openWatchLogger(activity);garminStatus=GarminBridge.statusText;garminDevice=GarminBridge.deviceText},modifier=Modifier.weight(1f)){Text("Open logger")}}}};item{Button(onClick={activity.requestLocationPermission()},modifier=Modifier.fillMaxWidth()){Text("Allow location for weather context")}};item{Row(verticalAlignment=Alignment.CenterVertically){Switch(checked=sim,onCheckedChange={enabled->sim=enabled;HardwareGates.setRuntimeMode(activity,if(enabled)HardwareGates.RuntimeMode.SIMULATION else HardwareGates.RuntimeMode.LIVE);GarminBridge.shutdown(activity);GarminBridge.initialize(activity)});Spacer(Modifier.width(10.dp));Text("Simulation mode")}};item{OutlinedButton(onClick={scope.launch{val file=withContext(Dispatchers.IO){ExportManager.exportJson(repo.db(),activity.cacheDir)};status="Exported ${file.name}"}},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.IosShare,null);Spacer(Modifier.width(8.dp));Text("Create JSON export")}};if(status.isNotBlank())item{Text(status)}}}
+@Composable
+private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, scope: kotlinx.coroutines.CoroutineScope) {
+    var sim by remember { mutableStateOf(HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION) }
+    var rolling by remember { mutableStateOf(RollingRecorderState.isEnabled(activity)) }
+    var status by remember { mutableStateOf("") }
+    var garminStatus by remember { mutableStateOf(GarminBridge.statusText) }
+    var garminDevice by remember { mutableStateOf(GarminBridge.deviceText) }
+    var rollingSummary by remember { mutableStateOf("No rolling samples yet") }
+    fun refreshRolling() {
+        scope.launch {
+            val s = withContext(Dispatchers.IO) { repo.db().rollingStatus() }
+            rollingSummary = if (s.first == 0 || s.second == null || s.third == null) "No rolling samples yet"
+                else "${s.first} samples · ${"%.1f".format((s.third!! - s.second!!) / 60000.0)} min span"
+        }
+    }
+    LaunchedEffect(Unit) { refreshRolling() }
+    LazyColumn(
+        Modifier.fillMaxSize().padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { Text("Settings", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
+        item {
+            Card {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Rolling black box", fontWeight = FontWeight.Bold)
+                    Text("Keeps a bounded 30-minute pre-event sensor buffer.", fontSize = 13.sp, color = MaterialTheme.colorScheme.secondary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = rolling, onCheckedChange = { enabled ->
+                            if (enabled) activity.requestNotificationPermission()
+                            rolling = enabled
+                            RollingRecorderService.setEnabled(activity, enabled)
+                            refreshRolling()
+                        })
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(if (rolling) "Enabled" else "Off")
+                            Text(rollingSummary, fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Card {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Garmin Epix Pro (Gen 2)", fontWeight = FontWeight.Bold)
+                    Text(garminDevice, fontSize = 13.sp)
+                    Text(garminStatus, fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            GarminBridge.refresh(activity)
+                            garminStatus = GarminBridge.statusText
+                            garminDevice = GarminBridge.deviceText
+                        }, modifier = Modifier.weight(1f)) { Text("Refresh") }
+                        Button(onClick = {
+                            GarminBridge.openWatchLogger(activity)
+                            garminStatus = GarminBridge.statusText
+                            garminDevice = GarminBridge.deviceText
+                        }, modifier = Modifier.weight(1f)) { Text("Open logger") }
+                    }
+                }
+            }
+        }
+        item {
+            Button(onClick = { activity.requestLocationPermission() }, modifier = Modifier.fillMaxWidth()) {
+                Text("Allow location for weather context")
+            }
+        }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(checked = sim, onCheckedChange = { enabled ->
+                    sim = enabled
+                    HardwareGates.setRuntimeMode(activity, if (enabled) HardwareGates.RuntimeMode.SIMULATION else HardwareGates.RuntimeMode.LIVE)
+                    GarminBridge.shutdown(activity)
+                    GarminBridge.initialize(activity)
+                })
+                Spacer(Modifier.width(10.dp))
+                Text("Simulation mode")
+            }
+        }
+        item {
+            OutlinedButton(onClick = {
+                scope.launch {
+                    val file = withContext(Dispatchers.IO) { ExportManager.exportJson(repo.db(), activity.cacheDir) }
+                    status = "Exported ${file.name}"
+                }
+            }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.IosShare, null)
+                Spacer(Modifier.width(8.dp))
+                Text("Create JSON export")
+            }
+        }
+        if (status.isNotBlank()) item { Text(status) }
+    }
+}

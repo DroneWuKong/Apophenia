@@ -42,4 +42,14 @@ The rolling black-box recorder is user-enabled and bounded. It does not silently
 
 Source is configured as a native Kotlin/Android project. The Garmin companion uses Connect IQ and the Android side uses Garmin's Connect IQ Companion SDK.
 
+On Windows with Garmin SDK Manager, the Epix Pro device definitions, Java 17,
+and a development signing key installed, build all three watch sizes with:
+
+```powershell
+./tools/build-garmin.ps1 -KeyPath C:/path/to/developer_key.der
+```
+
+The command writes `.prg` files and reports SHA-256 hashes under `build/garmin/`.
+Keep the signing key outside this repository.
+
 Hardware validation remains separate from software validation. Do not treat simulator or unit-test results as proof of physical sensor/watch behavior.
