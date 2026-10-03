@@ -29,8 +29,8 @@ UI / widget / tile / external intent / Garmin
              +--------+---------+
                       v
           asynchronous context enrichment
-          phone | device | location | weather
-          Health Connect | Garmin-delivered metrics | optional Octopod/radio aggregates
+          phone | device | location | weather | Wi-Fi/network/presence
+          Health Connect | Garmin metrics | optional Octopod | encrypted Tier-2 contents
                       |
                       v
             labeled context_samples rows
@@ -45,7 +45,7 @@ UI / widget / tile / external intent / Garmin
 | Component | Responsibility |
 | --- | --- |
 | `ObservationRepository` | Timestamp-first logging, pre-window copy, hypothesis routing, enrichment scheduling |
-| `ObservationDb` | SQLite schema, migrations, observations, hypotheses, context, rolling buffer, controls |
+| `ObservationDb` | SQLite schema, migrations, observations, hypotheses, scalar context, isolated encrypted contents, rolling buffer, controls |
 | `RollingRecorderService` | User-enabled foreground lifecycle for bounded rolling capture |
 | `RollingRecorder` | Samples and prunes the rolling scratch buffer |
 | `EventEnrichmentWorker` | Fail-soft instant context enrichment after the observation exists |
@@ -57,7 +57,12 @@ UI / widget / tile / external intent / Garmin
 | `HardwareGates` | Compile/runtime boundary for phone sensors, location, weather, and Garmin |
 | `HealthConnectProvider` | Optional read-only historical wearable context |
 | `HomeContextProvider` | Optional read-only aggregate Home Assistant/SmartThings/Wyze context through Octopod |
-| `RadioContextProvider` | Optional aggregate Wi-Fi, BLE-advertisement, and cellular signal snapshot with identifiers discarded |
+| `BluetoothContextProvider` | Gate-backed BLE snapshot with hashed device addresses and capture-level aggregates |
+| `WifiContextProvider` | Gate-backed Wi-Fi snapshot with hashed BSSIDs, band/RSSI, and capture-level aggregates |
+| `NetworkStateProvider` | Connectivity, carrier/network type, roaming, and available signal state |
+| `PhoneMetadataProvider` | Independent audio, display/interaction, power/thermal, and time/solar scalar snapshots |
+| `AuxiliaryPresenceProvider` | Off-default Wi-Fi Direct group state and NFC adapter-state snapshots |
+| `SensitiveContextProvider` | Deliberately gated notification/calendar/contacts/message metadata encrypted before persistence |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -92,6 +97,12 @@ The watch captures its timestamp and available watch context, then transmits thr
 ### Radio context
 
 Radio context is disabled by default and requires explicit nearby-device and precise-location permission. One capture aggregates the phone-visible Wi-Fi, Bluetooth LE, and cellular environment into counts, band/technology counts, and RSSI summaries. SSIDs, BSSIDs, Bluetooth names/addresses, and cellular identifiers are discarded. The same provider runs for event and control captures, while Android scan throttling and unavailable hardware fail soft. This is not a wideband spectrum analyzer; arbitrary RF requires an external SDR adapter. See [RADIO_CONTEXT.md](RADIO_CONTEXT.md).
+
+The v0.3 split providers supersede that preview aggregate path for event/control enrichment: Bluetooth and Wi-Fi persist only locally keyed identifier hashes, while network state remains non-identifying scalar context. See [BLUETOOTH_CONTEXT.md](BLUETOOTH_CONTEXT.md) and [PHONE_CONTEXT.md](PHONE_CONTEXT.md).
+
+### Tier-2 contents
+
+The app gate and Android permission are independent. When both are present, `SensitiveContextProvider` builds a bounded snapshot, encrypts it with an Android Keystore AES-GCM key, and returns only ciphertext-bearing rows for `sensitive_context`. The standard JSON exporter never queries this table. See [TIER2_CONTENTS.md](TIER2_CONTENTS.md).
 
 ## Statistical boundary
 

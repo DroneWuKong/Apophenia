@@ -77,7 +77,9 @@ The app explains what works without a prompt and lets you review optional access
 - A Garmin Epix Pro (Gen 2) logger with watch timestamps and a bounded offline queue
 - Durable watch receipts: events leave the queue only after Android confirms local storage
 - Optional aggregate home context through an existing Octopod/Home Assistant cluster
-- Optional Wi-Fi/cellular aggregates plus gate-backed Bluetooth LE presence with locally keyed device hashes
+- Gate-backed Wi-Fi and Bluetooth presence with locally keyed identifier hashes, plus network/connectivity state
+- Independent audio-state, display/interaction, power/thermal, time/solar, Wi-Fi Direct, and NFC snapshot gates
+- Deliberate notification, calendar, contacts, and message-metadata gates with encryption before SQLite persistence
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 
@@ -103,7 +105,7 @@ For recorder survival and real Garmin delivery, use the [48-hour physical accept
 | Area | What has actually been verified |
 | --- | --- |
 | Android | JDK 17 build, unit tests, lint, and debug APK pass locally and in GitHub Actions |
-| UI | Two Jetpack Compose smoke tests pass on an API 36 emulator |
+| UI | Three Jetpack Compose smoke tests pass on an API 36 emulator |
 | Permissions | Location, notification, weather, and Health Connect flows were exercised in an emulator |
 | Garmin | All three Epix Pro targets compile with Connect IQ SDK 9.2.0 |
 | Garmin queue | Six native Monkey C tests pass in the 47 mm simulator |
@@ -206,6 +208,8 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Optional Octopod home context](docs/HOME_CONTEXT.md)
 - [Optional radio context](docs/RADIO_CONTEXT.md)
 - [Bluetooth presence channel](docs/BLUETOOTH_CONTEXT.md)
+- [Wi-Fi, network, and auxiliary presence channels](docs/PHONE_CONTEXT.md)
+- [Encrypted Tier-2 content channels](docs/TIER2_CONTENTS.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)

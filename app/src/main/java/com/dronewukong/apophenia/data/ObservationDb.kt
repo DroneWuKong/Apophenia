@@ -8,7 +8,7 @@ import com.dronewukong.apophenia.correlation.TimedCaptureValue
 
 data class ObservationInsertResult(val id: Long, val inserted: Boolean)
 
-class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 4) {
+class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 5) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -34,6 +34,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         createContextTable(db)
         createRollingTable(db)
         createHypothesisTable(db)
+        createSensitiveContextTable(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -57,6 +58,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
             db.execSQL("ALTER TABLE observations ADD COLUMN vibe_rating INTEGER CHECK(vibe_rating BETWEEN 1 AND 5)")
             db.execSQL("ALTER TABLE observations ADD COLUMN egress INTEGER NOT NULL DEFAULT 0 CHECK(egress IN (0,1))")
         }
+        if (oldVersion < 5) createSensitiveContextTable(db)
     }
 
     private fun createObservationIndexes(db: SQLiteDatabase) {
@@ -120,6 +122,26 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         """.trimIndent())
     }
 
+    private fun createSensitiveContextTable(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS sensitive_context(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              timestamp_ms INTEGER NOT NULL,
+              observation_id INTEGER,
+              is_control INTEGER NOT NULL DEFAULT 0 CHECK(is_control IN (0,1)),
+              source TEXT NOT NULL,
+              content_type TEXT NOT NULL,
+              ciphertext_base64 TEXT NOT NULL,
+              iv_base64 TEXT NOT NULL,
+              key_alias TEXT NOT NULL,
+              capture_id TEXT NOT NULL,
+              FOREIGN KEY(observation_id) REFERENCES observations(id) ON DELETE CASCADE
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_sensitive_observation ON sensitive_context(observation_id)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_sensitive_capture ON sensitive_context(capture_id,content_type)")
+    }
+
     fun insertObservation(o: Observation): Long = insertObservationOrGet(o).id
 
     fun insertObservationOrGet(o: Observation): ObservationInsertResult {
@@ -175,6 +197,62 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         writableDatabase.beginTransaction()
         try { samples.forEach { insertContextRow(writableDatabase, it) }; writableDatabase.setTransactionSuccessful() }
         finally { writableDatabase.endTransaction() }
+    }
+
+    fun insertSensitiveContext(records: List<SensitiveContextRecord>) {
+        if (records.isEmpty()) return
+        writableDatabase.beginTransaction()
+        try {
+            records.forEach { record ->
+                writableDatabase.insertOrThrow("sensitive_context", null, ContentValues().apply {
+                    put("timestamp_ms", record.timestampMs)
+                    if (record.observationId == null) putNull("observation_id") else put("observation_id", record.observationId)
+                    put("is_control", if (record.isControl) 1 else 0)
+                    put("source", record.source)
+                    put("content_type", record.contentType)
+                    put("ciphertext_base64", record.ciphertextBase64)
+                    put("iv_base64", record.ivBase64)
+                    put("key_alias", record.keyAlias)
+                    put("capture_id", record.captureId)
+                })
+            }
+            writableDatabase.setTransactionSuccessful()
+        } finally {
+            writableDatabase.endTransaction()
+        }
+    }
+
+    fun sensitiveContextForObservation(observationId: Long): List<SensitiveContextRecord> =
+        querySensitive("observation_id=?", arrayOf(observationId.toString()))
+
+    fun allSensitiveContext(limit: Int = 100_000): List<SensitiveContextRecord> =
+        querySensitive(null, emptyArray(), limit)
+
+    private fun querySensitive(
+        where: String?,
+        args: Array<String>,
+        limit: Int = 100_000
+    ): List<SensitiveContextRecord> {
+        val out = mutableListOf<SensitiveContextRecord>()
+        val clause = where?.let { " WHERE $it" }.orEmpty()
+        readableDatabase.rawQuery(
+            "SELECT id,timestamp_ms,observation_id,is_control,source,content_type,ciphertext_base64,iv_base64,key_alias,capture_id FROM sensitive_context$clause ORDER BY timestamp_ms LIMIT ?",
+            args + limit.toString()
+        ).use { c ->
+            while (c.moveToNext()) out += SensitiveContextRecord(
+                id = c.getLong(0),
+                timestampMs = c.getLong(1),
+                observationId = if (c.isNull(2)) null else c.getLong(2),
+                isControl = c.getInt(3) == 1,
+                source = c.getString(4),
+                contentType = c.getString(5),
+                ciphertextBase64 = c.getString(6),
+                ivBase64 = c.getString(7),
+                keyAlias = c.getString(8),
+                captureId = c.getString(9)
+            )
+        }
+        return out
     }
 
     private fun insertContextRow(db: SQLiteDatabase, s: ContextSample) {
@@ -362,7 +440,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
 
     fun deleteAllData(){
         writableDatabase.beginTransaction()
-        try { writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("observations",null,null); writableDatabase.setTransactionSuccessful() }
+        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("observations",null,null); writableDatabase.setTransactionSuccessful() }
         finally { writableDatabase.endTransaction() }
     }
 

@@ -33,6 +33,21 @@ A scalar measurement with timestamp, source, metric, value and unit. It may be a
 
 `capture_id` groups all values from the same control/event capture window so dense sampling cannot be mistaken for independent observations. `phase` is one of `INSTANT`, `PRE`, `POST`, or `CONTROL`.
 
+Schema v5 adds scalar phone-context metrics for Wi-Fi presence, connectivity/network state, audio routing and volume, display/interaction state, power/thermal state, local time/solar phase, Wi-Fi Direct, and NFC adapter state. Identifying Wi-Fi values use only locally keyed BSSID hashes. Active playback package identity is marked `platform_restricted` because Android's public playback API exposes active configurations but not their owning UID/package.
+
+## Sensitive context
+
+`sensitive_context` is deliberately separate from `context_samples`. A row contains timestamp, optional observation ID, control flag, source, content type, `capture_id`, AES-GCM ciphertext, IV, and a non-secret key alias. Plaintext is encrypted in memory before the database insert. The associated data binds source, content type, and capture ID, so moving ciphertext to a different capture or channel makes authentication fail.
+
+The four current Tier-2 content types are:
+
+- active notification contents visible through Android Notification Access;
+- calendar events overlapping the bounded -12-hour/+36-hour capture window;
+- a contacts phone/email snapshot;
+- six hours of SMS metadata, excluding the message body by this channel's contract.
+
+These rows are captured only when both the deliberate app gate and the corresponding Android access are enabled. The data-only JSON exporter has no query or output field for `sensitive_context`. A later full-evidence exporter must add an explicit, separately confirmed route rather than reusing the ordinary export path.
+
 ## Rolling sample
 `rolling_samples` is a bounded scratch buffer, separate from durable event context. When an event occurs, the relevant window is copied into `context_samples`; old scratch samples are pruned.
 

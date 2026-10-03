@@ -9,7 +9,6 @@ import com.dronewukong.apophenia.data.ObservationDb
 import com.dronewukong.apophenia.data.ObservationKind
 import com.dronewukong.apophenia.data.ObservationStore
 import com.dronewukong.apophenia.environment.EnvironmentProvider
-import com.dronewukong.apophenia.radio.RadioContextSettings
 import com.dronewukong.apophenia.work.EventEnrichmentWorker
 import com.dronewukong.apophenia.work.ControlSampleWorker
 import kotlinx.coroutines.runBlocking
@@ -32,13 +31,14 @@ class SimulationModeTest {
         context = ApplicationProvider.getApplicationContext()
         ObservationStore.resetForTests()
         context.deleteDatabase("apophenia.db")
+        HardwareGates.clearAuthorizationsForTests(context)
         HardwareGates.setRuntimeMode(context, HardwareGates.RuntimeMode.SIMULATION)
     }
 
     @After
     fun tearDown() {
         HardwareGates.setRuntimeMode(context, HardwareGates.RuntimeMode.LIVE)
-        RadioContextSettings.setEnabled(context, false)
+        HardwareGates.clearAuthorizationsForTests(context)
         ObservationStore.resetForTests()
         context.deleteDatabase("apophenia.db")
     }
@@ -59,7 +59,24 @@ class SimulationModeTest {
 
     @Test
     fun simulationUsesTheProductionEnrichmentAndDatabasePipeline() {
-        RadioContextSettings.setEnabled(context, true)
+        listOf(
+            HardwareGates.Gate.LIVE_BLUETOOTH_CAPTURE,
+            HardwareGates.Gate.LIVE_WIFI_CAPTURE,
+            HardwareGates.Gate.LIVE_NETWORK_STATE_CAPTURE,
+            HardwareGates.Gate.LIVE_AUDIO_METADATA_CAPTURE,
+            HardwareGates.Gate.LIVE_DISPLAY_INTERACTION_CAPTURE,
+            HardwareGates.Gate.LIVE_POWER_THERMAL_CAPTURE,
+            HardwareGates.Gate.LIVE_TIME_CONTEXT_CAPTURE,
+            HardwareGates.Gate.LIVE_WIFI_P2P_CAPTURE,
+            HardwareGates.Gate.LIVE_NFC_CAPTURE
+        ).forEach { gate ->
+            HardwareGates.setAuthorized(
+                context,
+                gate,
+                enabled = true,
+                proof = HardwareGates.ConsentProof.SingleConfirmation
+            )
+        }
         val db = ObservationDb(context)
         val id = db.insertObservation(
             Observation(timestampMs = 1234L, kind = ObservationKind.OBSERVATION, label = "Simulation event")
@@ -73,7 +90,15 @@ class SimulationModeTest {
         assertTrue(samples.isNotEmpty())
         assertTrue(samples.all { it.source.startsWith("simulation") })
         assertTrue(samples.any { it.metric == "health_heart_rate_avg_bpm" })
-        assertTrue(samples.any { it.metric == "radio_wifi_ap_count" })
+        assertTrue(samples.any { it.metric == "bt_nearby_count" })
+        assertTrue(samples.any { it.metric == "wifi_visible_count" })
+        assertTrue(samples.any { it.metric == "network_connected" })
+        assertTrue(samples.any { it.metric == "audio_output_device" })
+        assertTrue(samples.any { it.metric == "screen_interactive" })
+        assertTrue(samples.any { it.metric == "battery_level_pct" })
+        assertTrue(samples.any { it.metric == "solar_elevation_deg" })
+        assertTrue(samples.any { it.metric == "wifi_p2p_group_formed" })
+        assertTrue(samples.any { it.metric == "nfc_adapter_enabled" })
         db.close()
     }
 

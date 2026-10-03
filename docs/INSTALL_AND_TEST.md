@@ -35,7 +35,10 @@ Open **Settings**.
 - **Location + weather:** tap **Allow**, accept an Android location choice, then tap **Test**. Expected: a result or a specific network/location error, never a silent button.
 - **Recorder notifications:** tap **Allow**. Expected on Android 13+: the native notification prompt appears.
 - **Health Connect:** tap **Connect**. Expected on supported devices: Android's Health Connect permission UI appears and returns to a connected, partially connected, or denied state.
-- **Radio environment:** turn it on, approve precise location and Nearby devices, then tap **Take test snapshot**. Expected: aggregate Wi-Fi/BLE/cellular counts or a specific permission/radio limitation. No network or device identifiers are stored.
+- **Bluetooth presence / Wi-Fi presence:** enable each gate, approve the Android Nearby/location prompts, then take a test snapshot. Expected: counts and RSSI or a specific permission/radio limitation. Raw addresses, names, SSIDs, and BSSIDs are never stored.
+- **Network state:** enable the gate and test basic connectivity. The optional phone-state prompt adds modem signal/type where Android exposes it.
+- **Device circumstances:** enable only the audio/display/power/time/Wi-Fi Direct/NFC rows you want. Foreground-app identity additionally requires Android Usage Access; without it the channel records an explicit platform gap.
+- **Tier-2 contents:** enablement requires typing the exact enum gate name, then the corresponding Android access. Expected: the gate can remain visibly armed while denied access produces no content rows. Current JSON export must contain no Tier-2 contents.
 
 Basic observation logging must continue when every optional permission is denied.
 

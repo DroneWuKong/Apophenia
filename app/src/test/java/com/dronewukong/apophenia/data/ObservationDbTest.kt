@@ -186,7 +186,7 @@ class ObservationDbTest {
         legacy.close()
 
         db = ObservationDb(context)
-        assertEquals(4, db.readableDatabase.version)
+        assertEquals(5, db.readableDatabase.version)
         assertEquals("Legacy", db.observations().single().label)
         assertEquals(ObservationOrigin.ANDROID, db.observations().single().origin)
     }
@@ -204,19 +204,62 @@ class ObservationDbTest {
         db.insertContext(listOf(sample(490, 1009.2).copy(observationId = observationId, phase = ContextPhase.PRE)))
         db.insertContext(listOf(control(600, 1008.0, "control:export")))
         db.insertHypothesis(Hypothesis(createdAtMs = 700, eventLabel = "Pressure idea", metric = "pressure_hpa"))
+        db.insertSensitiveContext(
+            listOf(
+                SensitiveContextRecord(
+                    timestampMs = 701,
+                    observationId = observationId,
+                    source = "android_tier2",
+                    contentType = "notification_contents",
+                    ciphertextBase64 = "should-never-export",
+                    ivBase64 = "iv",
+                    keyAlias = "alias",
+                    captureId = "event:$observationId:instant"
+                )
+            )
+        )
 
         val outputDirectory = context.cacheDir.resolve("export-test")
         val exported = ExportManager.exportJson(db, outputDirectory)
         val json = JSONObject(exported.readText())
 
-        assertEquals(4, json.getInt("schema"))
+        assertEquals(5, json.getInt("schema"))
         val observation = json.getJSONArray("observations").getJSONObject(0)
         assertEquals(4, observation.getInt("vibeRating"))
         assertFalse(observation.getBoolean("egress"))
         assertEquals("PRE", observation.getJSONArray("context").getJSONObject(0).getString("phase"))
         assertEquals(1, json.getJSONArray("hypotheses").length())
         assertEquals("CONTROL", json.getJSONArray("controls").getJSONObject(0).getString("phase"))
+        assertFalse(json.has("sensitiveContext"))
+        assertFalse(exported.readText().contains("should-never-export"))
         outputDirectory.deleteRecursively()
+    }
+
+    @Test
+    fun tierTwoContentsStayEncryptedInTheirOwnCascadingTable() {
+        val observationId = db.insertObservation(
+            Observation(timestampMs = 800, kind = ObservationKind.OBSERVATION, label = "Protected")
+        )
+        db.insertSensitiveContext(
+            listOf(
+                SensitiveContextRecord(
+                    timestampMs = 801,
+                    observationId = observationId,
+                    source = "simulation/tier2",
+                    contentType = "notification_contents",
+                    ciphertextBase64 = "ciphertext-only",
+                    ivBase64 = "iv-only",
+                    keyAlias = "test",
+                    captureId = "event:$observationId:instant"
+                )
+            )
+        )
+
+        val stored = db.sensitiveContextForObservation(observationId).single()
+        assertEquals("ciphertext-only", stored.ciphertextBase64)
+        assertEquals("notification_contents", stored.contentType)
+        assertTrue(db.deleteObservation(observationId))
+        assertTrue(db.sensitiveContextForObservation(observationId).isEmpty())
     }
 
     private fun sample(timestamp: Long, value: Double) = ContextSample(

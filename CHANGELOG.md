@@ -46,10 +46,15 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - One-tap VIBE controls in the app and a six-option home-screen widget, including the full-width red egress action.
 - App long-press note capture that preserves the initial press timestamp while the optional note is entered.
 - Gate-backed Bluetooth LE snapshots with locally keyed device hashes, coarse advertised class/name categories, per-device RSSI, and capture-level nearby/strongest-signal metrics.
+- Gate-backed Wi-Fi access-point rows with locally keyed BSSID hashes, band/RSSI metadata, and capture-level visible/strongest metrics.
+- Connectivity, carrier, network type, roaming, and available cellular-signal snapshots.
+- Independent audio-state, display/interaction, power/thermal, time/solar, Wi-Fi Direct, and NFC standard-gate collectors.
+- Schema v5 `sensitive_context` storage for notification, calendar, contacts, and message metadata, encrypted with per-install Android Keystore AES-GCM before SQLite insertion.
+- Type-the-exact-name Settings confirmations and separate Android permission/access flows for every Tier-2 content gate.
 
 ### Validation
 
-- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, and export coverage run in the software-only unit suite.
+- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, and simulation-pipeline coverage run in the software-only unit suite.
 
 ## [0.3.0-preview.2] - 2026-10-02
 

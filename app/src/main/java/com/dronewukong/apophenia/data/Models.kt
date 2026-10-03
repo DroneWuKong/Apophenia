@@ -68,6 +68,24 @@ data class ContextSample(
     val phase: ContextPhase = if (isControl) ContextPhase.CONTROL else ContextPhase.INSTANT
 )
 
+/**
+ * Encrypted Tier-2 content. Ciphertext and IV are the only content-bearing fields persisted.
+ * These rows deliberately live outside context_samples so the normal data export cannot include
+ * them by accident.
+ */
+data class SensitiveContextRecord(
+    val id: Long = 0,
+    val timestampMs: Long,
+    val observationId: Long? = null,
+    val isControl: Boolean = false,
+    val source: String,
+    val contentType: String,
+    val ciphertextBase64: String,
+    val ivBase64: String,
+    val keyAlias: String,
+    val captureId: String
+)
+
 data class Hypothesis(
     val id: Long = 0,
     val createdAtMs: Long,

@@ -2,7 +2,7 @@
 
 Apophenia is local-first.
 
-Stored locally: manual observations, phone context, rolling black-box samples, random controls, Garmin event context delivered through the paired-phone companion channel, optional aggregate home-state counts, and optional aggregate radio-environment metrics when explicitly enabled.
+Stored locally: manual observations, phone context, rolling black-box samples, random controls, Garmin event context delivered through the paired-phone companion channel, optional aggregate home-state counts, and explicitly enabled radio/presence metrics. Deliberately enabled notification, calendar, contacts, and message-metadata contents are encrypted before entering their separate SQLite table.
 
 Optional Health Connect reads are permission-gated and fail-soft. When authorized, Apophenia may read recent heart rate, resting heart rate, sleep, steps, SpO2, and exercise duration. The app does not write Health Connect records and logging still works when Health Connect is missing, unsupported, denied, or empty.
 
@@ -12,16 +12,18 @@ Network use:
 - Open-Meteo only when location permission and the environment gate are enabled. A weather request necessarily sends approximate latitude/longitude and time to that service; the app does not attach an account identity.
 - Garmin communication through the paired-phone Connect IQ companion service.
 - Optional Octopod requests to the user-configured local cluster. Apophenia stores aggregate counts and average temperature only—not entity/person names, camera images, raw audio/video, or Home Assistant/SmartThings/Wyze credentials.
-- Optional on-device radio surveys. The Wi-Fi/cellular aggregate channel stores counts, band or technology counts, and RSSI summaries while discarding SSIDs, BSSIDs, cell IDs, and raw scan rows. The separately gated Bluetooth-presence channel stores a locally keyed hash of each visible address, a coarse advertised class/name category, and RSSI; raw Bluetooth addresses and names are never persisted.
+- Optional on-device radio and presence snapshots. Wi-Fi stores a locally keyed BSSID hash, band/frequency, and RSSI while discarding SSIDs and raw BSSIDs. Bluetooth stores a locally keyed address hash, coarse advertised class/name category, and RSSI while discarding raw addresses and names. Network state stores connectivity, carrier/network type, roaming, and signal where Android exposes them; no cell ID is persisted.
 - Health Connect through Android's local Health Connect provider when explicitly authorized.
 
 Android cloud backup excludes the observation database. Android device-to-device transfer may copy the local database to a replacement device through the operating system's protected transfer mechanism. A user-selected JSON export is outside the app's local boundary once it is handed to another app or destination.
 
 Explicit phone-sensor, location, environment, Garmin, and rolling-recorder boundaries are identifiable in code. Simulation mode bypasses physical hardware while retaining storage and analysis behavior.
 
-Not collected by default: radio surveys, microphone recordings, camera recordings, contacts, message contents, or browsing history.
+Not collected by default: radio/presence channels, microphone recordings, camera recordings, notifications, calendar, contacts, message metadata, or browsing history. Tier-2 gates additionally require typing the exact gate name and granting the separate Android permission or access screen.
 
 JSON export and delete-all controls are available in Settings. Exported files leave the app's local boundary only when the user chooses a share destination.
+
+The current data-only JSON exporter excludes the encrypted `sensitive_context` table by construction. A gate being enabled does not silently add Tier-2 contents to that share. The full-evidence, manifest-preview, and export-audit paths remain future PR steps.
 
 Do not attach an unredacted export to a public issue. Use GitHub's private security-advisory channel for an unintended disclosure or permission bypass.
 

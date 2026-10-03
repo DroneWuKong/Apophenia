@@ -34,11 +34,11 @@ import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import com.dronewukong.apophenia.home.HomeContextProvider
 import com.dronewukong.apophenia.home.HomeContextSettings
+import com.dronewukong.apophenia.network.NetworkStateProvider
 import com.dronewukong.apophenia.rolling.RollingRecorderService
 import com.dronewukong.apophenia.rolling.RollingRecorderHealth
 import com.dronewukong.apophenia.rolling.RollingRecorderState
-import com.dronewukong.apophenia.radio.RadioContextProvider
-import com.dronewukong.apophenia.radio.RadioContextSettings
+import com.dronewukong.apophenia.wifi.WifiContextProvider
 import com.dronewukong.apophenia.work.PromptedCheckInScheduler
 import com.dronewukong.apophenia.work.PromptedCheckInState
 import java.io.File
@@ -663,15 +663,28 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var homeEndpoint by remember { mutableStateOf(HomeContextSettings.endpoint(activity)) }
     var homeStatus by remember { mutableStateOf(if (homeEnabled) "Ready to check" else "Off") }
     var homeChecking by remember { mutableStateOf(false) }
-    var radioEnabled by remember { mutableStateOf(RadioContextSettings.isEnabled(activity)) }
-    var radioAllowed by remember { mutableStateOf(activity.hasRadioPermissions()) }
-    var radioStatus by remember { mutableStateOf(if (radioEnabled) "Ready to scan" else "Off") }
-    var radioChecking by remember { mutableStateOf(false) }
+    var bluetoothAllowed by remember { mutableStateOf(activity.hasBluetoothPermissions()) }
     var bluetoothEnabled by remember {
         mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_BLUETOOTH_CAPTURE))
     }
     var bluetoothStatus by remember { mutableStateOf(if (bluetoothEnabled) "Ready to scan" else "Off") }
     var bluetoothChecking by remember { mutableStateOf(false) }
+    var wifiEnabled by remember {
+        mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_WIFI_CAPTURE))
+    }
+    var wifiAllowed by remember { mutableStateOf(activity.hasWifiPermissions()) }
+    var wifiStatus by remember { mutableStateOf(if (wifiEnabled) "Ready to scan" else "Off") }
+    var wifiChecking by remember { mutableStateOf(false) }
+    var networkEnabled by remember {
+        mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_NETWORK_STATE_CAPTURE))
+    }
+    var networkSignalAllowed by remember { mutableStateOf(activity.hasNetworkSignalPermission()) }
+    var networkStatus by remember { mutableStateOf(if (networkEnabled) "Ready to sample" else "Off") }
+    var networkChecking by remember { mutableStateOf(false) }
+    var gateRevision by remember { mutableIntStateOf(0) }
+    var pendingDeliberateGate by remember { mutableStateOf<HardwareGates.Gate?>(null) }
+    var deliberateGateInput by remember { mutableStateOf("") }
+    var usageAllowed by remember { mutableStateOf(activity.hasUsageAccess()) }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -690,7 +703,10 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     fun refreshPermissionState() {
         locationAllowed = activity.hasLocationPermission()
         notificationsAllowed = activity.hasNotificationPermission()
-        radioAllowed = activity.hasRadioPermissions()
+        bluetoothAllowed = activity.hasBluetoothPermissions()
+        wifiAllowed = activity.hasWifiPermissions()
+        networkSignalAllowed = activity.hasNetworkSignalPermission()
+        usageAllowed = activity.hasUsageAccess()
         scope.launch { healthStatus = withContext(Dispatchers.IO) { HealthConnectAccess.permissionSummary(activity) } }
     }
 
@@ -734,24 +750,6 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         }
     }
 
-    fun testRadioContext() {
-        if (radioChecking) return
-        radioChecking = true
-        radioStatus = "Scanning Wi-Fi and cellular…"
-        scope.launch {
-            val samples = withContext(Dispatchers.IO) { RadioContextProvider(activity).collect(null, false, force = true) }
-            val wifi = samples.firstOrNull { it.metric == "radio_wifi_ap_count" }?.value?.toInt()
-            val cells = samples.firstOrNull { it.metric == "radio_cell_count" }?.value?.toInt()
-            radioStatus = if (samples.isEmpty()) {
-                "No radio data · check Nearby devices, precise location, Bluetooth, and device location"
-            } else {
-                "Snapshot · ${wifi ?: 0} Wi-Fi · ${cells ?: 0} cells"
-            }
-            radioChecking = false
-            onMessage(radioStatus)
-        }
-    }
-
     fun testBluetoothContext() {
         if (bluetoothChecking) return
         bluetoothChecking = true
@@ -769,6 +767,42 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
             bluetoothChecking = false
             onMessage(bluetoothStatus)
+        }
+    }
+
+    fun testWifiContext() {
+        if (wifiChecking) return
+        wifiChecking = true
+        wifiStatus = "Reading the platform Wi-Fi scan snapshot…"
+        scope.launch {
+            val samples = withContext(Dispatchers.IO) { WifiContextProvider(activity).collect(null, false) }
+            val count = samples.firstOrNull { it.metric == "wifi_visible_count" }?.value?.toInt()
+            val strongest = samples.firstOrNull { it.metric == "wifi_rssi_max" }?.value?.toInt()
+            wifiStatus = if (samples.isEmpty()) {
+                "No Wi-Fi data · check gate, location, Nearby Wi-Fi, device location, and scan limits"
+            } else {
+                "Snapshot · ${count ?: 0} access points" + (strongest?.let { " · strongest $it dBm" } ?: "")
+            }
+            wifiChecking = false
+            onMessage(wifiStatus)
+        }
+    }
+
+    fun testNetworkContext() {
+        if (networkChecking) return
+        networkChecking = true
+        networkStatus = "Reading connectivity, carrier, and signal state…"
+        scope.launch {
+            val samples = withContext(Dispatchers.IO) { NetworkStateProvider(activity).collect(null, false) }
+            val connected = samples.firstOrNull { it.metric == "network_connected" }?.value == 1.0
+            val signal = samples.firstOrNull { it.metric == "network_signal_dbm" }?.value?.toInt()
+            networkStatus = if (samples.isEmpty()) {
+                "No network sample · gate or platform access unavailable"
+            } else {
+                (if (connected) "Connected" else "Disconnected") + (signal?.let { " · $it dBm" } ?: " · signal unavailable")
+            }
+            networkChecking = false
+            onMessage(networkStatus)
         }
     }
 
@@ -867,7 +901,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                             )
                             bluetoothEnabled = false
                             bluetoothStatus = "Off"
-                        } else if (simulation || radioAllowed) {
+                        } else if (simulation || bluetoothAllowed) {
                             val result = HardwareGates.setAuthorized(
                                 activity,
                                 HardwareGates.Gate.LIVE_BLUETOOTH_CAPTURE,
@@ -877,8 +911,8 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                             bluetoothEnabled = result == HardwareGates.AuthorizationResult.ENABLED
                             bluetoothStatus = if (bluetoothEnabled) "Enabled · test a snapshot" else "Confirmation rejected"
                         } else {
-                            activity.requestRadioPermissions { granted, message ->
-                                radioAllowed = granted
+                            activity.requestBluetoothPermissions { granted, message ->
+                                bluetoothAllowed = granted
                                 if (granted) {
                                     HardwareGates.setAuthorized(
                                         activity,
@@ -906,9 +940,9 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 )
                 OutlinedButton(
                     onClick = {
-                        if ((simulation || radioAllowed) && bluetoothEnabled) testBluetoothContext()
-                        else activity.requestRadioPermissions { granted, message ->
-                            radioAllowed = granted
+                        if ((simulation || bluetoothAllowed) && bluetoothEnabled) testBluetoothContext()
+                        else activity.requestBluetoothPermissions { granted, message ->
+                            bluetoothAllowed = granted
                             onMessage(message)
                             if (granted && bluetoothEnabled) testBluetoothContext()
                         }
@@ -923,56 +957,200 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
         }
         item {
-            SettingsCard(Icons.Default.CellTower, "Radio environment", "Optional aggregate snapshots from radios this phone exposes.") {
+            SettingsCard(Icons.Default.Wifi, "Wi-Fi presence", "Hashed BSSID presence, band, RSSI, and capture-level counts.") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = radioEnabled, onCheckedChange = { enabled ->
+                    Switch(checked = wifiEnabled, onCheckedChange = { enabled ->
                         if (!enabled) {
-                            radioEnabled = false
-                            RadioContextSettings.setEnabled(activity, false)
-                            radioStatus = "Off"
-                        } else if (radioAllowed) {
-                            radioEnabled = true
-                            RadioContextSettings.setEnabled(activity, true)
-                            radioStatus = "Enabled · test a snapshot"
+                            HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_WIFI_CAPTURE, enabled = false)
+                            wifiEnabled = false
+                            wifiStatus = "Off"
+                        } else if (simulation || wifiAllowed) {
+                            wifiEnabled = HardwareGates.setAuthorized(
+                                activity,
+                                HardwareGates.Gate.LIVE_WIFI_CAPTURE,
+                                enabled = true,
+                                proof = HardwareGates.ConsentProof.SingleConfirmation
+                            ) == HardwareGates.AuthorizationResult.ENABLED
+                            wifiStatus = if (wifiEnabled) "Enabled · test a snapshot" else "Confirmation rejected"
                         } else {
-                            activity.requestRadioPermissions { granted, message ->
-                                radioAllowed = granted
-                                radioEnabled = granted
-                                RadioContextSettings.setEnabled(activity, granted)
-                                radioStatus = if (granted) "Enabled · test a snapshot" else "Permission required"
+                            activity.requestWifiPermissions { granted, message ->
+                                wifiAllowed = granted
+                                if (granted) {
+                                    HardwareGates.setAuthorized(
+                                        activity,
+                                        HardwareGates.Gate.LIVE_WIFI_CAPTURE,
+                                        enabled = true,
+                                        proof = HardwareGates.ConsentProof.SingleConfirmation
+                                    )
+                                }
+                                wifiEnabled = granted
+                                wifiStatus = if (granted) "Enabled · test a snapshot" else "Permission required"
                                 onMessage(message)
                             }
                         }
                     })
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(if (radioEnabled) "Included in events and controls" else "Not collecting", fontWeight = FontWeight.SemiBold)
-                        Text(radioStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                        Text(if (wifiEnabled) "Included in events and controls" else "Not collecting", fontWeight = FontWeight.SemiBold)
+                        Text(wifiStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     }
                 }
                 Text(
-                    "Wi-Fi 2.4/5/6 GHz and cellular technology/signal. Counts and dBm only; identifiers are discarded.",
+                    "Stores a locally keyed BSSID hash, 2.4/5/6 GHz band, frequency, and RSSI. SSID and raw BSSID are never persisted.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
                 OutlinedButton(
                     onClick = {
-                        if (radioAllowed) testRadioContext()
-                        else activity.requestRadioPermissions { granted, message ->
-                            radioAllowed = granted
+                        if ((simulation || wifiAllowed) && wifiEnabled) testWifiContext()
+                        else activity.requestWifiPermissions { granted, message ->
+                            wifiAllowed = granted
                             onMessage(message)
-                            if (granted) testRadioContext()
+                            if (granted && wifiEnabled) testWifiContext()
                         }
                     },
-                    enabled = !radioChecking,
+                    enabled = !wifiChecking && wifiEnabled,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Radar, null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (radioChecking) "Scanning…" else if (radioAllowed) "Take test snapshot" else "Allow and test")
+                    Text(if (wifiChecking) "Scanning…" else "Take test snapshot")
                 }
                 Text(
-                    "This is a radio survey, not a full spectrum analyzer. External SDR hardware is required for arbitrary RF bands.",
+                    "Android may return cached or rate-limited scan results; timestamps describe collection, not guaranteed RF airtime.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
+        }
+        item {
+            SettingsCard(Icons.Default.CellTower, "Network state", "Carrier, network type, roaming, connectivity, and signal when exposed.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = networkEnabled, onCheckedChange = { enabled ->
+                        networkEnabled = if (!enabled) {
+                            HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_NETWORK_STATE_CAPTURE, enabled = false)
+                            false
+                        } else {
+                            HardwareGates.setAuthorized(
+                                activity,
+                                HardwareGates.Gate.LIVE_NETWORK_STATE_CAPTURE,
+                                enabled = true,
+                                proof = HardwareGates.ConsentProof.SingleConfirmation
+                            ) == HardwareGates.AuthorizationResult.ENABLED
+                        }
+                        networkStatus = if (networkEnabled) "Enabled · test a sample" else "Off"
+                    })
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (networkEnabled) "Included in events and controls" else "Not collecting", fontWeight = FontWeight.SemiBold)
+                        Text(networkStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                }
+                Text(
+                    "Basic connectivity needs no extra prompt. Android phone-state access adds cellular network type and signal where the modem exposes them.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { testNetworkContext() },
+                        enabled = !networkChecking && networkEnabled,
+                        modifier = Modifier.weight(1f)
+                    ) { Text(if (networkChecking) "Sampling…" else "Test") }
+                    OutlinedButton(
+                        onClick = {
+                            activity.requestNetworkSignalPermission { granted, message ->
+                                networkSignalAllowed = granted
+                                onMessage(message)
+                            }
+                        },
+                        enabled = !networkSignalAllowed,
+                        modifier = Modifier.weight(1f)
+                    ) { Text(if (networkSignalAllowed) "Signal allowed" else "Allow signal") }
+                }
+            }
+        }
+
+        item { SectionLabel("Phone metadata") }
+        item {
+            SettingsCard(Icons.Default.PhoneAndroid, "Device circumstances", "Independent standard gates; each snapshots only at event/control windows.") {
+                gateRevision
+                listOf(
+                    Triple(HardwareGates.Gate.LIVE_AUDIO_METADATA_CAPTURE, "Audio state", "Outputs, ringer, volume, and active playback count."),
+                    Triple(HardwareGates.Gate.LIVE_DISPLAY_INTERACTION_CAPTURE, "Display + interaction", "Screen, brightness, own notification count, keyboard, and foreground app when Android exposes it."),
+                    Triple(HardwareGates.Gate.LIVE_POWER_THERMAL_CAPTURE, "Power + thermal", "Battery, charging, thermal status, load, and memory pressure."),
+                    Triple(HardwareGates.Gate.LIVE_TIME_CONTEXT_CAPTURE, "Time + solar phase", "Timezone, weekday, day part, and locally computed solar elevation."),
+                    Triple(HardwareGates.Gate.LIVE_WIFI_P2P_CAPTURE, "Wi-Fi Direct", "Hardware and group state; off by default."),
+                    Triple(HardwareGates.Gate.LIVE_NFC_CAPTURE, "NFC state", "Adapter state at the capture window; no background tag polling.")
+                ).forEachIndexed { index, (gate, title, detail) ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                    GateSwitchRow(
+                        title = title,
+                        detail = detail,
+                        enabled = HardwareGates.isAuthorized(activity, gate),
+                        onCheckedChange = { enabled ->
+                            HardwareGates.setAuthorized(
+                                activity,
+                                gate,
+                                enabled,
+                                if (enabled) HardwareGates.ConsentProof.SingleConfirmation else null
+                            )
+                            gateRevision++
+                        }
+                    )
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Foreground app package", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (usageAllowed) "Android Usage Access enabled" else "Platform permission not granted; other display metrics still capture",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
+                    TextButton(onClick = { activity.requestUsageAccess(onMessage) }) {
+                        Text(if (usageAllowed) "Granted" else "Open access")
+                    }
+                }
+            }
+        }
+
+        item { SectionLabel("Encrypted contents") }
+        item {
+            SettingsCard(Icons.Default.EnhancedEncryption, "Tier-2 contents", "Type the exact gate name to enable. Contents are AES-GCM encrypted before SQLite and excluded from data-only export.") {
+                gateRevision
+                listOf(
+                    Triple(HardwareGates.Gate.LIVE_NOTIFICATION_CONTENTS_CAPTURE, "Notification contents", "Active notification text visible to Android Notification Access."),
+                    Triple(HardwareGates.Gate.LIVE_CALENDAR_CONTENTS_CAPTURE, "Calendar contents", "Events overlapping the bounded -12h/+36h capture window."),
+                    Triple(HardwareGates.Gate.LIVE_CONTACTS_CONTENTS_CAPTURE, "Contacts contents", "Full address-book snapshot at the capture window."),
+                    Triple(HardwareGates.Gate.LIVE_MESSAGE_METADATA_CAPTURE, "Message metadata", "Six-hour SMS metadata window; message body is not part of this channel.")
+                ).forEachIndexed { index, (gate, title, detail) ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                    val authorized = HardwareGates.isAuthorized(activity, gate)
+                    val platformAllowed = simulation || activity.hasTier2PlatformAccess(gate)
+                    GateSwitchRow(
+                        title = title,
+                        detail = detail + if (authorized && !platformAllowed) " Android access is still required." else "",
+                        enabled = authorized,
+                        onCheckedChange = { enabled ->
+                            if (!enabled) {
+                                HardwareGates.setAuthorized(activity, gate, false)
+                                gateRevision++
+                            } else {
+                                pendingDeliberateGate = gate
+                                deliberateGateInput = ""
+                            }
+                        },
+                        status = when {
+                            !authorized -> "Off"
+                            platformAllowed -> "Armed"
+                            else -> "Gate on · permission denied"
+                        }
+                    )
+                }
+                Text(
+                    "The ordinary JSON export has no code path to the sensitive_context table. Full-evidence export is added later with its own double confirmation.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
@@ -1066,9 +1244,49 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete all local data?") },
-            text = { Text("This permanently removes observations, hypotheses, controls, rolling samples, and captured context from this device.") },
+            text = { Text("This permanently removes observations, hypotheses, controls, rolling samples, ordinary context, and encrypted Tier-2 contents from this device.") },
             confirmButton = { Button(onClick = { scope.launch { withContext(Dispatchers.IO) { repo.db().deleteAllData() }; confirmDelete = false; onMessage("All local data deleted") } }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
+    }
+
+    pendingDeliberateGate?.let { gate ->
+        AlertDialog(
+            onDismissRequest = { pendingDeliberateGate = null; deliberateGateInput = "" },
+            title = { Text("Enable ${gate.name}?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("This gate captures protected contents at event and control windows and encrypts them on-device before storage.")
+                    OutlinedTextField(
+                        value = deliberateGateInput,
+                        onValueChange = { deliberateGateInput = it },
+                        label = { Text("Type the gate name") },
+                        supportingText = { Text(gate.name) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = deliberateGateInput.trim() == gate.name,
+                    onClick = {
+                        val result = HardwareGates.setAuthorized(
+                            activity,
+                            gate,
+                            enabled = true,
+                            proof = HardwareGates.ConsentProof.TypedGateName(deliberateGateInput)
+                        )
+                        pendingDeliberateGate = null
+                        deliberateGateInput = ""
+                        gateRevision++
+                        if (result == HardwareGates.AuthorizationResult.ENABLED && !simulation) {
+                            activity.requestTier2PlatformAccess(gate) { _, message -> onMessage(message) }
+                        }
+                    }
+                ) { Text("Enable gate") }
+            },
+            dismissButton = { TextButton(onClick = { pendingDeliberateGate = null; deliberateGateInput = "" }) { Text("Cancel") } }
         )
     }
 }
@@ -1103,6 +1321,27 @@ private fun AccessRow(icon: ImageVector, title: String, status: String, ready: B
         }
         if (action != null) TextButton(onClick = onClick, enabled = actionEnabled) { Text(action) }
         else Icon(if (ready) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null, tint = if (ready) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun GateSwitchRow(
+    title: String,
+    detail: String,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    status: String = if (enabled) "Armed" else "Off"
+) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Switch(checked = enabled, onCheckedChange = onCheckedChange)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                StatusPill(status, if (enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        }
     }
 }
 

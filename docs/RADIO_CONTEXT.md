@@ -21,6 +21,6 @@ Bluetooth now has its own explicit gate and persistence contract; see [BLUETOOTH
 
 ## Important limitation
 
-This is a radio survey, not a spectrum analyzer. Android exposes observations made by the phone's Wi-Fi, Bluetooth, and cellular stacks; it does not provide raw arbitrary-frequency power spectra. Capturing other bands or waterfall/IQ data requires an explicitly supported external receiver such as an RTL-SDR or HackRF, ideally through a separately permissioned local observer node.
+This preview aggregate adapter is retained for compatibility tests. Step 4 event/control enrichment uses the split `BluetoothContextProvider`, `WifiContextProvider`, and `NetworkStateProvider` contracts documented in [BLUETOOTH_CONTEXT.md](BLUETOOTH_CONTEXT.md) and [PHONE_CONTEXT.md](PHONE_CONTEXT.md). This is still not a spectrum analyzer: Android does not expose raw arbitrary-frequency power spectra, and external SDR capture remains a later gated implementation step.
 
 Wi-Fi and cellular APIs can return cached or rate-limited results, and Android limits background scans. These metrics are contextual signals, not calibrated RF measurements.
