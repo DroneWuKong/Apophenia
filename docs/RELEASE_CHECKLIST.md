@@ -20,6 +20,7 @@ This checklist prevents software evidence from being presented as hardware evide
 - [ ] Fresh install and upgrade behavior are tested on at least one physical phone.
 - [ ] One-tap logging, timeline, widget, Quick Settings tile, export, and delete are tested physically.
 - [ ] Location, weather, notification, and Health Connect denied/granted states are checked physically where available.
+- [ ] The relevant phone/watch matrix completed `docs/PHYSICAL_ACCEPTANCE.md`, including the 48-hour recorder soak and Garmin offline retry.
 - [ ] Rolling recorder survival and post-event collection are checked under real OEM battery management.
 
 ## Garmin validation

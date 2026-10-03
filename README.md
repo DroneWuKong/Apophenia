@@ -83,8 +83,8 @@ There is no account, advertising SDK, analytics, continuous microphone recording
 
 Apophenia is currently a **development preview**, not a Play Store release.
 
-1. Open the latest successful [Android workflow run](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml).
-2. Download and unzip the `apophenia-debug-apk` artifact.
+1. Prefer the tagged [0.3.0-preview.1 development pre-release](https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.1), or open the latest successful [Android workflow run](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml).
+2. Download `app-debug.apk` from the pre-release, or unzip the workflow's `apophenia-debug-apk` artifact.
 3. Open `app-debug.apk` on an Android 8.0 or newer phone.
 4. Allow installation from the browser or file manager if Android asks.
 5. Start with basic logging, then enable only the optional context you want.
@@ -92,6 +92,7 @@ Apophenia is currently a **development preview**, not a Play Store release.
 GitHub may require a sign-in to download Actions artifacts. Debug signatures can differ between build machines; if Android rejects an update, export anything you need, uninstall the previous debug build, and install the new one.
 
 The [install and test guide](docs/INSTALL_AND_TEST.md) has a short remote-testing checklist and a privacy-safe bug-report template.
+For recorder survival and real Garmin delivery, use the [48-hour physical acceptance checklist](docs/PHYSICAL_ACCEPTANCE.md).
 
 ## What is real today
 
@@ -200,6 +201,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)
 - [Release notes](docs/RELEASE_NOTES_0.2.1.md)
+- [0.3.0 preview release notes](docs/RELEASE_NOTES_0.3.0-preview.1.md)
 
 ## License and disclaimer
 

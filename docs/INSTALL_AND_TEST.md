@@ -53,6 +53,10 @@ Long-duration survival and OEM battery restrictions are physical-device validati
 - Log several observations and wait for control generation.
 - Expected: the normal timeline/database/analysis path works without physical sensor, GPS, weather, Health Connect, or Garmin access.
 
+## Physical soak and watch delivery
+
+For a real phone or Garmin watch, continue with [PHYSICAL_ACCEPTANCE.md](PHYSICAL_ACCEPTANCE.md). It covers the 48-hour foreground-recorder soak, screen-off/OEM battery behavior, pre/post separation, offline Garmin queue replay, duplicate prevention, and evidence to record without sharing private exports.
+
 ### 6. Export and delete
 
 - Export JSON and choose a destination you control.

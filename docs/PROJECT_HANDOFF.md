@@ -10,7 +10,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 
 - Kotlin / Jetpack Compose native Android app
 - package: `com.dronewukong.apophenia`
-- v0.2.1
+- v0.3.0-preview.1
 - Android min SDK 26
 - explicit hardware/simulation gates
 - local SQLite database

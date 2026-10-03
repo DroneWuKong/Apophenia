@@ -28,6 +28,7 @@ import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import com.dronewukong.apophenia.rolling.RollingRecorderService
+import com.dronewukong.apophenia.rolling.RollingRecorderHealth
 import com.dronewukong.apophenia.rolling.RollingRecorderState
 import com.dronewukong.apophenia.work.PromptedCheckInScheduler
 import com.dronewukong.apophenia.work.PromptedCheckInState
@@ -435,9 +436,13 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
 
     fun refreshRolling() {
         scope.launch {
-            val snapshot = withContext(Dispatchers.IO) { repo.db().rollingStatus() }
-            rollingSummary = if (snapshot.first == 0 || snapshot.second == null || snapshot.third == null) "No samples yet"
-            else "${snapshot.first} samples · ${"%.1f".format((snapshot.third!! - snapshot.second!!) / 60000.0)} min"
+            val (snapshot, health) = withContext(Dispatchers.IO) { repo.db().rollingStatus() to RollingRecorderHealth.snapshot(activity) }
+            val buffer = if (snapshot.first == 0 || snapshot.second == null || snapshot.third == null) "No buffered samples"
+            else "${snapshot.first} buffered · ${"%.1f".format((snapshot.third!! - snapshot.second!!) / 60000.0)} min"
+            val heartbeat = if (health.lastSampleAtMs == 0L) "no heartbeat yet"
+            else "last heartbeat ${((System.currentTimeMillis() - health.lastSampleAtMs).coerceAtLeast(0L) / 1000L)}s ago"
+            val failure = health.lastError.takeIf { it.isNotBlank() }?.let { " · last error: $it" }.orEmpty()
+            rollingSummary = "$buffer · $heartbeat · ${health.capturedSampleCount} captured$failure"
         }
     }
 

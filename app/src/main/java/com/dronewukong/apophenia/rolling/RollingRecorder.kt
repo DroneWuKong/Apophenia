@@ -37,6 +37,66 @@ object RollingRecorderState {
     fun setEnabled(context: Context, enabled: Boolean) = context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putBoolean(ENABLED, enabled).apply()
 }
 
+data class RollingRecorderDiagnostics(
+    val lastStartAtMs: Long = 0L,
+    val lastSampleAtMs: Long = 0L,
+    val lastSensorSampleAtMs: Long = 0L,
+    val lastDeviceSampleAtMs: Long = 0L,
+    val capturedSampleCount: Long = 0L,
+    val failureCount: Long = 0L,
+    val lastError: String = ""
+)
+
+object RollingRecorderHealth {
+    private const val PREF = "rolling_recorder_health"
+
+    fun snapshot(context: Context): RollingRecorderDiagnostics {
+        val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+        return RollingRecorderDiagnostics(
+            lastStartAtMs = prefs.getLong("last_start_at", 0L),
+            lastSampleAtMs = prefs.getLong("last_sample_at", 0L),
+            lastSensorSampleAtMs = prefs.getLong("last_sensor_at", 0L),
+            lastDeviceSampleAtMs = prefs.getLong("last_device_at", 0L),
+            capturedSampleCount = prefs.getLong("sample_count", 0L),
+            failureCount = prefs.getLong("failure_count", 0L),
+            lastError = prefs.getString("last_error", "").orEmpty()
+        )
+    }
+
+    @Synchronized
+    fun recordStarted(context: Context, atMs: Long = System.currentTimeMillis()) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
+            .putLong("last_start_at", atMs)
+            .remove("last_error")
+            .apply()
+    }
+
+    @Synchronized
+    fun recordBatch(context: Context, source: String, sampleCount: Int, atMs: Long = System.currentTimeMillis()) {
+        val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putLong("last_sample_at", atMs)
+            .putLong(if (source == "sensor") "last_sensor_at" else "last_device_at", atMs)
+            .putLong("sample_count", prefs.getLong("sample_count", 0L) + sampleCount)
+            .apply()
+    }
+
+    @Synchronized
+    fun recordFailure(context: Context, error: Throwable, atMs: Long = System.currentTimeMillis()) {
+        val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putLong("failure_count", prefs.getLong("failure_count", 0L) + 1L)
+            .putLong("last_failure_at", atMs)
+            .putString("last_error", error.message ?: error.javaClass.simpleName)
+            .apply()
+    }
+
+    @Synchronized
+    fun clear(context: Context) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().clear().commit()
+    }
+}
+
 class RollingRecorderService : Service() {
     private val scheduler = Executors.newScheduledThreadPool(1)
     private var sensorTask: ScheduledFuture<*>? = null
@@ -53,11 +113,13 @@ class RollingRecorderService : Service() {
                     ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(), foregroundType)
                 }.isSuccess
                 if (!started) {
+                    RollingRecorderHealth.recordFailure(this, IllegalStateException("Android refused foreground recorder startup"))
                     RollingRecorderState.setEnabled(this, false)
                     stopSelf()
                     return START_NOT_STICKY
                 }
                 RollingRecorderState.setEnabled(this, true)
+                RollingRecorderHealth.recordStarted(this)
                 startSampling()
             }
         }
@@ -76,7 +138,9 @@ class RollingRecorderService : Service() {
                     val db = ObservationDb(applicationContext)
                     db.insertRolling(samples, RollingRecorderConfig.RETENTION_MS)
                     db.captureActivePostWindows(System.currentTimeMillis(), RollingRecorderConfig.POST_WINDOW_MS)
-                }
+                    samples.size
+                }.onSuccess { RollingRecorderHealth.recordBatch(applicationContext, "sensor", it) }
+                    .onFailure { RollingRecorderHealth.recordFailure(applicationContext, it) }
             }, 0, RollingRecorderConfig.SENSOR_PERIOD_SEC, TimeUnit.SECONDS)
         }
         if (deviceTask == null || deviceTask?.isCancelled == true) {
@@ -87,7 +151,9 @@ class RollingRecorderService : Service() {
                     val db = ObservationDb(applicationContext)
                     db.insertRolling(samples, RollingRecorderConfig.RETENTION_MS)
                     db.captureActivePostWindows(System.currentTimeMillis(), RollingRecorderConfig.POST_WINDOW_MS)
-                }
+                    samples.size
+                }.onSuccess { RollingRecorderHealth.recordBatch(applicationContext, "device", it) }
+                    .onFailure { RollingRecorderHealth.recordFailure(applicationContext, it) }
             }, 0, RollingRecorderConfig.DEVICE_PERIOD_SEC, TimeUnit.SECONDS)
         }
     }

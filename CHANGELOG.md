@@ -13,6 +13,7 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - One-to-one control matching by local four-hour block and weekday/weekend.
 - Bootstrap effect intervals plus recorded permutation seed, count, and attainable p-value resolution.
 - Injectable Garmin packet ingest tests covering timestamp preservation, malformed packets, metric attachment, and duplicate retries.
+- Rolling-recorder heartbeat, sample-count, and last-error diagnostics plus a repeatable 48-hour physical acceptance checklist.
 
 ### Changed
 
