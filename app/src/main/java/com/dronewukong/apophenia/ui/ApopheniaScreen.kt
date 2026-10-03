@@ -44,8 +44,15 @@ import com.dronewukong.apophenia.data.*
 import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.export.ExportManager
 import com.dronewukong.apophenia.export.EventReportManager
+import com.dronewukong.apophenia.export.DossierScrubber
+import com.dronewukong.apophenia.export.EjectManager
+import com.dronewukong.apophenia.export.EjectWindow
+import com.dronewukong.apophenia.export.EjectWiper
 import com.dronewukong.apophenia.export.ExportTier
 import com.dronewukong.apophenia.export.PreparedExport
+import com.dronewukong.apophenia.export.ExportManifest
+import com.dronewukong.apophenia.export.ExportManifestEntry
+import com.dronewukong.apophenia.export.ExportReleasePolicy
 import com.dronewukong.apophenia.export.LanDestinationType
 import com.dronewukong.apophenia.export.LanExportManager
 import com.dronewukong.apophenia.export.LanExportSettings
@@ -117,6 +124,8 @@ private data class PendingVibeNote(
 )
 
 private data class PendingRestore(val bundle: File, val inspection: BackupInspection)
+private enum class PendingExportRoute { SHARE, SAF, LAN, EJECT_SAF, EJECT_LAN }
+private data class PendingSealedRelease(val prepared: PreparedExport, val route: PendingExportRoute, val seals: List<EvidenceSeal>)
 
 private val appColors = darkColorScheme(
     background = Color(0xFF090B10),
@@ -932,6 +941,16 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var reportIncludeStills by remember { mutableStateOf(false) }
     var confirmDossierEventId by remember { mutableStateOf<Long?>(null) }
     var confirmReport by remember { mutableStateOf(false) }
+    var evidenceSeals by remember { mutableStateOf<List<EvidenceSeal>>(emptyList()) }
+    var exportAuditLog by remember { mutableStateOf<List<ExportAuditEntry>>(emptyList()) }
+    var pendingUnseal by remember { mutableStateOf<EvidenceSeal?>(null) }
+    var unsealInput by remember { mutableStateOf("") }
+    var pendingSealedRelease by remember { mutableStateOf<PendingSealedRelease?>(null) }
+    var sealedReleaseInput by remember { mutableStateOf("") }
+    var ejectWindow by remember { mutableStateOf(EjectWindow.ALL) }
+    var confirmEjectBuild by remember { mutableStateOf(false) }
+    var pendingEjectRoute by remember { mutableStateOf<PendingExportRoute?>(null) }
+    var ejectConfirmationInput by remember { mutableStateOf("") }
     var pendingMediaScrub by remember { mutableStateOf<Long?>(null) }
     var mediaAssets by remember { mutableStateOf<List<MediaAsset>>(emptyList()) }
     var purgeLedger by remember { mutableStateOf<List<PurgeLedgerEntry>>(emptyList()) }
@@ -1006,6 +1025,17 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         scope.launch {
             reportEvents = withContext(Dispatchers.IO) { ObservationStore.liveRepository(activity).db().observations(20) }
             selectedReportEventIds = selectedReportEventIds.intersect(reportEvents.map { it.id }.toSet())
+        }
+    }
+
+    fun refreshExportSafety() {
+        scope.launch {
+            val snapshot = withContext(Dispatchers.IO) {
+                val db = ObservationStore.liveRepository(activity).db()
+                db.evidenceSeals() to db.exportAuditLog(20)
+            }
+            evidenceSeals = snapshot.first
+            exportAuditLog = snapshot.second
         }
     }
 
@@ -1086,20 +1116,6 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         }
     }
 
-    fun pushLan(prepared: PreparedExport) {
-        if (lanPushBusy) return
-        lanPushBusy = true
-        scope.launch {
-            val result = runCatching { withContext(Dispatchers.IO) { LanExportManager(activity).push(prepared.bundle) } }
-            lanPushBusy = false
-            result.onSuccess {
-                prepared.bundle.delete()
-                pendingExport = null
-                onMessage("LAN push completed · ${it.bytesWritten} bytes · explicit transfer only")
-            }.onFailure { onMessage("LAN push failed; prepared bundle kept locally: ${it.message ?: "unknown error"}") }
-        }
-    }
-
     fun prepareDossier(observationId: Long) {
         if (exportPreparing) return
         exportPreparing = true
@@ -1133,6 +1149,180 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             exportPreparing = false
             result.onSuccess { pendingExport = it }
                 .onFailure { onMessage("Report preparation failed: ${it.message ?: "unknown error"}") }
+        }
+    }
+
+    fun prepareEject() {
+        if (exportPreparing) return
+        if (captureSessionActive()) {
+            onMessage("Disarm AV, drive, flight, and control-link sessions before EJECT")
+            return
+        }
+        exportPreparing = true
+        scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    EjectManager(activity).prepare(
+                        ObservationStore.liveRepository(activity).db(), ejectWindow,
+                        File(activity.cacheDir, "exports")
+                    )
+                }
+            }
+            exportPreparing = false
+            result.onSuccess { pendingExport = it }
+                .onFailure { onMessage("EJECT preparation failed: ${it.message ?: "unknown error"}") }
+        }
+    }
+
+    fun rawPrepared(snapshot: RawDatabaseSnapshot): PreparedExport = PreparedExport(
+        bundle = snapshot.file,
+        bundleSha256 = snapshot.sha256,
+        manifest = ExportManifest(
+            createdAtMs = System.currentTimeMillis(),
+            tier = ExportTier.RAW_SQLITE,
+            schemaVersion = snapshot.schemaVersion,
+            entries = listOf(ExportManifestEntry(snapshot.file.name, snapshot.file.length(), snapshot.sha256))
+        ),
+        includesAllEvidence = true
+    )
+
+    fun clearPrepared(prepared: PreparedExport) {
+        if (prepared.manifest.tier == ExportTier.RAW_SQLITE) pendingRawDatabase = null else pendingExport = null
+    }
+
+    fun recordRoute(
+        prepared: PreparedExport,
+        route: ExportRoute,
+        outcome: ExportOutcome,
+        detail: String
+    ) {
+        ObservationStore.liveRepository(activity).db().let { db -> ExportReleasePolicy.record(db, prepared, route, outcome, detail) }
+    }
+
+    fun performEjectRoute(prepared: PreparedExport, route: PendingExportRoute) {
+        if (captureSessionActive()) {
+            onMessage("EJECT stopped: a capture session became active")
+            return
+        }
+        when (route) {
+            PendingExportRoute.EJECT_SAF -> activity.saveExportWithSaf(prepared.bundle) { success, resultMessage ->
+                if (!success) { onMessage(resultMessage); return@saveExportWithSaf }
+                if (captureSessionActive()) {
+                    scope.launch { withContext(Dispatchers.IO) { recordRoute(prepared, ExportRoute.SAF, ExportOutcome.WRITE_COMPLETED, "SAF stream completed; wipe stopped because capture became active") }; refreshExportSafety() }
+                    onMessage("EJECT wipe stopped after save: a capture session became active; local evidence remains")
+                    return@saveExportWithSaf
+                }
+                scope.launch {
+                    val result = runCatching { withContext(Dispatchers.IO) {
+                        EjectWiper(activity).wipeAfterVerifiedRoute(
+                            ObservationStore.liveRepository(activity).db(), prepared,
+                            ExportRoute.SAF, ExportOutcome.WRITE_COMPLETED, "SAF stream completed byte-for-byte"
+                        )
+                    } }
+                    result.onSuccess {
+                        prepared.bundle.delete(); pendingExport = null; refreshExportSafety()
+                        onMessage("EJECT complete · evidence saved · local evidence wiped · ${it.purgedMediaCount} AV and ${it.deletedRfFileCount} RF files deleted")
+                        activity.recreate()
+                    }.onFailure { onMessage("EJECT evidence-table wipe stopped after save; any successful file purges remain in the purge ledger: ${it.message ?: "unknown error"}") }
+                }
+            }
+            PendingExportRoute.EJECT_LAN -> {
+                if (lanPushBusy) return
+                lanPushBusy = true
+                scope.launch {
+                    val pushed = runCatching { withContext(Dispatchers.IO) { LanExportManager(activity).push(prepared.bundle) } }
+                    lanPushBusy = false
+                    pushed.onSuccess { result ->
+                        if (captureSessionActive()) {
+                            val routeType = if (result.destination == "document-tree") ExportRoute.LAN_DOCUMENT_TREE else ExportRoute.LAN_HTTP
+                            val outcome = if (result.httpStatus == null) ExportOutcome.WRITE_COMPLETED else ExportOutcome.ENDPOINT_ACKNOWLEDGED
+                            withContext(Dispatchers.IO) { recordRoute(prepared, routeType, outcome, "LAN route completed; wipe stopped because capture became active") }
+                            refreshExportSafety()
+                            onMessage("EJECT wipe stopped after LAN transfer: a capture session became active; local evidence remains")
+                            return@onSuccess
+                        }
+                        val routeType = if (result.destination == "document-tree") ExportRoute.LAN_DOCUMENT_TREE else ExportRoute.LAN_HTTP
+                        val outcome = if (result.httpStatus == null) ExportOutcome.WRITE_COMPLETED else ExportOutcome.ENDPOINT_ACKNOWLEDGED
+                        val wipe = runCatching { withContext(Dispatchers.IO) {
+                            EjectWiper(activity).wipeAfterVerifiedRoute(
+                                ObservationStore.liveRepository(activity).db(), prepared, routeType, outcome,
+                                if (result.httpStatus == null) "Document-provider stream completed byte-for-byte" else "HTTP ${result.httpStatus} acknowledged ${result.bytesWritten} bytes"
+                            )
+                        } }
+                        wipe.onSuccess {
+                            prepared.bundle.delete(); pendingExport = null; refreshExportSafety()
+                            onMessage("EJECT complete · LAN route acknowledged · local evidence wiped")
+                            activity.recreate()
+                        }.onFailure { onMessage("EJECT evidence-table wipe stopped after LAN route; any successful file purges remain in the purge ledger: ${it.message ?: "unknown error"}") }
+                    }.onFailure { onMessage("EJECT LAN transfer failed; no local evidence was wiped: ${it.message ?: "unknown error"}") }
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    fun executeRoute(prepared: PreparedExport, route: PendingExportRoute) {
+        if (route == PendingExportRoute.EJECT_SAF || route == PendingExportRoute.EJECT_LAN) {
+            pendingEjectRoute = route
+            ejectConfirmationInput = ""
+            return
+        }
+        when (route) {
+            PendingExportRoute.SHARE -> {
+                activity.shareExports(listOf(prepared.bundle))
+                scope.launch { withContext(Dispatchers.IO) {
+                    recordRoute(prepared, ExportRoute.SHARESHEET, ExportOutcome.HANDOFF_TO_CHOOSER, "Android chooser opened; recipient read/delivery is not observable")
+                }; refreshExportSafety() }
+                clearPrepared(prepared)
+                onMessage("Opened Android sharesheet; audit records chooser handoff, not delivery")
+            }
+            PendingExportRoute.SAF -> activity.saveExportWithSaf(prepared.bundle) { success, resultMessage ->
+                if (success) {
+                    scope.launch { withContext(Dispatchers.IO) {
+                        recordRoute(prepared, ExportRoute.SAF, ExportOutcome.WRITE_COMPLETED, "SAF stream completed byte-for-byte")
+                    }; prepared.bundle.delete(); clearPrepared(prepared); refreshExportSafety() }
+                }
+                onMessage(resultMessage)
+            }
+            PendingExportRoute.LAN -> {
+                if (lanPushBusy) return
+                lanPushBusy = true
+                scope.launch {
+                    val result = runCatching { withContext(Dispatchers.IO) { LanExportManager(activity).push(prepared.bundle) } }
+                    lanPushBusy = false
+                    result.onSuccess {
+                        val routeType = if (it.destination == "document-tree") ExportRoute.LAN_DOCUMENT_TREE else ExportRoute.LAN_HTTP
+                        val outcome = if (it.httpStatus == null) ExportOutcome.WRITE_COMPLETED else ExportOutcome.ENDPOINT_ACKNOWLEDGED
+                        withContext(Dispatchers.IO) { recordRoute(prepared, routeType, outcome, if (it.httpStatus == null) "Document-provider stream completed byte-for-byte" else "HTTP ${it.httpStatus} acknowledged ${it.bytesWritten} bytes") }
+                        prepared.bundle.delete(); clearPrepared(prepared); refreshExportSafety()
+                        onMessage("LAN route completed · audit does not claim destination durability or exactly-once delivery")
+                    }.onFailure { onMessage("LAN push failed; prepared bundle kept locally: ${it.message ?: "unknown error"}") }
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    fun requestRoute(prepared: PreparedExport, route: PendingExportRoute) {
+        val seals = ObservationStore.liveRepository(activity).db().let { ExportReleasePolicy.sealsRequiringRelease(it, prepared) }
+        if (seals.isNotEmpty()) {
+            pendingSealedRelease = PendingSealedRelease(prepared, route, seals)
+            sealedReleaseInput = ""
+        } else executeRoute(prepared, route)
+    }
+
+    fun scrubDossier(prepared: PreparedExport) {
+        if (exportPreparing) return
+        exportPreparing = true
+        scope.launch {
+            val result = runCatching { withContext(Dispatchers.IO) {
+                DossierScrubber.prepareScrubbedCopy(prepared, File(activity.cacheDir, "exports"))
+            } }
+            exportPreparing = false
+            result.onSuccess { scrubbed ->
+                prepared.bundle.delete(); pendingExport = scrubbed
+                onMessage("Scrubbed copy ready · raw AV and Tier-2 plaintext removed")
+            }.onFailure { onMessage("Scrub failed; original preview kept: ${it.message ?: "unknown error"}") }
         }
     }
 
@@ -1335,7 +1525,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     }
 
     LaunchedEffect(permissionRevision) { refreshPermissionState() }
-    LaunchedEffect(Unit) { refreshRolling(); refreshMedia(); refreshDemoSummary(); refreshReportEvents() }
+    LaunchedEffect(Unit) { refreshRolling(); refreshMedia(); refreshDemoSummary(); refreshReportEvents(); refreshExportSafety() }
     LaunchedEffect(demoMode.active) { simulation = HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION; refreshDemoSummary() }
     DisposableEffect(Unit) {
         onDispose { runCatching { audioTrack?.stop() }; audioTrack?.release(); audioTrack = null }
@@ -2417,6 +2607,51 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
         }
         item {
+            SettingsCard(Icons.Default.VerifiedUser, "Evidence seals + export audit", "A seal adds an exact-phrase release step. Audit outcomes distinguish chooser handoff, completed document writes, and endpoint acknowledgement.") {
+                val globalSeal = evidenceSeals.firstOrNull { it.scope == EvidenceSealScope.GLOBAL }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Global evidence seal", fontWeight = FontWeight.SemiBold)
+                        Text(if (globalSeal == null) "Off" else "Sealed since ${DateFormat.getDateTimeInstance().format(Date(globalSeal.sealedAtMs))}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = {
+                        if (globalSeal == null) {
+                            ObservationStore.liveRepository(activity).db().setGlobalSeal(true)
+                            refreshExportSafety(); onMessage("All evidence sealed; release now requires the exact phrase")
+                        } else pendingUnseal = globalSeal
+                    }) { Text(if (globalSeal == null) "Seal all" else "Unseal") }
+                }
+                HorizontalDivider()
+                Text("Recent export log", fontWeight = FontWeight.SemiBold)
+                if (exportAuditLog.isEmpty()) Text("No routes recorded yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                exportAuditLog.take(6).forEach { entry ->
+                    Text("${entry.tier} · ${entry.route.name} · ${entry.outcome.name}\n${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(entry.occurredAtMs))} · ${entry.bundleSha256.take(16)}…", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                HorizontalDivider()
+                Text("EJECT", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                Text("Build verified full evidence for the chosen window, then wipe the entire local evidence store only after a byte-complete SAF write or acknowledged LAN route. Sharesheet is intentionally ineligible.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                EjectWindow.entries.chunked(2).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        row.forEach { window ->
+                            FilterChip(
+                                selected = ejectWindow == window,
+                                onClick = { ejectWindow = window },
+                                label = { Text(window.displayName) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+                Button(
+                    onClick = { if (captureSessionActive()) onMessage("Disarm every capture session before EJECT") else confirmEjectBuild = true },
+                    enabled = !exportPreparing && !demoMode.active,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth()
+                ) { Icon(Icons.Default.Eject, null); Spacer(Modifier.width(8.dp)); Text("EJECT · export then wipe") }
+            }
+        }
+        item {
             SettingsCard(Icons.Default.Description, "Selected-event dossiers + reports", "Dossier: one event with every available channel and raw evidence. Report: selected events as HTML/PDF with honest tiers, gaps, tables, and derived charts.") {
                 if (reportEvents.isEmpty()) {
                     Text("No live events available. Demo fixtures are never eligible.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
@@ -2434,6 +2669,13 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                                 Text(event.label, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                                 Text("#${event.id} · ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(event.timestampMs))}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                            val seal = evidenceSeals.firstOrNull { it.observationId == event.id }
+                            TextButton(onClick = {
+                                if (seal == null) {
+                                    ObservationStore.liveRepository(activity).db().setEventSeal(event.id, true)
+                                    refreshExportSafety(); onMessage("Event #${event.id} sealed")
+                                } else pendingUnseal = seal
+                            }) { Text(if (seal == null) "Seal" else "Unseal") }
                             TextButton(onClick = { confirmDossierEventId = event.id }, enabled = !exportPreparing) { Text("Dossier") }
                         }
                     }
@@ -2530,6 +2772,83 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         )
     }
 
+    if (confirmEjectBuild) {
+        AlertDialog(
+            onDismissRequest = { confirmEjectBuild = false },
+            title = { Text("Prepare EJECT package?") },
+            text = { Text("Confirmation 1. This builds full portable evidence for ${ejectWindow.displayName.lowercase()} and verifies every manifest hash. If you later complete EJECT, the ENTIRE local evidence store is wiped, including evidence outside a partial export window. Capture sessions must remain disarmed. Nothing leaves during this preparation.") },
+            confirmButton = { Button(onClick = { confirmEjectBuild = false; prepareEject() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Build EJECT preview") } },
+            dismissButton = { TextButton(onClick = { confirmEjectBuild = false }) { Text("Cancel") } }
+        )
+    }
+
+    pendingUnseal?.let { seal ->
+        AlertDialog(
+            onDismissRequest = { pendingUnseal = null; unsealInput = "" },
+            title = { Text("Unseal ${seal.label}?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Sealing never blocks an authorized export; it prevents accidental release. Type UNSEAL to remove this extra release step.")
+                    OutlinedTextField(value = unsealInput, onValueChange = { unsealInput = it }, label = { Text("Type UNSEAL") }, singleLine = true)
+                }
+            },
+            confirmButton = {
+                Button(enabled = unsealInput == "UNSEAL", onClick = {
+                    val db = ObservationStore.liveRepository(activity).db()
+                    if (seal.scope == EvidenceSealScope.GLOBAL) db.setGlobalSeal(false) else seal.observationId?.let { db.setEventSeal(it, false) }
+                    pendingUnseal = null; unsealInput = ""; refreshExportSafety(); onMessage("Evidence seal removed")
+                }) { Text("Unseal") }
+            },
+            dismissButton = { TextButton(onClick = { pendingUnseal = null; unsealInput = "" }) { Text("Keep sealed") } }
+        )
+    }
+
+    pendingSealedRelease?.let { pending ->
+        AlertDialog(
+            onDismissRequest = { pendingSealedRelease = null; sealedReleaseInput = "" },
+            title = { Text("Release sealed evidence?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${pending.seals.size} active seal${if (pending.seals.size == 1) " applies" else "s apply"}: ${pending.seals.joinToString { it.label }}.")
+                    Text("Type ${ExportReleasePolicy.RELEASE_PHRASE} exactly. This authorizes only the route currently shown; it does not remove any seal.")
+                    OutlinedTextField(value = sealedReleaseInput, onValueChange = { sealedReleaseInput = it }, label = { Text(ExportReleasePolicy.RELEASE_PHRASE) }, singleLine = true)
+                }
+            },
+            confirmButton = {
+                Button(enabled = sealedReleaseInput == ExportReleasePolicy.RELEASE_PHRASE, onClick = {
+                    val prepared = pending.prepared
+                    val route = pending.route
+                    pendingSealedRelease = null; sealedReleaseInput = ""
+                    executeRoute(prepared, route)
+                }) { Text("Authorize this route") }
+            },
+            dismissButton = { TextButton(onClick = { pendingSealedRelease = null; sealedReleaseInput = "" }) { Text("Cancel") } }
+        )
+    }
+
+    pendingEjectRoute?.let { route ->
+        val prepared = pendingExport?.takeIf { it.manifest.tier == ExportTier.EJECT }
+        if (prepared != null) {
+            AlertDialog(
+                onDismissRequest = { pendingEjectRoute = null; ejectConfirmationInput = "" },
+                title = { Text("Final EJECT confirmation") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Confirmation 2. Android will ${if (route == PendingExportRoute.EJECT_SAF) "save the verified package" else "push the verified package to the configured LAN route"}. Only after that write completes will Apophenia delete all local observations, contexts, protected contents, retained AV/RF, hypotheses, and seals. Export and purge receipts remain locally.", color = MaterialTheme.colorScheme.error)
+                        Text("Type EJECT AND WIPE exactly.")
+                        OutlinedTextField(value = ejectConfirmationInput, onValueChange = { ejectConfirmationInput = it }, label = { Text("EJECT AND WIPE") }, singleLine = true)
+                    }
+                },
+                confirmButton = {
+                    Button(enabled = ejectConfirmationInput == "EJECT AND WIPE", onClick = {
+                        pendingEjectRoute = null; ejectConfirmationInput = ""; performEjectRoute(prepared, route)
+                    }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Continue to route, then wipe") }
+                },
+                dismissButton = { TextButton(onClick = { pendingEjectRoute = null; ejectConfirmationInput = "" }) { Text("Cancel") } }
+            )
+        }
+    }
+
     confirmDossierEventId?.let { eventId ->
         val event = reportEvents.firstOrNull { it.id == eventId }
         AlertDialog(
@@ -2561,7 +2880,9 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                     Text("${manifest.entries.size} payload files · ${formatBytes(manifest.totalBytes)} payload · ${formatBytes(prepared.bundle.length())} ZIP", fontWeight = FontWeight.SemiBold)
                     Text("Raw AV: ${if (manifest.containsRawAv) "YES" else "no"} · Tier-2 contents: ${if (manifest.containsTier2Contents) "YES" else "no"}", color = if (manifest.containsRawAv || manifest.containsTier2Contents) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary)
                     Text("Bundle SHA-256\n${prepared.bundleSha256}", fontSize = 11.sp)
-                    if (manifest.tier != ExportTier.DATA_ONLY) {
+                    if (manifest.tier == ExportTier.EJECT) {
+                        Text("EJECT can route only through byte-complete SAF or an acknowledged LAN write. Opening a sharesheet is not enough to authorize deletion. The final exact-phrase confirmation occurs before the route.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                    } else if (manifest.tier != ExportTier.DATA_ONLY) {
                         Text("Confirmation 2 of 2: choosing Share, Save, or Push LAN below explicitly releases this plaintext ${manifest.tier.displayName.lowercase()} from the app boundary.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                     } else {
                         Text("Data-only excludes raw AV and Tier-2 contents. Hashed identifiers remain exactly as stored.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2579,26 +2900,21 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             },
             confirmButton = {
                 Column(horizontalAlignment = Alignment.End) {
+                    if (manifest.tier == ExportTier.SINGLE_EVENT_DOSSIER && (manifest.containsRawAv || manifest.containsTier2Contents)) {
+                        TextButton(onClick = { scrubDossier(prepared) }, enabled = !exportPreparing) { Text(if (exportPreparing) "Scrubbing…" else "Scrub copy before share") }
+                    }
                     if (lanEnabled && lanConfiguration.type != LanDestinationType.NONE) {
-                        TextButton(onClick = { pushLan(prepared) }, enabled = !lanPushBusy) {
-                            Text(if (lanPushBusy) "Pushing…" else "Push LAN")
+                        TextButton(onClick = { requestRoute(prepared, if (manifest.tier == ExportTier.EJECT) PendingExportRoute.EJECT_LAN else PendingExportRoute.LAN) }, enabled = !lanPushBusy) {
+                            Text(if (lanPushBusy) "Pushing…" else if (manifest.tier == ExportTier.EJECT) "EJECT via LAN" else "Push LAN")
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = {
-                        activity.saveExportWithSaf(prepared.bundle) { success, resultMessage ->
-                            if (success) {
-                                prepared.bundle.delete()
-                                pendingExport = null
-                            }
-                            onMessage(resultMessage)
-                        }
-                    }) { Text("Save as…") }
-                    Button(onClick = {
-                        activity.shareExports(listOf(prepared.bundle))
-                        pendingExport = null
-                        onMessage("Opened Android sharesheet for the verified ${manifest.tier.displayName.lowercase()} bundle")
-                    }) { Text("Share") }
+                    TextButton(onClick = { requestRoute(prepared, if (manifest.tier == ExportTier.EJECT) PendingExportRoute.EJECT_SAF else PendingExportRoute.SAF) }) {
+                        Text(if (manifest.tier == ExportTier.EJECT) "Save + wipe…" else "Save as…")
+                    }
+                    if (manifest.tier != ExportTier.EJECT) {
+                        Button(onClick = { requestRoute(prepared, PendingExportRoute.SHARE) }) { Text("Share") }
+                    }
                     }
                 }
             },
@@ -2607,6 +2923,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     }
 
     pendingRawDatabase?.let { snapshot ->
+        val prepared = rawPrepared(snapshot)
         AlertDialog(
             onDismissRequest = { snapshot.file.delete(); pendingRawDatabase = null },
             title = { Text("Raw SQLite preview") },
@@ -2620,17 +2937,8 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = {
-                        activity.saveExportWithSaf(snapshot.file) { success, resultMessage ->
-                            if (success) { snapshot.file.delete(); pendingRawDatabase = null }
-                            onMessage(resultMessage)
-                        }
-                    }) { Text("Save as…") }
-                    Button(onClick = {
-                        activity.shareExport(snapshot.file)
-                        pendingRawDatabase = null
-                        onMessage("Opened Android sharesheet for the verified SQLite snapshot")
-                    }) { Text("Share") }
+                    TextButton(onClick = { requestRoute(prepared, PendingExportRoute.SAF) }) { Text("Save as…") }
+                    Button(onClick = { requestRoute(prepared, PendingExportRoute.SHARE) }) { Text("Share") }
                 }
             },
             dismissButton = { TextButton(onClick = { snapshot.file.delete(); pendingRawDatabase = null }) { Text("Cancel + delete") } }

@@ -82,7 +82,7 @@ class OmniprobeInspector(
             unmatchedValues = unmatched,
             mediaAssets = media,
             purgeEntries = db.purgeLedger().filter { it.observationId == observation.id },
-            exportState = "Data-only, full-evidence, and restorable-backup ZIPs require verified manifest previews before sharesheet, SAF, or gated LAN release. Raw SQLite snapshots are checkpointed and hash-previewed. Verified restore exists; the durable export-audit ledger remains step 22."
+            exportState = "Every route requires a verified preview. ${db.exportAuditCount()} durable route/wipe audit entries and ${db.evidenceSealCount()} active evidence seals are stored. Sharesheet entries mean chooser handoff only; SAF/LAN outcomes state only what the app could verify."
         )
     }
 

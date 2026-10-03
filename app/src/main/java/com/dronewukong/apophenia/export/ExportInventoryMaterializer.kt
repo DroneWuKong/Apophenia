@@ -16,6 +16,12 @@ class ExportInventoryMaterializer(private val context: Context, private val db: 
         return payloadFor(listOf(observation), "inventories/omniprobe-event-$observationId.json")
     }
 
+    fun payloadForEvents(observationIds: Set<Long>, path: String = "inventories/omniprobe-window.json"): ExportPayload {
+        val observations = db.observations(100_000).filter { it.id in observationIds }
+        require(observations.size == observationIds.size) { "One or more inventory events no longer exist" }
+        return payloadFor(observations, path)
+    }
+
     private fun payloadFor(observations: List<com.dronewukong.apophenia.data.Observation>, path: String): ExportPayload {
         val inspector = OmniprobeInspector(context, db)
         val events = JSONArray()

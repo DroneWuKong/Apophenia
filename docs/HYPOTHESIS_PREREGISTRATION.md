@@ -14,7 +14,7 @@ Free-form legacy hypothesis notes remain supported but are labeled **HYPOTHESIS 
 
 ## Anti-backdating and immutability
 
-When Patterns opens a feature with enough matched event/control captures for a permutation result, schema v9 records that cohort/feature in `analysis_views`. A later attempt to register that exact cohort, metric, and window is refused rather than mislabeled as prior prediction.
+When Patterns opens a feature with enough matched event/control captures for a permutation result, the `analysis_views` ledger introduced in schema v9 records that cohort/feature. A later attempt to register that exact cohort, metric, and window is refused rather than mislabeled as prior prediction.
 
 An earlier valid registration remains editable only until its first eligible evaluation. Recording that evaluation atomically sets `locked_at_ms`. Later data can create another append-only evaluation signature, but the cohort, metric, direction, window, expectation, and original timestamp cannot change. Insufficient data produces no evaluation and does not lock.
 
@@ -30,4 +30,4 @@ An `ANY` registration confirms only when a nonzero direction meets the corrected
 
 ## Validation boundary
 
-JVM tests cover schema v2-to-v9 migration, pre-view insertion, post-view refusal, first-result locking, duplicate-signature rejection, window-to-feature mapping, and all three evaluation outcomes. Emulator tests cover the Compose surfaces. No statistical outcome proves a cause, diagnosis, hardware effect, or field phenomenon.
+JVM tests cover schema v2-to-current migration, pre-view insertion, post-view refusal, first-result locking, duplicate-signature rejection, window-to-feature mapping, and all three evaluation outcomes. Emulator tests cover the Compose surfaces. No statistical outcome proves a cause, diagnosis, hardware effect, or field phenomenon.

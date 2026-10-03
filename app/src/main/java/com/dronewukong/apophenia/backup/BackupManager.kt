@@ -97,7 +97,7 @@ class BackupManager(
             rfDirectory.listFiles()?.filter { it.isFile && it.extension == "iq" }?.sortedBy { it.name }?.forEach { file ->
                 payloads += ExportPayload("rf/${safeToken(file.name)}", file.readBytes())
             }
-            val prepared = ExportManager.preparePayloadBundle(ExportTier.FULL_BACKUP, dir, nowMs, payloads)
+            val prepared = ExportManager.preparePayloadBundle(ExportTier.FULL_BACKUP, dir, nowMs, payloads, includesAllEvidence = true)
             try {
                 val verified = verifyToStaging(prepared.bundle)
                 verified.directory.deleteRecursively()
@@ -404,15 +404,17 @@ class BackupManager(
         private val restoreLock = Any()
         private val requiredTables = setOf(
             "observations", "context_samples", "rolling_samples", "hypotheses", "sensitive_context",
-            "capture_sessions", "session_events", "media_assets", "purge_ledger", "hypothesis_evaluations", "analysis_views"
+            "capture_sessions", "session_events", "media_assets", "purge_ledger", "hypothesis_evaluations", "analysis_views",
+            "evidence_seals", "export_audit_log"
         )
         private val deleteOrder = listOf(
             "sensitive_context", "session_events", "context_samples", "rolling_samples", "hypothesis_evaluations",
-            "analysis_views", "purge_ledger", "media_assets", "hypotheses", "observations", "capture_sessions"
+            "analysis_views", "evidence_seals", "purge_ledger", "media_assets", "hypotheses", "observations", "capture_sessions",
+            "export_audit_log"
         )
         private val insertOrder = listOf(
-            "observations", "hypotheses", "capture_sessions", "context_samples", "rolling_samples", "sensitive_context",
-            "session_events", "media_assets", "hypothesis_evaluations", "analysis_views", "purge_ledger"
+            "observations", "evidence_seals", "hypotheses", "capture_sessions", "context_samples", "rolling_samples", "sensitive_context",
+            "session_events", "media_assets", "hypothesis_evaluations", "analysis_views", "purge_ledger", "export_audit_log"
         )
     }
 }

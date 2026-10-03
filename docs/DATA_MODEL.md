@@ -37,7 +37,7 @@ Omniprobe does not add a duplicate observation table. It projects one event acro
 
 Evidence-mode state is local configuration rather than event evidence: active preset, TOTAL_EVIDENCE flag, activation timestamp, and future microphone pre-buffer duration live in private preferences. The status strip reads gate authorizations and live AV state directly. No preset row is inserted into `context_samples`, and a preset is not evidence that any hardware channel ran.
 
-Demo mode reuses schema v9 in a separate `apophenia-demo.db`. Fixture observations use `origin=SIMULATION` plus versioned `external_event_id`; context and controls use `demo:` capture IDs and `demo_fixture=true` metadata. The separate database, rather than a nullable flag scattered through live queries, prevents synthetic rows from entering live cohorts, sessions, Omniprobe views, or exports.
+Demo mode reuses the current schema v10 in a separate `apophenia-demo.db`. Fixture observations use `origin=SIMULATION` plus versioned `external_event_id`; context and controls use `demo:` capture IDs and `demo_fixture=true` metadata. The separate database, rather than a nullable flag scattered through live queries, prevents synthetic rows from entering live cohorts, sessions, Omniprobe views, or exports.
 
 Schema v9 is also the raw-backup contract. A raw export checkpoints the WAL into one `.db` file and verifies SQLite integrity plus the required table set. A full backup pairs that database with portable protected evidence so device-bound AV/Tier-2 keys can be recreated on restore. See [SCHEMA.md](SCHEMA.md) for the table contract; a successful restore is software persistence evidence, not evidence that any physical channel captured correctly.
 
@@ -127,3 +127,9 @@ Raw MAC addresses, Wi-Fi BSSIDs, adapter/system identifiers, Field-Kit device ID
 ## Dossier and report projections
 
 Single-event dossiers and selected-event reports add no authority tables and do not rewrite stored evidence. They are verified projections of `observations`, `context_samples`, session events, immutable hypothesis evaluations, media inventory, Tier-2 rows where the tier permits them, and current Omniprobe gap accounting. Dossier RF bytes are included only when referenced by the event context and matching its stored SHA-256. Report JSON redacts Tier-2 values; optional retained stills are the only raw-AV report payload. Post-event rows remain visible for reconstruction but are excluded from derived predictor charts.
+
+## Evidence seals and export audit
+
+Schema v10 adds `evidence_seals` and `export_audit_log`. A seal is current confirmation state, keyed globally or to one observation; it is not capture data and does not remove export capability. Audit rows are append-only application events containing the prepared tier/scope/hash/flags and exactly what the route exposed: chooser handoff, byte-complete write, endpoint acknowledgement, or EJECT wipe completion. No row means exactly-once delivery or durable recipient retention.
+
+EJECT clears evidence tables and active seals only after a verified route and retains `purge_ledger` plus `export_audit_log` as receipt-only local state. The transferred package contains audit history only through its preparation timestamp; the just-completed route necessarily occurs afterward.

@@ -96,6 +96,7 @@ class MainActivitySmokeTest {
             "Native Automotive properties",
             "Encrypted evidence media",
             "Octopod observer",
+            "Evidence seals + export audit",
             "Explicit LAN export"
         ).forEach(::scrollSettingsTo)
     }
@@ -158,7 +159,25 @@ class MainActivitySmokeTest {
         compose.waitUntil(timeoutMillis = 15_000) {
             compose.onAllNodesWithText("Raw SQLite preview").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("schema_version 9", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("schema_version 10", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Cancel + delete").performClick()
+    }
+
+    @Test
+    fun sealedExportRequiresDeliberateReleaseBeforeAnyRoute() {
+        dismissContextIntroIfPresent()
+        compose.onNodeWithText("Settings").performClick()
+        scrollSettingsTo("Evidence seals + export audit")
+        compose.onNodeWithText("Seal all").performScrollTo().performClick()
+        scrollSettingsTo("Prepare data-only export")
+        compose.onNodeWithText("Prepare data-only export").performClick()
+        compose.waitUntil(timeoutMillis = 15_000) {
+            compose.onAllNodesWithText("Manifest preview · Data-only").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Share").performClick()
+        compose.onNodeWithText("Release sealed evidence?").assertIsDisplayed()
+        compose.waitUntil { compose.onAllNodesWithText("RELEASE SEALED EVIDENCE", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Cancel").performClick()
         compose.onNodeWithText("Cancel + delete").performClick()
     }
 

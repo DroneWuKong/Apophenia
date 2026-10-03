@@ -82,6 +82,10 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Separately gated, manifest-previewed LAN push to a persisted Android document tree or literal private/link-local HTTP(S) endpoint. SMB/NFS uses the operator-selected DocumentsProvider; optional credentials are Keystore-encrypted, public/DNS destinations and redirects are refused, and no background retry or exactly-once claim is made.
 - Verified single-event dossiers with observation/context/session evidence, per-event Omniprobe inventory, portable retained AV and Tier-2 content, derived charts, and hash-checked referenced RF IQ.
 - Selected-event self-contained HTML and Android-rendered PDF reports with timeline/channel tables, JSON/CSV/SVG companions, optional manifest-labeled AV stills, Tier-2 redaction, and honest stored-result/descriptive tiers.
+- Schema-v10 global/per-event evidence seals with exact-phrase per-route release and deliberate unseal.
+- Durable export audit outcomes that distinguish sharesheet chooser handoff, byte-complete SAF/document-provider writes, local HTTP acknowledgement, and completed EJECT wipe without delivery/durability claims.
+- One-tap dossier scrub copies that remove raw AV and Tier-2 plaintext, preserve protected counts/gaps, and receive a fresh verified manifest.
+- Window-selectable EJECT packages with double confirmation, no sharesheet path, pre-wipe re-verification, capture-session rechecks, AV-key/RF deletion gates, and receipt-only audit/purge retention after the evidence store is cleared.
 - First-class **Egress · bailed** and **Bad vibes · stayed** analysis cohorts, kept separate from ordinary label cohorts.
 - Binary hashed-device presence features for every observed BLE/Wi-Fi identity, with missing channel windows excluded rather than treated as absence.
 - Required multiple-comparisons scope on every result: total features tested, eligible features, Benjamini-Hochberg method, and explicit **indistinguishable from noise** labeling after correction.

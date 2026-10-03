@@ -183,7 +183,9 @@ class MainActivity : ComponentActivity() {
         val result = runCatching {
             val output = contentResolver.openOutputStream(uri, "w")
                 ?: error("Android did not provide a writable destination")
-            ExportRoutes.writeDocument(source, output)
+            val written = ExportRoutes.writeDocument(source, output)
+            require(written == source.length()) { "Destination accepted $written of ${source.length()} bytes" }
+            written
         }
         callback?.invoke(
             result.isSuccess,

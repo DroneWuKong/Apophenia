@@ -7,6 +7,33 @@ enum class CaptureSessionType { DRIVE_SESSION, FLIGHT_SESSION }
 enum class CaptureSessionStatus { ACTIVE, COMPLETED, INTERRUPTED }
 enum class MediaType { AUDIO, VIDEO }
 enum class MediaStatus { ACTIVE, PURGED, MISSING }
+enum class EvidenceSealScope { GLOBAL, EVENT }
+enum class ExportRoute { SHARESHEET, SAF, LAN_DOCUMENT_TREE, LAN_HTTP, EJECT_WIPE }
+enum class ExportOutcome { HANDOFF_TO_CHOOSER, WRITE_COMPLETED, ENDPOINT_ACKNOWLEDGED, WIPE_COMPLETED }
+
+data class EvidenceSeal(
+    val scopeKey: String,
+    val scope: EvidenceSealScope,
+    val observationId: Long?,
+    val sealedAtMs: Long,
+    val label: String
+)
+
+data class ExportAuditEntry(
+    val id: Long = 0,
+    val occurredAtMs: Long,
+    val tier: String,
+    val route: ExportRoute,
+    val outcome: ExportOutcome,
+    val bundleSha256: String,
+    val bundleName: String,
+    val payloadCount: Int,
+    val totalPayloadBytes: Long,
+    val containsRawAv: Boolean,
+    val containsTier2Contents: Boolean,
+    val scope: String,
+    val detail: String
+)
 
 data class MediaAsset(
     val id: String,

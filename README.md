@@ -69,6 +69,7 @@ The app explains what works without a prompt and lets you review optional access
 - Quick logging for observations, headache, sinus/congestion, light, sound, body sensations, coincidences, hypotheses, and custom entries
 - A home-screen widget and Quick Settings tile
 - Local SQLite storage plus manifest-previewed data/full evidence, event dossiers, HTML/PDF reports, checkpointed raw `.db` snapshots, verified restorable backups, and a separately gated one-shot LAN route
+- Global/per-event evidence seals, scrub-before-share dossiers, an honest route audit, and EJECT export-then-wipe limited to verifiable SAF/LAN completion
 - A user-enabled rolling black box with 30 minutes of pre-event context and a labeled post-event window
 - Random control captures that use the same pipeline as event captures, then match one-to-one by local time block and weekday/weekend
 - Optional neutral check-in prompts that let you record “nothing unusual” through the control pipeline
@@ -116,7 +117,7 @@ For recorder survival and real Garmin delivery, use the [48-hour physical accept
 | Area | What has actually been verified |
 | --- | --- |
 | Android | JDK 17 build, unit tests, lint, and debug APK pass locally and in GitHub Actions |
-| UI | Nine Jetpack Compose smoke tests pass on an API 36 emulator, including demo isolation, Omniprobe, export-manifest preview, raw-SQLite preview, and Android PDF report generation |
+| UI | Ten Jetpack Compose smoke tests pass on an API 36 emulator, including demo isolation, Omniprobe, sealed-release enforcement, export-manifest/raw-SQLite previews, and Android PDF report generation |
 | Permissions | Location, notification, weather, and Health Connect flows were exercised in an emulator |
 | Garmin | All three Epix Pro targets compile with Connect IQ SDK 9.2.0 |
 | Garmin queue | Six native Monkey C tests pass in the 47 mm simulator |

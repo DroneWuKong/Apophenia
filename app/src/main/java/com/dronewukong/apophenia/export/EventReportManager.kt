@@ -62,7 +62,7 @@ class EventReportManager(
         payloads += evidenceMaterializer.sensitivePayloads(db.sensitiveContextForObservation(observationId))
         payloads += evidenceMaterializer.mediaPayloads(db.mediaAssets(observationId, includePurged = false, limit = 10_000))
         payloads += rfPayloads(context)
-        return ExportManager.preparePayloadBundle(ExportTier.SINGLE_EVENT_DOSSIER, dir, nowMs, payloads)
+        return ExportManager.preparePayloadBundle(ExportTier.SINGLE_EVENT_DOSSIER, dir, nowMs, payloads, setOf(observationId))
     }
 
     fun prepareReport(
@@ -93,7 +93,7 @@ class EventReportManager(
         stills.forEach { (eventId, jpeg) ->
             payloads += ExportPayload("report/stills/event-$eventId.jpg", jpeg, containsRawAv = true)
         }
-        return ExportManager.preparePayloadBundle(ExportTier.REPORT, dir, nowMs, payloads)
+        return ExportManager.preparePayloadBundle(ExportTier.REPORT, dir, nowMs, payloads, observationIds)
     }
 
     private fun observation(db: ObservationDb, id: Long): Observation = db.observations(100_000).firstOrNull { it.id == id }

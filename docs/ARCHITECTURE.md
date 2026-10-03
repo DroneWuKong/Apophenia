@@ -168,7 +168,7 @@ The current matcher does not control for activity, location, sleep/wake state, o
 
 `OmniprobeInspector` reads one already-persisted observation and joins its `context_samples`, `sensitive_context`, `media_assets`, and `purge_ledger` rows. Channel matching never creates evidence. Stored values win over a later permission or gate-state change because they describe what existed at capture time; absent values use the current gate/capability state only to explain the gap. Unrecognized context rows are rendered separately instead of discarded. See [OMNIPROBE.md](OMNIPROBE.md).
 
-The overlay separately collects the current process-wide AV ring state. It labels that state as live/current rather than attributing it to the historical event. It does not read or invent an export audit table before that schema exists.
+The overlay separately collects the current process-wide AV ring state. It labels that state as live/current rather than attributing it to the historical event. Export status reads the real v10 seal/audit tables.
 
 ## Evidence modes
 
@@ -187,6 +187,8 @@ The overlay separately collects the current process-wide AV ring state. It label
 `LanExportManager` can act only when `LIVE_EXPORT_LAN` is independently authorized and the operator presses **Push LAN** on a prepared manifest. Document-tree output relies on persisted Android provider access; direct HTTP(S) rejects public/DNS destinations and redirects. Optional credentials are Keystore-encrypted. There is no scheduler, retry worker, background uploader, or exactly-once claim.
 
 `EventReportManager` is the event-scoped projection boundary. A dossier combines one observation, its context/session rows, an event-specific Omniprobe inventory, retained protected evidence, and hash-verified referenced RF IQ into the same verified bundle contract. Selected-event report mode produces self-contained HTML, Android `PdfDocument` output, JSON/CSV, and SVG-derived charts. It redacts Tier-2 plaintext and includes raw AV only when retained stills are explicitly requested. Report selection never manufactures a new association result; it reuses immutable stored evaluation wording or labels the output descriptive. See [REPORTS.md](REPORTS.md).
+
+`ExportReleasePolicy` resolves global/event seals against the exact prepared scope and writes bounded route outcomes to `export_audit_log`. `DossierScrubber` creates a new verified artifact rather than mutating the reviewed ZIP. `EjectManager` materializes the chosen window; `EjectWiper` accepts only completed SAF/document-provider writes or a 2xx local HTTP acknowledgement, re-verifies the bundle, serially purges AV and RF, and only then clears evidence tables while preserving audit/purge receipts. A sharesheet handoff can never authorize EJECT.
 
 ## Software-only boundary
 

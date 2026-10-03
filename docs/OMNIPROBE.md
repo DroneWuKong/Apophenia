@@ -34,7 +34,7 @@ The header shows the current audio/video ring state and pending freeze count. Th
 
 The raw-evidence section shows registered media, status, stream, and a live retention countdown or `keep forever`. Event-specific purge-ledger rows remain visible after raw media is deleted and state whether derived metrics survived.
 
-The export section is intentionally bounded to the implementation state. Data-only/full-evidence/full-backup manifests, checkpointed raw SQLite snapshots, verified restore, sharesheet/SAF, and separately gated LAN push exist. The durable audit ledger remains a later step. Omniprobe states that boundary instead of fabricating an empty audit history.
+The export section reports the durable route/wipe audit-entry count and active evidence-seal count. Data-only/full-evidence/full-backup/dossier/report/EJECT manifests, checkpointed raw SQLite snapshots, verified restore, sharesheet/SAF, and separately gated LAN push exist. A sharesheet row remains explicitly a chooser handoff; SAF/LAN rows retain their bounded observable outcome rather than claiming delivery durability.
 
 ## Security boundary
 

@@ -7,6 +7,9 @@ import com.dronewukong.apophenia.data.ObservationDb
 import com.dronewukong.apophenia.data.ObservationKind
 import com.dronewukong.apophenia.data.MediaAsset
 import com.dronewukong.apophenia.data.MediaType
+import com.dronewukong.apophenia.data.ExportAuditEntry
+import com.dronewukong.apophenia.data.ExportOutcome
+import com.dronewukong.apophenia.data.ExportRoute
 import com.dronewukong.apophenia.export.ExportEvidenceMaterializer
 import com.dronewukong.apophenia.export.ExportPayload
 import java.io.File
@@ -56,7 +59,14 @@ class BackupManagerTest {
     @Test
     fun checkpointedBackupInspectsAndRestoresExactSqliteState() {
         db.writableDatabase.enableWriteAheadLogging()
-        db.insertObservation(Observation(timestampMs = 1_000, kind = ObservationKind.WEIRD, label = "Backed up"))
+        val backedUpId = db.insertObservation(Observation(timestampMs = 1_000, kind = ObservationKind.WEIRD, label = "Backed up"))
+        db.setEventSeal(backedUpId, true, 1_100)
+        db.insertExportAudit(ExportAuditEntry(
+            occurredAtMs = 1_200, tier = "DATA_ONLY", route = ExportRoute.SHARESHEET,
+            outcome = ExportOutcome.HANDOFF_TO_CHOOSER, bundleSha256 = "a".repeat(64), bundleName = "earlier.zip",
+            payloadCount = 1, totalPayloadBytes = 10, containsRawAv = false, containsTier2Contents = false,
+            scope = "events:$backedUpId", detail = "chooser opened"
+        ))
         File(context.filesDir, "rf-survey").apply { mkdirs() }.resolve("window.iq").writeBytes(byteArrayOf(9, 8, 7))
         val prepared = manager.prepare(db, output, nowMs = 5_000)
         val inspection = manager.inspect(prepared.bundle)
@@ -72,6 +82,8 @@ class BackupManagerTest {
         assertEquals(1, result.observationCount)
         assertEquals(1, result.restoredRfIqCount)
         assertEquals(listOf("Backed up"), db.observations().map { it.label })
+        assertEquals(listOf(backedUpId), db.evidenceSeals().map { it.observationId })
+        assertEquals(ExportOutcome.HANDOFF_TO_CHOOSER, db.exportAuditLog().single().outcome)
         assertArrayEquals(byteArrayOf(9, 8, 7), File(context.filesDir, "rf-survey/window.iq").readBytes())
     }
 

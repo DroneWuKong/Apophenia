@@ -41,6 +41,7 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
         createCaptureSessionTable(db)
         createSessionEventTable(db)
         createMediaTables(db)
+        createExportSafetyTables(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -81,6 +82,7 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
             createHypothesisEvaluationTable(db)
             createAnalysisViewTable(db)
         }
+        if (oldVersion < 10) createExportSafetyTables(db)
     }
 
     private fun createObservationIndexes(db: SQLiteDatabase) {
@@ -280,6 +282,38 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
         """.trimIndent())
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_purge_time ON purge_ledger(purged_at_ms)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_purge_observation ON purge_ledger(observation_id,purged_at_ms)")
+    }
+
+    private fun createExportSafetyTables(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS evidence_seals(
+              scope_key TEXT PRIMARY KEY,
+              scope TEXT NOT NULL,
+              observation_id INTEGER UNIQUE,
+              sealed_at_ms INTEGER NOT NULL,
+              label TEXT NOT NULL,
+              FOREIGN KEY(observation_id) REFERENCES observations(id) ON DELETE CASCADE
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_evidence_seal_time ON evidence_seals(sealed_at_ms)")
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS export_audit_log(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              occurred_at_ms INTEGER NOT NULL,
+              tier TEXT NOT NULL,
+              route TEXT NOT NULL,
+              outcome TEXT NOT NULL,
+              bundle_sha256 TEXT NOT NULL,
+              bundle_name TEXT NOT NULL,
+              payload_count INTEGER NOT NULL,
+              total_payload_bytes INTEGER NOT NULL,
+              contains_raw_av INTEGER NOT NULL CHECK(contains_raw_av IN (0,1)),
+              contains_tier2_contents INTEGER NOT NULL CHECK(contains_tier2_contents IN (0,1)),
+              scope TEXT NOT NULL,
+              detail TEXT NOT NULL DEFAULT ''
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_export_audit_time ON export_audit_log(occurred_at_ms)")
     }
 
     fun insertObservation(o: Observation): Long = insertObservationOrGet(o).id
@@ -955,11 +989,84 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
         return out
     }
 
+    fun setGlobalSeal(sealed: Boolean, sealedAtMs: Long = System.currentTimeMillis()): Boolean = if (sealed) {
+        writableDatabase.insertWithOnConflict("evidence_seals", null, ContentValues().apply {
+            put("scope_key", GLOBAL_SEAL_KEY); put("scope", EvidenceSealScope.GLOBAL.name); putNull("observation_id")
+            put("sealed_at_ms", sealedAtMs); put("label", "All evidence")
+        }, SQLiteDatabase.CONFLICT_REPLACE) != -1L
+    } else writableDatabase.delete("evidence_seals", "scope_key=?", arrayOf(GLOBAL_SEAL_KEY)) > 0
+
+    fun setEventSeal(observationId: Long, sealed: Boolean, sealedAtMs: Long = System.currentTimeMillis()): Boolean {
+        if (!sealed) return writableDatabase.delete("evidence_seals", "scope_key=?", arrayOf("event:$observationId")) > 0
+        val label = readableDatabase.rawQuery("SELECT label FROM observations WHERE id=?", arrayOf(observationId.toString())).use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        } ?: return false
+        return writableDatabase.insertWithOnConflict("evidence_seals", null, ContentValues().apply {
+            put("scope_key", "event:$observationId"); put("scope", EvidenceSealScope.EVENT.name); put("observation_id", observationId)
+            put("sealed_at_ms", sealedAtMs); put("label", label)
+        }, SQLiteDatabase.CONFLICT_REPLACE) != -1L
+    }
+
+    fun evidenceSeals(): List<EvidenceSeal> {
+        val out = mutableListOf<EvidenceSeal>()
+        readableDatabase.rawQuery(
+            "SELECT scope_key,scope,observation_id,sealed_at_ms,label FROM evidence_seals ORDER BY sealed_at_ms DESC",
+            null
+        ).use { c -> while (c.moveToNext()) out += EvidenceSeal(
+            scopeKey = c.getString(0), scope = EvidenceSealScope.valueOf(c.getString(1)),
+            observationId = if (c.isNull(2)) null else c.getLong(2), sealedAtMs = c.getLong(3), label = c.getString(4)
+        ) }
+        return out
+    }
+
+    fun insertExportAudit(entry: ExportAuditEntry): Long = writableDatabase.insertOrThrow("export_audit_log", null, ContentValues().apply {
+        put("occurred_at_ms", entry.occurredAtMs); put("tier", entry.tier); put("route", entry.route.name); put("outcome", entry.outcome.name)
+        put("bundle_sha256", entry.bundleSha256); put("bundle_name", entry.bundleName); put("payload_count", entry.payloadCount)
+        put("total_payload_bytes", entry.totalPayloadBytes); put("contains_raw_av", if (entry.containsRawAv) 1 else 0)
+        put("contains_tier2_contents", if (entry.containsTier2Contents) 1 else 0); put("scope", entry.scope); put("detail", entry.detail)
+    })
+
+    fun exportAuditLog(limit: Int = 1_000): List<ExportAuditEntry> {
+        val out = mutableListOf<ExportAuditEntry>()
+        readableDatabase.rawQuery(
+            "SELECT id,occurred_at_ms,tier,route,outcome,bundle_sha256,bundle_name,payload_count,total_payload_bytes,contains_raw_av,contains_tier2_contents,scope,detail FROM export_audit_log ORDER BY occurred_at_ms DESC,id DESC LIMIT ?",
+            arrayOf(limit.toString())
+        ).use { c -> while (c.moveToNext()) out += ExportAuditEntry(
+            id = c.getLong(0), occurredAtMs = c.getLong(1), tier = c.getString(2), route = ExportRoute.valueOf(c.getString(3)),
+            outcome = ExportOutcome.valueOf(c.getString(4)), bundleSha256 = c.getString(5), bundleName = c.getString(6),
+            payloadCount = c.getInt(7), totalPayloadBytes = c.getLong(8), containsRawAv = c.getInt(9) == 1,
+            containsTier2Contents = c.getInt(10) == 1, scope = c.getString(11), detail = c.getString(12)
+        ) }
+        return out
+    }
+
+    fun evidenceSealCount(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM evidence_seals", null).use { it.moveToFirst(); it.getInt(0) }
+    fun exportAuditCount(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM export_audit_log", null).use { it.moveToFirst(); it.getInt(0) }
+
+    /** Removes the evidence store after a verified EJECT route while retaining only audit and purge receipts. */
+    fun wipeEvidenceForEject() {
+        writableDatabase.beginTransaction()
+        try {
+            writableDatabase.delete("evidence_seals", null, null)
+            writableDatabase.delete("sensitive_context", null, null)
+            writableDatabase.delete("session_events", null, null)
+            writableDatabase.delete("context_samples", null, null)
+            writableDatabase.delete("rolling_samples", null, null)
+            writableDatabase.delete("hypothesis_evaluations", null, null)
+            writableDatabase.delete("analysis_views", null, null)
+            writableDatabase.delete("media_assets", null, null)
+            writableDatabase.delete("hypotheses", null, null)
+            writableDatabase.delete("observations", null, null)
+            writableDatabase.delete("capture_sessions", null, null)
+            writableDatabase.setTransactionSuccessful()
+        } finally { writableDatabase.endTransaction() }
+    }
+
     fun deleteObservation(id:Long):Boolean = writableDatabase.delete("observations","id=?",arrayOf(id.toString()))>0
 
     fun deleteAllData(){
         writableDatabase.beginTransaction()
-        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("session_events",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypothesis_evaluations",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("analysis_views",null,null); writableDatabase.delete("media_assets",null,null); writableDatabase.delete("purge_ledger",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.setTransactionSuccessful() }
+        try { writableDatabase.delete("evidence_seals",null,null); writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("session_events",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypothesis_evaluations",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("analysis_views",null,null); writableDatabase.delete("media_assets",null,null); writableDatabase.delete("purge_ledger",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.delete("export_audit_log",null,null); writableDatabase.setTransactionSuccessful() }
         finally { writableDatabase.endTransaction() }
     }
 
@@ -975,6 +1082,7 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
     }
 
     companion object {
-        const val SCHEMA_VERSION = 9
+        const val SCHEMA_VERSION = 10
+        private const val GLOBAL_SEAL_KEY = "global"
     }
 }

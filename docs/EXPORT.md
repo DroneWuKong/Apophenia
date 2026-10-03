@@ -43,7 +43,7 @@ The event Keystore keys are deliberately non-exportable Android keys. The full e
 
 ### Raw SQLite snapshot
 
-The raw route creates `apophenia-sqlite-<timestamp>.db`. Before copying, the app runs `PRAGMA wal_checkpoint(FULL)`, refuses a busy checkpoint, copies the main database, reopens the copy read-only, requires `PRAGMA integrity_check=ok`, requires schema version 9, and checks the required table set. The preview shows schema version, row counts, byte size, and SHA-256 before Share or Save. No separate `-wal` file is needed because committed WAL pages were checkpointed into the copied database.
+The raw route creates `apophenia-sqlite-<timestamp>.db`. Before copying, the app runs `PRAGMA wal_checkpoint(FULL)`, refuses a busy checkpoint, copies the main database, reopens the copy read-only, requires `PRAGMA integrity_check=ok`, requires schema version 10, and checks the required table set. The preview shows schema version, row counts, byte size, and SHA-256 before Share or Save. No separate `-wal` file is needed because committed WAL pages were checkpointed into the copied database.
 
 The `.db` contains ciphertext and metadata exactly as stored. It does not contain the app-private AV/RF files and is not, by itself, a complete restore bundle. The stable schema is documented in [SCHEMA.md](SCHEMA.md).
 
@@ -52,7 +52,7 @@ The `.db` contains ciphertext and metadata exactly as stored. It does not contai
 The full backup is a verified outer ZIP containing:
 
 - `database/apophenia.db`, checkpointed and integrity-checked;
-- `database/schema.json`, declaring schema version 9 and the checkpoint contract;
+- `database/schema.json`, declaring schema version 10 and the checkpoint contract;
 - `portable/full-evidence.zip`, a separately verified full-evidence bundle used to recreate device-bound protected data;
 - retained `rf/*.iq` windows present at backup time.
 
@@ -71,6 +71,31 @@ Because retained AV and Tier-2 contents are portable plaintext, preparation requ
 Report mode accepts up to 100 selected live events and creates self-contained HTML plus a real Android-rendered PDF, machine-readable JSON, context CSV, and a derived-metric SVG. It carries the timestamped timeline, channel tables, Omniprobe gaps, honest result tiers, and stored pre-registration evaluations that apply to the selected cohorts. Tier-2 plaintext is redacted. Raw AV is excluded unless the operator explicitly requests retained pre-event stills; any included still is marked in the manifest.
 
 Report selection is not a new causal analysis. When no eligible stored evaluation exists, the output says it is descriptive; small selections use **interesting, not yet established**. See [REPORTS.md](REPORTS.md).
+
+## Evidence seals and scrub-before-share
+
+A global seal applies to every export. A per-event seal applies to dossiers/reports containing that event; all-data bundles and EJECT also honor every event seal. Routing sealed evidence requires typing **RELEASE SEALED EVIDENCE** for that one route. The seal remains active afterward. Removing a seal separately requires typing **UNSEAL**.
+
+An event dossier with raw AV or Tier-2 content offers **Scrub copy before share**. The verified replacement removes raw AV and plaintext Tier-2 payloads, redacts protected values from the Omniprobe inventory while retaining counts/gaps, gets a fresh manifest/hash, and leaves the original local evidence untouched.
+
+## Durable export audit
+
+Every route records what the app can honestly observe: time, tier, route, bundle SHA-256/name, payload count/bytes, AV/Tier-2 flags, scope, and outcome.
+
+- sharesheet: `HANDOFF_TO_CHOOSER`; Android does not prove which recipient read or retained the URI;
+- SAF/document provider: `WRITE_COMPLETED` only after the output stream returns the exact source byte count;
+- direct HTTP LAN: `ENDPOINT_ACKNOWLEDGED` only after the exact request bytes and a 2xx response;
+- EJECT: the route outcome plus a separate `WIPE_COMPLETED` receipt.
+
+None of these outcomes claims destination durability or exactly-once delivery. Omniprobe and Settings show the local log.
+
+## EJECT
+
+EJECT builds a verified full-evidence package for **last hour**, **last 6 hours**, **last 24 hours**, or **all local evidence**. It includes selected observations/context/controls/sessions/hypotheses, Omniprobe inventories, protected contents, retained AV, referenced hash-checked RF IQ, prior purge receipts, seals, and the export log as it existed at preparation time.
+
+Confirmation 1 builds and previews the package. Confirmation 2 requires typing **EJECT AND WIPE** before selecting SAF or using configured LAN. Sharesheet is unavailable because opening a chooser is not proof of a completed transfer. Capture sessions must remain disarmed. Immediately before deletion, the app re-verifies the bundle and then requires every retained AV artifact/key purge and RF-directory deletion to succeed before clearing observations, context, protected contents, hypotheses, sessions, media inventory, and seals. Export and purge receipts remain locally.
+
+Choosing a partial EJECT window still wipes the **entire** local evidence store; the UI states this before preparation and again before routing. The audit entry added after a route cannot be inside the already-transferred package, but remains in the local receipt-only store.
 
 ## Manifest contract
 
@@ -92,10 +117,4 @@ Cancelling a preview deletes the prepared ZIP. A successful SAF copy deletes the
 
 Demo fixtures are structurally excluded: `ExportManager` refuses `apophenia-demo.db`, and the Settings export surface always reads the canonical live database even while the UI is in demo mode.
 
-## Not implemented in this step
-
-The following remain separately reviewable work:
-
-- sealed flags, durable export-audit ledger, and EJECT export-then-wipe (step 22).
-
-Until those steps land, a manifest preview is proof of the prepared bundle's bytes—not proof that a destination retained them, not an export-audit record, and not an exactly-once-delivery claim.
+Inbound share-to-log and Tasker intent hooks remain step 23. A manifest preview proves only the prepared bytes; the audit uses bounded outcome names and never upgrades a handoff/acknowledgement into destination-retention proof.

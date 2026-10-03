@@ -7,7 +7,10 @@ enum class ExportTier(val displayName: String) {
     FULL_EVIDENCE("Full evidence package"),
     FULL_BACKUP("Full backup"),
     SINGLE_EVENT_DOSSIER("Single-event dossier"),
-    REPORT("Selected-event report")
+    SCRUBBED_DOSSIER("Scrubbed event dossier"),
+    REPORT("Selected-event report"),
+    RAW_SQLITE("Raw SQLite snapshot"),
+    EJECT("EJECT evidence package")
 }
 
 data class ExportManifestEntry(
@@ -32,7 +35,9 @@ data class ExportManifest(
 data class PreparedExport(
     val bundle: File,
     val bundleSha256: String,
-    val manifest: ExportManifest
+    val manifest: ExportManifest,
+    val observationIds: Set<Long> = emptySet(),
+    val includesAllEvidence: Boolean = false
 )
 
 data class ExportPayload(

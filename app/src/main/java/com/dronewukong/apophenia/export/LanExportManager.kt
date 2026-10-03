@@ -43,6 +43,7 @@ class LanExportManager(
         ) ?: error("The document provider refused the export file")
         val written = app.contentResolver.openOutputStream(document, "w")?.let { ExportRoutes.writeDocument(bundle, it) }
             ?: error("The document provider did not return a writable stream")
+        require(written == bundle.length()) { "Document provider wrote $written of ${bundle.length()} bytes" }
         return LanPushResult("document-tree", written)
     }
 
@@ -66,10 +67,11 @@ class LanExportManager(
             connection.setRequestProperty("Authorization", "Basic $basic")
         }
         try {
-            connection.outputStream.use { output -> bundle.inputStream().use { it.copyTo(output) } }
+            val written = connection.outputStream.use { output -> bundle.inputStream().use { it.copyTo(output) } }
+            require(written == bundle.length()) { "LAN stream wrote $written of ${bundle.length()} bytes" }
             val status = connection.responseCode
             require(status in 200..299) { "LAN endpoint returned HTTP $status" }
-            return LanPushResult(target.toString(), bundle.length(), status)
+            return LanPushResult(target.toString(), written, status)
         } finally {
             connection.disconnect()
         }

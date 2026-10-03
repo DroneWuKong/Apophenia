@@ -48,14 +48,16 @@ object ExportManager {
             payloads += evidenceMaterializer.mediaPayloads(db.mediaAssets(includePurged = false, limit = 10_000))
             payloads += ExportInventoryMaterializer(context, db).payload()
         }
-        return preparePayloadBundle(tier, dir, nowMs, payloads)
+        return preparePayloadBundle(tier, dir, nowMs, payloads, includesAllEvidence = true)
     }
 
     internal fun preparePayloadBundle(
         tier: ExportTier,
         dir: File,
         nowMs: Long,
-        payloads: MutableList<ExportPayload>
+        payloads: MutableList<ExportPayload>,
+        observationIds: Set<Long> = emptySet(),
+        includesAllEvidence: Boolean = false
     ): PreparedExport {
         dir.mkdirs()
         validatePayloads(payloads)
@@ -87,7 +89,7 @@ object ExportManager {
             check(temporary.renameTo(target)) { "Could not commit prepared export" }
             val verified = verifyBundle(target)
             check(verified == manifest) { "Prepared export manifest changed during verification" }
-            return PreparedExport(target, sha256(target), manifest)
+            return PreparedExport(target, sha256(target), manifest, observationIds, includesAllEvidence)
         } catch (error: Throwable) {
             temporary.delete()
             target.delete()
@@ -204,6 +206,21 @@ object ExportManager {
                     .put("observationId", entry.observationId).put("mediaType", entry.mediaType.name)
                     .put("purgedAtMs", entry.purgedAtMs).put("reason", entry.reason)
                     .put("bytesDeleted", entry.bytesDeleted).put("derivedMetricsRetained", entry.derivedMetricsRetained)
+            )
+        } })
+        root.put("evidenceSeals", JSONArray().also { rows -> db.evidenceSeals().forEach { seal ->
+            rows.put(
+                JSONObject().put("scopeKey", seal.scopeKey).put("scope", seal.scope.name)
+                    .put("observationId", seal.observationId).put("sealedAtMs", seal.sealedAtMs).put("label", seal.label)
+            )
+        } })
+        root.put("exportAuditLog", JSONArray().also { rows -> db.exportAuditLog(100_000).forEach { entry ->
+            rows.put(
+                JSONObject().put("id", entry.id).put("occurredAtMs", entry.occurredAtMs).put("tier", entry.tier)
+                    .put("route", entry.route.name).put("outcome", entry.outcome.name).put("bundleSha256", entry.bundleSha256)
+                    .put("bundleName", entry.bundleName).put("payloadCount", entry.payloadCount)
+                    .put("totalPayloadBytes", entry.totalPayloadBytes).put("containsRawAv", entry.containsRawAv)
+                    .put("containsTier2Contents", entry.containsTier2Contents).put("scope", entry.scope).put("detail", entry.detail)
             )
         } })
         return root
