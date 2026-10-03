@@ -39,6 +39,8 @@ JSON export and delete-all controls are available in Settings. Exported files le
 
 The current data-only JSON exporter excludes the encrypted `sensitive_context` table by construction. A gate being enabled does not silently add Tier-2 contents to that share. The full-evidence, manifest-preview, and export-audit paths remain future PR steps.
 
+Omniprobe is a local inspection surface, not an export route. It may decrypt an event's authorized Tier-2 rows for on-screen review with the existing Keystore key, but it creates no plaintext file and sends nothing. Its raw-AV section is inventory only; playback remains in the memory-only evidence player. The export panel explicitly says that the legacy JSON share has no tiered manifest or audit ledger yet.
+
 Do not attach an unredacted export to a public issue. Use GitHub's private security-advisory channel for an unintended disclosure or permission bypass.
 
 ## Total-capture posture

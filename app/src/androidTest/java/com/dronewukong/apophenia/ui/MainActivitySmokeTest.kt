@@ -98,6 +98,16 @@ class MainActivitySmokeTest {
         compose.onNodeWithText("Expected direction").performScrollTo().assertIsDisplayed()
     }
 
+    @Test
+    fun settingsOpenOmniprobeWithHonestEmptyState() {
+        dismissContextIntroIfPresent()
+        compose.onNodeWithText("Settings").performClick()
+        scrollSettingsTo("Omniprobe")
+        compose.onNodeWithText("Open Omniprobe").performClick()
+        compose.onNodeWithText("Every planned gate, every stored value, every explained gap").assertIsDisplayed()
+        compose.onNodeWithText("No events yet. Log an observation, then return to inspect its circumstances.").assertIsDisplayed()
+    }
+
     private fun dismissContextIntroIfPresent() {
         if (compose.onAllNodesWithText("Not now").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithText("Not now").performClick()

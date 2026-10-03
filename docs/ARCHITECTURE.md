@@ -88,6 +88,7 @@ UI / widget / tile / external intent / Garmin
 | `CallAudioCapability` | Tier-3 jurisdiction/platform gap model; no capture substitution |
 | `MediaRetentionManager` | Contained artifact/key deletion, fixed-deadline expiry, keep-forever, event scrub, anti-resurrection, and purge-ledger writes |
 | `MediaEvidenceReader` | Ciphertext/hash verification plus memory-only PCM or MJPEG decryption for the in-app player |
+| `OmniprobeInspector` | Per-event join across ordinary context, encrypted Tier-2 rows, media inventory, purge history, gate capability, and explicit gap accounting |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -160,6 +161,12 @@ Schema v9 pre-registration binds a timestamp to cohort, exact metric, expected d
 `ConfounderSurfacer` accepts the same one-to-one matched values but allows a single pair. It ranks descriptive normalized differences to suggest context worth checking; it never supplies p-values, corrected evidence, or causal labels. `AssociationEngine` separately emits a plain-language baseline comparison while retaining the technical seed, interval, p-value, resolution, and comparison disclosure. See [PLAIN_LANGUAGE_AND_CONFOUNDERS.md](PLAIN_LANGUAGE_AND_CONFOUNDERS.md).
 
 The current matcher does not control for activity, location, sleep/wake state, or attention. Optional prompted neutral check-ins reduce reliance on passive random times but do not remove self-selection bias.
+
+## Omniprobe accounting boundary
+
+`OmniprobeInspector` reads one already-persisted observation and joins its `context_samples`, `sensitive_context`, `media_assets`, and `purge_ledger` rows. Channel matching never creates evidence. Stored values win over a later permission or gate-state change because they describe what existed at capture time; absent values use the current gate/capability state only to explain the gap. Unrecognized context rows are rendered separately instead of discarded. See [OMNIPROBE.md](OMNIPROBE.md).
+
+The overlay separately collects the current process-wide AV ring state. It labels that state as live/current rather than attributing it to the historical event. It does not read or invent an export audit table before that schema exists.
 
 ## Software-only boundary
 

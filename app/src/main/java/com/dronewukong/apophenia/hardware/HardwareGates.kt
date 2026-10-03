@@ -90,7 +90,9 @@ object HardwareGates {
         HARDWARE_ABSENT,
         LOCKED_BY_STATUTE,
         BUILD_DISABLED,
-        SIMULATION_MODE
+        SIMULATION_MODE,
+        NO_SAMPLE_IN_WINDOW,
+        NO_ACTIVE_SESSION
     }
 
     data class GateStatus(

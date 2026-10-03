@@ -231,6 +231,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Association-engine credibility](docs/ENGINE_CREDIBILITY.md)
 - [Hypothesis pre-registration](docs/HYPOTHESIS_PREREGISTRATION.md)
 - [Plain-language results and confounder surfacing](docs/PLAIN_LANGUAGE_AND_CONFOUNDERS.md)
+- [Omniprobe event inventory](docs/OMNIPROBE.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)

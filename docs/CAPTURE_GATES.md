@@ -10,7 +10,7 @@
 
 Disabling any gate is immediate. All new v0.3 gates default off. The four pre-existing build-backed channels retain their prior defaults for compatibility. `SIMULATION` never reports a live channel as active.
 
-Current gap reasons are `GATE_OFF`, `PERMISSION_DENIED`, `PLATFORM_RESTRICTED`, `HARDWARE_ABSENT`, `LOCKED_BY_STATUTE`, `BUILD_DISABLED`, and `SIMULATION_MODE`. Omniprobe will render these states in its implementation step.
+Current capability gap reasons are `GATE_OFF`, `PERMISSION_DENIED`, `PLATFORM_RESTRICTED`, `HARDWARE_ABSENT`, `LOCKED_BY_STATUTE`, `BUILD_DISABLED`, and `SIMULATION_MODE`. Omniprobe renders them and adds `NO_SAMPLE_IN_WINDOW` plus `NO_ACTIVE_SESSION` for authorized channels whose absence does not prove a capability failure. See [OMNIPROBE.md](OMNIPROBE.md).
 
 ## Tier 1 — standard
 

@@ -899,6 +899,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var videoFrames by remember { mutableStateOf<List<VideoEvidenceFrame>>(emptyList()) }
     var videoFrameIndex by remember { mutableIntStateOf(0) }
     var videoTitle by remember { mutableStateOf("") }
+    var showOmniprobe by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
     fun refreshRolling() {
@@ -2130,6 +2131,13 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
 
         item { SectionLabel("Your data") }
         item {
+            SettingsCard(Icons.Default.Radar, "Omniprobe", "Inspect every planned channel for an event: stored values, capture IDs, explicit gaps, live AV state, retention, and export status.") {
+                OutlinedButton(onClick = { showOmniprobe = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Visibility, null); Spacer(Modifier.width(8.dp)); Text("Open Omniprobe")
+                }
+            }
+        }
+        item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(onClick = {
@@ -2147,6 +2155,10 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 }
             }
         }
+    }
+
+    if (showOmniprobe) {
+        OmniprobeOverlay(activity = activity, db = repo.db(), onDismiss = { showOmniprobe = false })
     }
 
     pendingMediaScrub?.let { observationId ->

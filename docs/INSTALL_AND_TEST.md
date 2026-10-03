@@ -52,6 +52,7 @@ Open **Settings**.
 - **Screen ring:** authorize by exact name, arm, accept Android's MediaProjection dialog, and confirm the second persistent indicator. The consent is per arm. Verify app-switch/display-size behavior physically.
 - **Call audio:** choose the applicable jurisdiction state and run the per-call capability check. The expected current result is either Android platform-restricted or **Locked by statute, not by Apophenia**; no audio should be fabricated.
 - **Encrypted evidence media:** after an AV event finishes, open its event group in Settings. Play audio or review frames, mark the event keep forever, then return it to its original deadline. Scrub the event and confirm raw playback disappears while the purge ledger says derived metrics were kept. No plaintext playback file should appear in app storage.
+- **Omniprobe:** log an event, then open **Settings → Omniprobe**. Expected: all planned gates are listed; captured values show source, phase, and `capture_id`; absent channels show a reason; live AV-ring state is visibly separate from the selected event; raw media shows a retention countdown or keep-forever state; and the export panel says that tiered export/audit is not implemented yet. Do not treat a simulator gap classification as physical permission or hardware proof.
 
 Basic observation logging must continue when every optional permission is denied.
 
