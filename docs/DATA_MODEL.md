@@ -59,6 +59,8 @@ Ground rows use `android_ground`, `local_solar`, or `noaa_swpc`. Pressure is nor
 
 RF survey rows use source `rf_survey` and one event/control `capture_id`. Scalar rows include center frequency, sample rate, bounded IQ byte count, receiver-relative RMS/peak dBFS, and peak offset. Metadata inventories the app-private raw IQ by opaque ID, SHA-256, window, and retention; it does not persist a filesystem path or represent dBFS as calibrated field strength.
 
+Audio-derived rows use source `audio_derived` and `capture_id=event:<id>:audio`. The loudness curve can contain dense one-second rows, but the shared capture ID keeps them one evidence window. Silence ratio, onset count, and descriptive hum/voice/high-frequency/broadband band energy are recorded separately for `PRE` and `POST`. Raw PCM never enters SQLite: an app-private manifest inventories the AES-GCM ciphertext, per-event Keystore alias, IV, sample format, pre/post byte counts, ciphertext SHA-256, and retention deadline. `POST` remains ineligible for predictor calculations.
+
 ## Sensitive context
 
 `sensitive_context` is deliberately separate from `context_samples`. A row contains timestamp, optional observation ID, control flag, source, content type, `capture_id`, AES-GCM ciphertext, IV, and a non-secret key alias. Plaintext is encrypted in memory before the database insert. The associated data binds source, content type, and capture ID, so moving ciphertext to a different capture or channel makes authentication fail.

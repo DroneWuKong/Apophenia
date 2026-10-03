@@ -7,6 +7,7 @@ import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.dronewukong.apophenia.hardware.HardwareGates
+import com.dronewukong.apophenia.audio.AudioRingCaptureManager
 import com.dronewukong.apophenia.rolling.RollingRecorderConfig
 import com.dronewukong.apophenia.work.EventEnrichmentWorker
 import com.dronewukong.apophenia.work.PostEventWindowWorker
@@ -51,6 +52,9 @@ class ObservationRepository(context: Context) {
     }
 
     fun logWithResult(request: ObservationCaptureRequest, onSaved: ((Long, Boolean) -> Unit)? = null) {
+        // Freeze at the user-supplied tap time, before SQLite or WorkManager can add latency.
+        val audioFreeze = if (request.kind == ObservationKind.HYPOTHESIS_NOTE) null
+        else AudioRingCaptureManager.freezeNow(request.timestampMs)
         executor.execute {
             if (request.kind == ObservationKind.HYPOTHESIS_NOTE) {
                 val id = db.insertHypothesis(
@@ -82,9 +86,12 @@ class ObservationRepository(context: Context) {
             )
             val id = insert.id
             if (!insert.inserted) {
+                AudioRingCaptureManager.discard(audioFreeze)
                 if (onSaved != null) main.post { onSaved.invoke(id, false) }
                 return@execute
             }
+
+            AudioRingCaptureManager.attach(audioFreeze, id)
 
             db.copyRollingToObservation(
                 id,

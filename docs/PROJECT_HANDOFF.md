@@ -141,7 +141,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 
 ## Next work
 
-The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Steps 1–9 now cover gates/hashing/VIBE, quick capture, Bluetooth, phone/Tier-2 context, OBD-II drive sessions, native Automotive properties, MAVLink flight sessions, CRSF/GHST, Field-Kit, TAK, ground context, and bounded RTL-SDR survey windows. These are software and simulator results, not physical validation.
+The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Steps 1–10 now cover gates/hashing/VIBE, quick capture, Bluetooth, phone/Tier-2 context, OBD-II drive sessions, native Automotive properties, MAVLink flight sessions, CRSF/GHST, Field-Kit, TAK, ground context, bounded RTL-SDR survey windows, and the microphone evidence ring with derived spectral metrics. These are software and simulator results, not physical validation.
 
 ### Next physical-validation checklist — 3 October 2026
 

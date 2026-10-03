@@ -77,6 +77,9 @@ UI / widget / tile / external intent / Garmin
 | `TakContextProvider` | Bounded CoT multicast window, keyed own-UID filtering, and separately gated full-visible traffic |
 | `GroundContextProvider` | Gate-backed barometer/magnetic/solar snapshot plus cached NOAA Kp/F10.7 observations |
 | `RfSurveyContextProvider` | Tier-3 bounded `rtl_tcp` IQ window, app-private artifact inventory, and receiver-relative spectral summary |
+| `AudioRingCaptureService` | Deliberately armed microphone foreground capture and persistent live indicator |
+| `AudioRingCaptureManager` | Timestamp-first circular freeze, overlapping post windows, encrypted checkpoint/finalization, and derived-row insertion |
+| `AudioArtifactStore` | Per-event Android Keystore AES-GCM raw-audio artifact and opportunistic 14-day pruning |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |

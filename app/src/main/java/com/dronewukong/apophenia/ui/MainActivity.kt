@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
     private var wifiResult: ((Boolean, String) -> Unit)? = null
     private var networkResult: ((Boolean, String) -> Unit)? = null
     private var vehicleBluetoothResult: ((Boolean, String) -> Unit)? = null
+    private var audioResult: ((Boolean, String) -> Unit)? = null
     private var tier2Result: ((Boolean, String) -> Unit)? = null
     private var pendingTier2Gate: HardwareGates.Gate? = null
     private var healthResult: ((String) -> Unit)? = null
@@ -111,6 +112,15 @@ class MainActivity : ComponentActivity() {
             if (allowed) "Bluetooth adapter access enabled." else "Bluetooth adapter access was not enabled."
         )
         vehicleBluetoothResult = null
+    }
+    private val audioPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+        permissionRevision++
+        audioResult?.invoke(
+            allowed,
+            if (allowed) "Microphone access enabled for the armed audio ring."
+            else "Microphone access was not enabled; the audio ring remains stopped."
+        )
+        audioResult = null
     }
     private val tier2Permission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         val gate = pendingTier2Gate
@@ -187,6 +197,18 @@ class MainActivity : ComponentActivity() {
 
     fun hasVehicleBluetoothPermission(): Boolean = Build.VERSION.SDK_INT < 31 ||
         ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+
+    fun hasAudioPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    fun requestAudioPermission(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
+        if (hasAudioPermission()) {
+            onResult(true, "Microphone access is already enabled.")
+            return
+        }
+        audioResult = onResult
+        audioPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
 
     fun requestVehicleBluetoothPermission(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
         if (hasVehicleBluetoothPermission()) {

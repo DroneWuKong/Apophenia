@@ -59,6 +59,8 @@ import com.dronewukong.apophenia.ground.GroundContextProvider
 import com.dronewukong.apophenia.rf.RfSurveyConfig
 import com.dronewukong.apophenia.rf.RfSurveyContextProvider
 import com.dronewukong.apophenia.rf.RfSurveySettings
+import com.dronewukong.apophenia.audio.AudioRingCaptureManager
+import com.dronewukong.apophenia.audio.AudioRingCaptureService
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -674,6 +676,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     val driveState by DriveSessionManager.state.collectAsState()
     val flightState by MavlinkSessionManager.state.collectAsState()
     val controlLinkState by ControlLinkManager.state.collectAsState()
+    val audioRingState by AudioRingCaptureManager.state.collectAsState()
     var rollingSummary by remember { mutableStateOf("No samples yet") }
     var healthStatus by remember { mutableStateOf("Checking…") }
     var locationAllowed by remember { mutableStateOf(activity.hasLocationPermission()) }
@@ -741,6 +744,9 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var rfWindowMs by remember { mutableStateOf(initialRfConfig.windowMs.toString()) }
     var rfRetentionDays by remember { mutableStateOf(initialRfConfig.retentionDays.toString()) }
     var confirmRfSurvey by remember { mutableStateOf(false) }
+    var audioGateEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_AUDIO_CAPTURE)) }
+    var confirmAudioGate by remember { mutableStateOf(false) }
+    var audioGateInput by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -919,6 +925,23 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         else showUsbControlPicker = true
     }
 
+    fun armAudioRing() {
+        fun startAfterNotification() {
+            if (simulation) {
+                AudioRingCaptureService.start(activity)
+                onMessage("SIMULATION audio ring armed")
+            } else activity.requestAudioPermission { granted, message ->
+                onMessage(message)
+                if (granted) AudioRingCaptureService.start(activity)
+            }
+        }
+        if (!notificationsAllowed) activity.requestNotificationPermission { granted, message ->
+            notificationsAllowed = granted
+            onMessage(message)
+            if (granted) startAfterNotification()
+        } else startAfterNotification()
+    }
+
     LaunchedEffect(permissionRevision) { refreshPermissionState() }
     LaunchedEffect(Unit) { refreshRolling() }
 
@@ -942,7 +965,6 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 }
             }
         }
-
         item { SectionLabel("Study design") }
         item {
             SettingsCard(Icons.Default.Alarm, "Neutral check-ins", "Optional prompts every 3–6 hours create user-confirmed baseline captures.") {
@@ -1572,6 +1594,38 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
         }
 
+        item { SectionLabel("Audio/video evidence") }
+        item {
+            SettingsCard(Icons.Default.Mic, "Audio evidence ring", "Tier 2 · persistent 60-second encrypted pre-event ring plus 30 seconds post-event when armed.") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(if (audioRingState.active) "LIVE · microphone ring buffering" else if (audioGateEnabled) "Gate authorized · ring disarmed" else "Gate off", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            audioRingState.lastError ?: if (audioRingState.active) "${audioRingState.capturedBytes / 1_024} KiB processed · ${audioRingState.pendingEvents} event freeze(s) finishing" else "No microphone capture outside an armed ring",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
+                    StatusPill(if (audioRingState.active) "AUDIO LIVE" else "OFF", if (audioRingState.active) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline)
+                }
+                if (audioRingState.active) {
+                    Button(onClick = { AudioRingCaptureService.stop(activity) }, modifier = Modifier.fillMaxWidth()) { Text("Disarm audio ring") }
+                } else if (audioGateEnabled) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = ::armAudioRing, modifier = Modifier.weight(1f)) { Text("Arm audio ring") }
+                        OutlinedButton(onClick = {
+                            AudioRingCaptureService.stop(activity)
+                            HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_AUDIO_CAPTURE, false)
+                            audioGateEnabled = false
+                        }, modifier = Modifier.weight(1f)) { Text("Revoke gate") }
+                    }
+                } else {
+                    Button(onClick = { audioGateInput = ""; confirmAudioGate = true }, modifier = Modifier.fillMaxWidth()) { Text("Enable + arm") }
+                }
+                Text("Every observation freezes the sound already in memory. Raw PCM is written only after per-event AES-256-GCM encryption; derived loudness, hum/voice/high-frequency bands, onsets, and silence ratios survive raw retention. POST rows are excluded from predictors.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
+
         item { SectionLabel("Ground context + owned RF receiver") }
         item {
             SettingsCard(Icons.Default.Explore, "Ground context", "Local barometer, magnetic field and declination, solar phase, plus gated public NOAA Kp and F10.7 indices.") {
@@ -1909,6 +1963,36 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 }) { Text("Enable RF survey") }
             },
             dismissButton = { TextButton(onClick = { confirmRfSurvey = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (confirmAudioGate) {
+        AlertDialog(
+            onDismissRequest = { confirmAudioGate = false },
+            title = { Text("Enable live microphone buffering?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("When armed, Apophenia continuously holds the most recent 60 seconds of microphone PCM in memory. Logging any observation freezes that pre-event sound and 30 post-event seconds into a per-event encrypted artifact. Android shows a persistent recording indicator.")
+                    Text("Type LIVE_AUDIO_CAPTURE to authorize this deliberate gate.", fontWeight = FontWeight.SemiBold)
+                    OutlinedTextField(value = audioGateInput, onValueChange = { audioGateInput = it }, singleLine = true, label = { Text("Gate name") })
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val enabled = HardwareGates.setAuthorized(
+                        activity,
+                        HardwareGates.Gate.LIVE_AUDIO_CAPTURE,
+                        true,
+                        HardwareGates.ConsentProof.TypedGateName(audioGateInput)
+                    ) == HardwareGates.AuthorizationResult.ENABLED
+                    if (enabled) {
+                        audioGateEnabled = true
+                        confirmAudioGate = false
+                        armAudioRing()
+                    } else onMessage("Type LIVE_AUDIO_CAPTURE exactly")
+                }) { Text("Authorize + arm") }
+            },
+            dismissButton = { TextButton(onClick = { confirmAudioGate = false }) { Text("Cancel") } }
         )
     }
 }

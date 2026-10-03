@@ -85,10 +85,11 @@ The app explains what works without a prompt and lets you review optional access
 - User-started MAVLink `FLIGHT_SESSION` capture over UDP, TCP, or class-compliant USB/SiK, with hashed airframe identity, persistent capture indication, exact `STATUSTEXT`, and explicit telemetry age/sequence gaps
 - User-started CRC-validated CRSF/GHST link statistics, bounded owned Field-Kit detector snapshots, and TAK own-track context with a separate full-visible-traffic gate
 - Ground barometer/magnetic/solar context with public NOAA Kp/F10.7 observations, plus Tier-3 bounded RTL-SDR IQ windows through an owned receiver's local `rtl_tcp` driver
+- A deliberately armed microphone ring with a persistent indicator, encrypted 60-second pre-event/30-second post-event evidence, and permanent descriptive spectral/loudness metrics
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 
-There is no account, advertising SDK, analytics, continuous microphone recording, or camera recording.
+There is no account, advertising SDK, analytics, or automatic upload. Microphone capture exists only behind its deliberate gate and explicit armed state, with a persistent Android indicator.
 
 ## Try it
 
