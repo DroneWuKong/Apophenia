@@ -35,6 +35,14 @@ A scalar measurement with timestamp, source, metric, value and unit. It may be a
 
 Schema v5 adds scalar phone-context metrics for Wi-Fi presence, connectivity/network state, audio routing and volume, display/interaction state, power/thermal state, local time/solar phase, Wi-Fi Direct, and NFC adapter state. Identifying Wi-Fi values use only locally keyed BSSID hashes. Active playback package identity is marked `platform_restricted` because Android's public playback API exposes active configurations but not their owning UID/package.
 
+Schema v6 adds nullable `session_id` to scalar context. When a drive session is active, OBD values and concurrently captured phone/Bluetooth context carry the same ID. Session-stream rows use a unique `capture_id` per polling instant; event/control rows retain their event/control capture identity. Dense stream rows therefore remain distinguishable from independent human observations.
+
+## Capture session
+
+`capture_sessions` stores a random session ID, type (`DRIVE_SESSION` or future `FLIGHT_SESSION`), start/end timestamps, locally keyed equipment-identity hash, status (`ACTIVE`, `COMPLETED`, or `INTERRUPTED`), and non-identifying boundary metadata. A process restart marks an unclosed active drive session interrupted rather than pretending it ended cleanly.
+
+For an OBD drive session, one deliberate paired-adapter connection is the software boundary. Physical testing must determine how closely adapter connection lifetime matches one ignition cycle on a specific vehicle/adapter combination.
+
 ## Sensitive context
 
 `sensitive_context` is deliberately separate from `context_samples`. A row contains timestamp, optional observation ID, control flag, source, content type, `capture_id`, AES-GCM ciphertext, IV, and a non-secret key alias. Plaintext is encrypted in memory before the database insert. The associated data binds source, content type, and capture ID, so moving ciphertext to a different capture or channel makes authentication fail.

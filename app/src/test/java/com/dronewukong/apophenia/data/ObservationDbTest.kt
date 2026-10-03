@@ -186,7 +186,7 @@ class ObservationDbTest {
         legacy.close()
 
         db = ObservationDb(context)
-        assertEquals(5, db.readableDatabase.version)
+        assertEquals(6, db.readableDatabase.version)
         assertEquals("Legacy", db.observations().single().label)
         assertEquals(ObservationOrigin.ANDROID, db.observations().single().origin)
     }
@@ -201,7 +201,16 @@ class ObservationDbTest {
                 vibeRating = VibeGrade.FUCKED.rating
             )
         )
-        db.insertContext(listOf(sample(490, 1009.2).copy(observationId = observationId, phase = ContextPhase.PRE)))
+        db.insertSession(
+            CaptureSession(
+                id = "drive:test",
+                type = CaptureSessionType.DRIVE_SESSION,
+                startedAtMs = 450,
+                identityHash = "idhash:v1:test"
+            )
+        )
+        db.insertContext(listOf(sample(490, 1009.2).copy(observationId = observationId, phase = ContextPhase.PRE, sessionId = "drive:test")))
+        db.insertContext(listOf(sample(480, 52.0).copy(source = "obd_elm327", metric = "obd_vehicle_speed_kph", unit = "km/h", sessionId = "drive:test", captureId = "drive:test:stream:480")))
         db.insertContext(listOf(control(600, 1008.0, "control:export")))
         db.insertHypothesis(Hypothesis(createdAtMs = 700, eventLabel = "Pressure idea", metric = "pressure_hpa"))
         db.insertSensitiveContext(
@@ -223,16 +232,39 @@ class ObservationDbTest {
         val exported = ExportManager.exportJson(db, outputDirectory)
         val json = JSONObject(exported.readText())
 
-        assertEquals(5, json.getInt("schema"))
+        assertEquals(6, json.getInt("schema"))
         val observation = json.getJSONArray("observations").getJSONObject(0)
         assertEquals(4, observation.getInt("vibeRating"))
         assertFalse(observation.getBoolean("egress"))
         assertEquals("PRE", observation.getJSONArray("context").getJSONObject(0).getString("phase"))
+        assertEquals("drive:test", observation.getJSONArray("context").getJSONObject(0).getString("sessionId"))
         assertEquals(1, json.getJSONArray("hypotheses").length())
         assertEquals("CONTROL", json.getJSONArray("controls").getJSONObject(0).getString("phase"))
         assertFalse(json.has("sensitiveContext"))
         assertFalse(exported.readText().contains("should-never-export"))
+        assertEquals("DRIVE_SESSION", json.getJSONArray("sessions").getJSONObject(0).getString("type"))
+        assertEquals("drive:test", json.getJSONArray("sessionContext").getJSONObject(0).getString("sessionId"))
         outputDirectory.deleteRecursively()
+    }
+
+    @Test
+    fun captureSessionLifecycleAndContextJoinAreDurable() {
+        db.insertSession(
+            CaptureSession(
+                id = "drive:one",
+                type = CaptureSessionType.DRIVE_SESSION,
+                startedAtMs = 1_000,
+                identityHash = "idhash:v1:adapter"
+            )
+        )
+        db.insertContext(listOf(sample(1_100, 44.0).copy(sessionId = "drive:one")))
+
+        assertEquals("drive:one", db.allContext().single().sessionId)
+        assertTrue(db.endSession("drive:one", 2_000, CaptureSessionStatus.COMPLETED, "end_reason=test"))
+        val session = db.session("drive:one")!!
+        assertEquals(CaptureSessionStatus.COMPLETED, session.status)
+        assertEquals(2_000L, session.endedAtMs)
+        assertTrue(session.metadata.contains("end_reason=test"))
     }
 
     @Test

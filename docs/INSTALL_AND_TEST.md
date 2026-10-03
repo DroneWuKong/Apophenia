@@ -39,6 +39,7 @@ Open **Settings**.
 - **Network state:** enable the gate and test basic connectivity. The optional phone-state prompt adds modem signal/type where Android exposes it.
 - **Device circumstances:** enable only the audio/display/power/time/Wi-Fi Direct/NFC rows you want. Foreground-app identity additionally requires Android Usage Access; without it the channel records an explicit platform gap.
 - **Tier-2 contents:** enablement requires typing the exact enum gate name, then the corresponding Android access. Expected: the gate can remain visibly armed while denied access produces no content rows. Current JSON export must contain no Tier-2 contents.
+- **OBD-II drive session:** pair an ELM327-style adapter in Android first, enable the vehicle gate, choose the paired adapter, and confirm the persistent drive-capture notification. Do this parked and treat the first physical run as bench validation; simulator PID/DTC results are not a hardware claim.
 
 Basic observation logging must continue when every optional permission is denied.
 

@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
     private var bluetoothResult: ((Boolean, String) -> Unit)? = null
     private var wifiResult: ((Boolean, String) -> Unit)? = null
     private var networkResult: ((Boolean, String) -> Unit)? = null
+    private var vehicleBluetoothResult: ((Boolean, String) -> Unit)? = null
     private var tier2Result: ((Boolean, String) -> Unit)? = null
     private var pendingTier2Gate: HardwareGates.Gate? = null
     private var healthResult: ((String) -> Unit)? = null
@@ -95,6 +96,14 @@ class MainActivity : ComponentActivity() {
             if (allowed) "Phone-state signal access enabled." else "Phone-state access was not enabled; basic connectivity still works."
         )
         networkResult = null
+    }
+    private val vehicleBluetoothPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+        permissionRevision++
+        vehicleBluetoothResult?.invoke(
+            allowed,
+            if (allowed) "Bluetooth adapter access enabled." else "Bluetooth adapter access was not enabled."
+        )
+        vehicleBluetoothResult = null
     }
     private val tier2Permission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         val gate = pendingTier2Gate
@@ -162,6 +171,18 @@ class MainActivity : ComponentActivity() {
 
     fun hasNetworkSignalPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
+
+    fun hasVehicleBluetoothPermission(): Boolean = Build.VERSION.SDK_INT < 31 ||
+        ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+
+    fun requestVehicleBluetoothPermission(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
+        if (hasVehicleBluetoothPermission()) {
+            onResult(true, "Bluetooth adapter access is already enabled.")
+            return
+        }
+        vehicleBluetoothResult = onResult
+        vehicleBluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+    }
 
     fun hasTier2PlatformAccess(gate: HardwareGates.Gate): Boolean = when (gate) {
         HardwareGates.Gate.LIVE_NOTIFICATION_CONTENTS_CAPTURE ->

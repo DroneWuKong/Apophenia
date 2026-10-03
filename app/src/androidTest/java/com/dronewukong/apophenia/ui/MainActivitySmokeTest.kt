@@ -80,6 +80,7 @@ class MainActivitySmokeTest {
             "Network state",
             "Device circumstances",
             "Tier-2 contents",
+            "OBD-II drive session",
             "Octopod observer"
         ).forEach(::scrollSettingsTo)
     }

@@ -16,6 +16,8 @@ import com.dronewukong.apophenia.phone.PhoneMetadataProvider
 import com.dronewukong.apophenia.phone.AuxiliaryPresenceProvider
 import com.dronewukong.apophenia.phone.SensitiveContextProvider
 import com.dronewukong.apophenia.wifi.WifiContextProvider
+import com.dronewukong.apophenia.vehicle.DriveSessionManager
+import com.dronewukong.apophenia.vehicle.ObdContextProvider
 import kotlinx.coroutines.runBlocking
 import java.util.UUID
 class ControlSampleWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
@@ -37,7 +39,9 @@ class ControlSampleWorker(context: Context, params: WorkerParameters) : Worker(c
    samples+=runCatching{NetworkStateProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    samples+=runCatching{PhoneMetadataProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    samples+=runCatching{AuxiliaryPresenceProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
-   db.insertContext(samples.map{it.copy(captureId=captureId,metadata=if(it.metadata.isBlank())"control_source=$source" else "${it.metadata};control_source=$source")})
+   samples+=runCatching{ObdContextProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
+   val driveSession=DriveSessionManager.activeId()
+   db.insertContext(samples.map{it.copy(captureId=captureId,metadata=if(it.metadata.isBlank())"control_source=$source" else "${it.metadata};control_source=$source",sessionId=it.sessionId?:driveSession)})
    db.insertSensitiveContext(runCatching{SensitiveContextProvider(applicationContext).collect(null,true,captureId)}.getOrDefault(emptyList()))
    if(source==SOURCE_RANDOM)ControlScheduler.scheduleNext(applicationContext)
    Result.success()

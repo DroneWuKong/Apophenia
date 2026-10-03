@@ -51,10 +51,12 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Independent audio-state, display/interaction, power/thermal, time/solar, Wi-Fi Direct, and NFC standard-gate collectors.
 - Schema v5 `sensitive_context` storage for notification, calendar, contacts, and message metadata, encrypted with per-install Android Keystore AES-GCM before SQLite insertion.
 - Type-the-exact-name Settings confirmations and separate Android permission/access flows for every Tier-2 content gate.
+- Schema v6 capture sessions and `session_id` joins on context rows.
+- User-started ELM327 Bluetooth `DRIVE_SESSION` capture with standard OBD-II PIDs, stored/pending DTCs, hashed adapter identity, ten-second session samples, and a persistent foreground notification.
 
 ### Validation
 
-- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, and simulation-pipeline coverage run in the software-only unit suite.
+- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, and simulation-pipeline coverage run in the software-only unit suite.
 
 ## [0.3.0-preview.2] - 2026-10-02
 

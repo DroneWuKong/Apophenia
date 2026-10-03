@@ -4,6 +4,8 @@ Apophenia is local-first.
 
 Stored locally: manual observations, phone context, rolling black-box samples, random controls, Garmin event context delivered through the paired-phone companion channel, optional aggregate home-state counts, and explicitly enabled radio/presence metrics. Deliberately enabled notification, calendar, contacts, and message-metadata contents are encrypted before entering their separate SQLite table.
 
+When the vehicle gate is enabled and the operator starts a session, Apophenia connects only to the paired Bluetooth adapter selected in the app. The raw Bluetooth address exists in memory for that connection but is never written to SQLite or preferences; the session stores a locally keyed hash. Standard vehicle telemetry and diagnostic trouble codes are local context. A foreground notification remains visible while session sampling is active.
+
 Optional Health Connect reads are permission-gated and fail-soft. When authorized, Apophenia may read recent heart rate, resting heart rate, sleep, steps, SpO2, and exercise duration. The app does not write Health Connect records and logging still works when Health Connect is missing, unsupported, denied, or empty.
 
 The rolling buffer is bounded and pruned. It is not an unlimited surveillance log.

@@ -63,6 +63,9 @@ UI / widget / tile / external intent / Garmin
 | `PhoneMetadataProvider` | Independent audio, display/interaction, power/thermal, and time/solar scalar snapshots |
 | `AuxiliaryPresenceProvider` | Off-default Wi-Fi Direct group state and NFC adapter-state snapshots |
 | `SensitiveContextProvider` | Deliberately gated notification/calendar/contacts/message metadata encrypted before persistence |
+| `DriveSessionManager` | Owns one in-memory ELM327 connection, hashed adapter identity, and durable session lifecycle |
+| `DriveSessionService` | Persistent foreground indicator and ten-second active-drive sampling loop |
+| `Elm327Client` | Transport-independent AT initialization, standard PID polling, DTC parsing, and honest unsupported-command tracking |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -103,6 +106,10 @@ The v0.3 split providers supersede that preview aggregate path for event/control
 ### Tier-2 contents
 
 The app gate and Android permission are independent. When both are present, `SensitiveContextProvider` builds a bounded snapshot, encrypts it with an Android Keystore AES-GCM key, and returns only ciphertext-bearing rows for `sensitive_context`. The standard JSON exporter never queries this table. See [TIER2_CONTENTS.md](TIER2_CONTENTS.md).
+
+### OBD-II drive sessions
+
+The operator selects an already paired Bluetooth device. `BluetoothElm327Transport` opens the Serial Port Profile socket, while `Elm327Client` contains no Android dependency and is exercised with deterministic transports. An active foreground service polls on a bounded cadence and stamps OBD plus concurrent phone/Bluetooth event/control context with one `DRIVE_SESSION` ID. Process loss closes the software claim as interrupted. See [VEHICLE_OBD.md](VEHICLE_OBD.md).
 
 ## Statistical boundary
 

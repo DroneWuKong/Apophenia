@@ -3,6 +3,8 @@ package com.dronewukong.apophenia.data
 enum class ObservationKind { OBSERVATION, COINCIDENCE, HYPOTHESIS_NOTE, WEIRD, VIBE }
 enum class ObservationOrigin { ANDROID, WIDGET, TILE, EXTERNAL, GARMIN, SIMULATION }
 enum class ContextPhase { INSTANT, PRE, POST, CONTROL }
+enum class CaptureSessionType { DRIVE_SESSION, FLIGHT_SESSION }
+enum class CaptureSessionStatus { ACTIVE, COMPLETED, INTERRUPTED }
 
 enum class VibeGrade(val rating: Int, val renderedLabel: String) {
     GOOD(1, "Vibe good 🙂"),
@@ -65,7 +67,18 @@ data class ContextSample(
     val unit: String,
     val metadata: String = "",
     val captureId: String = "",
-    val phase: ContextPhase = if (isControl) ContextPhase.CONTROL else ContextPhase.INSTANT
+    val phase: ContextPhase = if (isControl) ContextPhase.CONTROL else ContextPhase.INSTANT,
+    val sessionId: String? = null
+)
+
+data class CaptureSession(
+    val id: String,
+    val type: CaptureSessionType,
+    val startedAtMs: Long,
+    val endedAtMs: Long? = null,
+    val identityHash: String,
+    val status: CaptureSessionStatus = CaptureSessionStatus.ACTIVE,
+    val metadata: String = ""
 )
 
 /**

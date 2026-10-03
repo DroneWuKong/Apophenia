@@ -8,7 +8,7 @@ import com.dronewukong.apophenia.correlation.TimedCaptureValue
 
 data class ObservationInsertResult(val id: Long, val inserted: Boolean)
 
-class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 5) {
+class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 6) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -35,6 +35,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         createRollingTable(db)
         createHypothesisTable(db)
         createSensitiveContextTable(db)
+        createCaptureSessionTable(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -59,6 +60,11 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
             db.execSQL("ALTER TABLE observations ADD COLUMN egress INTEGER NOT NULL DEFAULT 0 CHECK(egress IN (0,1))")
         }
         if (oldVersion < 5) createSensitiveContextTable(db)
+        if (oldVersion < 6) {
+            createCaptureSessionTable(db)
+            db.execSQL("ALTER TABLE context_samples ADD COLUMN session_id TEXT")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_context_session ON context_samples(session_id,timestamp_ms)")
+        }
     }
 
     private fun createObservationIndexes(db: SQLiteDatabase) {
@@ -81,6 +87,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
               metadata TEXT NOT NULL DEFAULT '',
               capture_id TEXT NOT NULL DEFAULT '',
               phase TEXT NOT NULL DEFAULT 'INSTANT',
+              session_id TEXT,
               FOREIGN KEY(observation_id) REFERENCES observations(id) ON DELETE CASCADE
             )
         """.trimIndent())
@@ -89,6 +96,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         db.execSQL("CREATE INDEX idx_context_control ON context_samples(is_control, metric)")
         db.execSQL("CREATE INDEX idx_context_capture ON context_samples(capture_id, metric)")
         db.execSQL("CREATE INDEX idx_context_phase ON context_samples(phase, metric)")
+        db.execSQL("CREATE INDEX idx_context_session ON context_samples(session_id,timestamp_ms)")
     }
 
     private fun createRollingTable(db: SQLiteDatabase) {
@@ -140,6 +148,22 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         """.trimIndent())
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_sensitive_observation ON sensitive_context(observation_id)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_sensitive_capture ON sensitive_context(capture_id,content_type)")
+    }
+
+    private fun createCaptureSessionTable(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS capture_sessions(
+              id TEXT PRIMARY KEY,
+              type TEXT NOT NULL,
+              started_at_ms INTEGER NOT NULL,
+              ended_at_ms INTEGER,
+              identity_hash TEXT NOT NULL,
+              status TEXT NOT NULL,
+              metadata TEXT NOT NULL DEFAULT ''
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_session_type_time ON capture_sessions(type,started_at_ms)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_session_status ON capture_sessions(status,type)")
     }
 
     fun insertObservation(o: Observation): Long = insertObservationOrGet(o).id
@@ -222,6 +246,62 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         }
     }
 
+    fun insertSession(session: CaptureSession) {
+        writableDatabase.insertOrThrow("capture_sessions", null, ContentValues().apply {
+            put("id", session.id)
+            put("type", session.type.name)
+            put("started_at_ms", session.startedAtMs)
+            if (session.endedAtMs == null) putNull("ended_at_ms") else put("ended_at_ms", session.endedAtMs)
+            put("identity_hash", session.identityHash)
+            put("status", session.status.name)
+            put("metadata", session.metadata)
+        })
+    }
+
+    fun endSession(
+        id: String,
+        endedAtMs: Long,
+        status: CaptureSessionStatus,
+        metadataSuffix: String = ""
+    ): Boolean {
+        require(status != CaptureSessionStatus.ACTIVE)
+        val existing = session(id) ?: return false
+        val metadata = listOf(existing.metadata, metadataSuffix).filter(String::isNotBlank).joinToString(";")
+        return writableDatabase.update("capture_sessions", ContentValues().apply {
+            put("ended_at_ms", endedAtMs)
+            put("status", status.name)
+            put("metadata", metadata)
+        }, "id=? AND status=?", arrayOf(id, CaptureSessionStatus.ACTIVE.name)) > 0
+    }
+
+    fun interruptActiveSessions(type: CaptureSessionType, endedAtMs: Long): Int =
+        writableDatabase.update("capture_sessions", ContentValues().apply {
+            put("ended_at_ms", endedAtMs)
+            put("status", CaptureSessionStatus.INTERRUPTED.name)
+        }, "type=? AND status=?", arrayOf(type.name, CaptureSessionStatus.ACTIVE.name))
+
+    fun session(id: String): CaptureSession? = querySessions("id=?", arrayOf(id), 1).firstOrNull()
+
+    fun sessions(limit: Int = 10_000): List<CaptureSession> = querySessions(null, emptyArray(), limit)
+
+    private fun querySessions(where: String?, args: Array<String>, limit: Int): List<CaptureSession> {
+        val clause = where?.let { " WHERE $it" }.orEmpty()
+        val out = mutableListOf<CaptureSession>()
+        readableDatabase.rawQuery(
+            "SELECT id,type,started_at_ms,ended_at_ms,identity_hash,status,metadata FROM capture_sessions$clause ORDER BY started_at_ms DESC LIMIT ?",
+            args + limit.toString()
+        ).use { c -> while (c.moveToNext()) out += CaptureSession(
+            id = c.getString(0),
+            type = CaptureSessionType.valueOf(c.getString(1)),
+            startedAtMs = c.getLong(2),
+            endedAtMs = if (c.isNull(3)) null else c.getLong(3),
+            identityHash = c.getString(4),
+            status = CaptureSessionStatus.valueOf(c.getString(5)),
+            metadata = c.getString(6)
+        ) }
+        return out
+    }
+
     fun sensitiveContextForObservation(observationId: Long): List<SensitiveContextRecord> =
         querySensitive("observation_id=?", arrayOf(observationId.toString()))
 
@@ -260,6 +340,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
             put("timestamp_ms", s.timestampMs); if (s.observationId == null) putNull("observation_id") else put("observation_id", s.observationId)
             put("is_control", if (s.isControl) 1 else 0); put("source", s.source); put("metric", s.metric)
             put("value", s.value); put("unit", s.unit); put("metadata", s.metadata); put("capture_id", s.captureId); put("phase", s.phase.name)
+            if (s.sessionId == null) putNull("session_id") else put("session_id", s.sessionId)
         })
     }
 
@@ -338,7 +419,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
     }
 
     fun contextForObservation(observationId:Long):List<ContextSample> = queryContext(
-        "SELECT id,timestamp_ms,observation_id,is_control,source,metric,value,unit,metadata,capture_id,phase FROM context_samples WHERE observation_id=? ORDER BY timestamp_ms",
+        "SELECT id,timestamp_ms,observation_id,is_control,source,metric,value,unit,metadata,capture_id,phase,session_id FROM context_samples WHERE observation_id=? ORDER BY timestamp_ms",
         arrayOf(observationId.toString())
     )
 
@@ -432,7 +513,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
     }
 
     fun allContext(limit:Int=5000):List<ContextSample> = queryContext(
-        "SELECT id,timestamp_ms,observation_id,is_control,source,metric,value,unit,metadata,capture_id,phase FROM context_samples ORDER BY timestamp_ms DESC LIMIT ?",
+        "SELECT id,timestamp_ms,observation_id,is_control,source,metric,value,unit,metadata,capture_id,phase,session_id FROM context_samples ORDER BY timestamp_ms DESC LIMIT ?",
         arrayOf(limit.toString())
     )
 
@@ -440,7 +521,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
 
     fun deleteAllData(){
         writableDatabase.beginTransaction()
-        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("observations",null,null); writableDatabase.setTransactionSuccessful() }
+        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.setTransactionSuccessful() }
         finally { writableDatabase.endTransaction() }
     }
 
@@ -449,7 +530,8 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         readableDatabase.rawQuery(sql,args).use{c->while(c.moveToNext())out+=ContextSample(
             id=c.getLong(0),timestampMs=c.getLong(1),observationId=if(c.isNull(2))null else c.getLong(2),isControl=c.getInt(3)==1,
             source=c.getString(4),metric=c.getString(5),value=c.getDouble(6),unit=c.getString(7),metadata=c.getString(8),captureId=c.getString(9),
-            phase=runCatching{ContextPhase.valueOf(c.getString(10))}.getOrDefault(if(c.getInt(3)==1)ContextPhase.CONTROL else ContextPhase.INSTANT)
+            phase=runCatching{ContextPhase.valueOf(c.getString(10))}.getOrDefault(if(c.getInt(3)==1)ContextPhase.CONTROL else ContextPhase.INSTANT),
+            sessionId=if(c.columnCount<=11||c.isNull(11))null else c.getString(11)
         )}
         return out
     }

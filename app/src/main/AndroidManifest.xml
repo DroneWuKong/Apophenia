@@ -23,10 +23,12 @@
     <!-- Nearby-device presence is intentionally usable as physical-context inference, so
          neverForLocation is not asserted; asserting it can filter some BLE advertisements. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
@@ -95,6 +97,11 @@
         <service android:name=".rolling.RollingRecorderService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-enabled rolling local sensor buffer for preserving context before and after manually logged observations." />
         </service>
+
+        <service
+            android:name=".vehicle.DriveSessionService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <service
             android:name=".phone.NotificationCaptureService"

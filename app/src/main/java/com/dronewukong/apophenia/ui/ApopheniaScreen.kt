@@ -41,6 +41,9 @@ import com.dronewukong.apophenia.rolling.RollingRecorderState
 import com.dronewukong.apophenia.wifi.WifiContextProvider
 import com.dronewukong.apophenia.work.PromptedCheckInScheduler
 import com.dronewukong.apophenia.work.PromptedCheckInState
+import com.dronewukong.apophenia.vehicle.DriveSessionManager
+import com.dronewukong.apophenia.vehicle.PairedObdAdapter
+import com.dronewukong.apophenia.vehicle.DriveSessionService
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -653,6 +656,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var rolling by remember { mutableStateOf(RollingRecorderState.isEnabled(activity)) }
     var promptedCheckIns by remember { mutableStateOf(PromptedCheckInState.isEnabled(activity)) }
     val garminBridge by GarminBridge.state.collectAsState()
+    val driveState by DriveSessionManager.state.collectAsState()
     var rollingSummary by remember { mutableStateOf("No samples yet") }
     var healthStatus by remember { mutableStateOf("Checking…") }
     var locationAllowed by remember { mutableStateOf(activity.hasLocationPermission()) }
@@ -685,6 +689,11 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var pendingDeliberateGate by remember { mutableStateOf<HardwareGates.Gate?>(null) }
     var deliberateGateInput by remember { mutableStateOf("") }
     var usageAllowed by remember { mutableStateOf(activity.hasUsageAccess()) }
+    var vehicleEnabled by remember {
+        mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_VEHICLE_CAPTURE))
+    }
+    var pairedObdAdapters by remember { mutableStateOf<List<PairedObdAdapter>>(emptyList()) }
+    var showObdAdapterPicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -803,6 +812,32 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
             networkChecking = false
             onMessage(networkStatus)
+        }
+    }
+
+    fun openObdAdapterPicker() {
+        if (!notificationsAllowed) {
+            activity.requestNotificationPermission { granted, message ->
+                notificationsAllowed = granted
+                onMessage(message)
+                if (granted) openObdAdapterPicker()
+            }
+            return
+        }
+        if (!simulation && !activity.hasVehicleBluetoothPermission()) {
+            activity.requestVehicleBluetoothPermission { granted, message ->
+                onMessage(message)
+                if (granted) openObdAdapterPicker()
+            }
+            return
+        }
+        scope.launch {
+            pairedObdAdapters = withContext(Dispatchers.IO) { DriveSessionManager.pairedAdapters(activity) }
+            if (pairedObdAdapters.isEmpty()) {
+                onMessage("No paired Bluetooth adapters found. Pair the ELM327 in Android first.")
+            } else {
+                showObdAdapterPicker = true
+            }
         }
     }
 
@@ -1157,6 +1192,54 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
         }
 
+        item { SectionLabel("Vehicle") }
+        item {
+            SettingsCard(Icons.Default.DirectionsCar, "OBD-II drive session", "One active user-paired ELM327 connection groups vehicle, Bluetooth cabin presence, and phone context.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = vehicleEnabled, onCheckedChange = { enabled ->
+                        vehicleEnabled = if (!enabled) {
+                            if (driveState.active) DriveSessionService.stop(activity)
+                            HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_VEHICLE_CAPTURE, false)
+                            false
+                        } else {
+                            HardwareGates.setAuthorized(
+                                activity,
+                                HardwareGates.Gate.LIVE_VEHICLE_CAPTURE,
+                                true,
+                                HardwareGates.ConsentProof.SingleConfirmation
+                            ) == HardwareGates.AuthorizationResult.ENABLED
+                        }
+                    })
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (driveState.active) "DRIVE_SESSION active" else if (vehicleEnabled) "Armed · no session" else "Off", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            driveState.lastError ?: if (driveState.active) "${driveState.adapterLabel} · ${driveState.sampleCount} snapshots" else "Raw adapter addresses are never persisted",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                if (driveState.active) {
+                    Button(
+                        onClick = { DriveSessionService.stop(activity) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("End drive session") }
+                } else {
+                    OutlinedButton(
+                        onClick = ::openObdAdapterPicker,
+                        enabled = vehicleEnabled,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (simulation) "Start simulated drive" else "Choose paired adapter") }
+                }
+                Text(
+                    "Standard PIDs cover RPM, speed, load, temperatures, throttle, fuel, trims, voltage, and DTCs. PID 0x70/manufacturer temperature coverage is recorded as variable rather than assumed.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
         item { SectionLabel("Watch") }
         item {
             SettingsCard(Icons.Default.Watch, "Garmin Epix Pro (Gen 2)", garminBridge.deviceText) {
@@ -1287,6 +1370,42 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 ) { Text("Enable gate") }
             },
             dismissButton = { TextButton(onClick = { pendingDeliberateGate = null; deliberateGateInput = "" }) { Text("Cancel") } }
+        )
+    }
+
+    if (showObdAdapterPicker) {
+        AlertDialog(
+            onDismissRequest = { showObdAdapterPicker = false },
+            title = { Text("Choose paired OBD-II adapter") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    pairedObdAdapters.forEach { adapter ->
+                        TextButton(
+                            onClick = {
+                                showObdAdapterPicker = false
+                                scope.launch {
+                                    val result = withContext(Dispatchers.IO) { DriveSessionManager.start(activity, adapter) }
+                                    onMessage(result.fold(
+                                        onSuccess = {
+                                            DriveSessionService.start(activity)
+                                            "Drive session started with ${adapter.displayName}"
+                                        },
+                                        onFailure = { it.message ?: "Drive session could not start" }
+                                    ))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(adapter.displayName, fontWeight = FontWeight.SemiBold)
+                                Text(adapter.address, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showObdAdapterPicker = false }) { Text("Cancel") } }
         )
     }
 }
