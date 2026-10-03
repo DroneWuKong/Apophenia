@@ -21,7 +21,9 @@ class HypothesisEvaluatorTest {
 
         assertEquals(HypothesisOutcome.CONFIRMED, HypothesisEvaluator.evaluate(higher, strongHigher, 5_000)?.outcome)
         assertEquals(HypothesisOutcome.REFUTED, HypothesisEvaluator.evaluate(lower, strongHigher, 5_000)?.outcome)
-        assertTrue(HypothesisEvaluator.evaluate(lower, strongHigher, 5_000)!!.summary.startsWith("Refuted"))
+        val refuted = HypothesisEvaluator.evaluate(lower, strongHigher, 5_000)!!.summary
+        assertTrue(refuted.contains("Good news: this pattern doesn't hold up against your controls."))
+        assertTrue(refuted.contains("Refuted"))
     }
 
     @Test fun correctedWeakResultIsNotYetSupportedAndInsufficientDataDoesNotLock() {

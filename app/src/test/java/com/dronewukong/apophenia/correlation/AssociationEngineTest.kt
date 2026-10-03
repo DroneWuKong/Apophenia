@@ -13,10 +13,12 @@ class AssociationEngineTest {
             listOf(1.0, 2.0, 3.0, 4.0, 5.0),
             seed = 42
         )
-        assertEquals("indistinguishable from noise", result.evidence)
+        assertTrue(result.evidence.contains("interesting, not yet established"))
+        assertTrue(result.evidence.contains("indistinguishable from noise"))
         assertEquals("negligible effect", result.effectMagnitude)
         assertTrue(kotlin.math.abs(result.standardizedEffect ?: 99.0) < 0.01)
         assertTrue(result.summary.contains("not evidence of causation"))
+        assertTrue(result.plainLanguageSummary.contains("Good news: this pattern doesn't hold up against your controls."))
     }
 
     @Test
@@ -33,6 +35,8 @@ class AssociationEngineTest {
         assertNotNull(result.eventMad)
         assertNotNull(result.effectCiLow)
         assertNotNull(result.effectCiHigh)
+        assertEquals("interesting, not yet established", result.evidence)
+        assertTrue(result.plainLanguageSummary.contains("Interesting, not yet established"))
     }
 
     @Test
@@ -75,5 +79,16 @@ class AssociationEngineTest {
         assertTrue(result.evidence.isNotBlank())
         assertTrue(result.summary.contains("seed=8675309"))
         assertTrue(result.summary.contains("95% bootstrap CI"))
+    }
+
+    @Test
+    fun binaryPresenceUsesBaselineRelativePlainLanguage() {
+        val result = AssociationEngine.compare(
+            listOf(1.0,1.0,1.0,0.0), listOf(1.0,0.0,0.0,0.0),
+            permutations = 199, seed = 42, featureName = "hashed device presence"
+        )
+        assertTrue(result.plainLanguageSummary.contains("75%"))
+        assertTrue(result.plainLanguageSummary.contains("25%"))
+        assertTrue(result.plainLanguageSummary.contains("3.0× as common"))
     }
 }

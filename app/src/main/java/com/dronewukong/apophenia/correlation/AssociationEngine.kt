@@ -31,6 +31,8 @@ data class AssociationResult(
     val effectMagnitude: String,
     val evidence: String,
     val strength: String,
+    val plainLanguageSummary: String,
+    val smallSample: Boolean,
     val summary: String
 )
 
@@ -40,10 +42,11 @@ object AssociationEngine {
         controlValues: List<Double>,
         permutations: Int = 1_000,
         seed: Int? = null,
-        bootstrapIterations: Int = 1_000
+        bootstrapIterations: Int = 1_000,
+        featureName: String = "feature"
     ): AssociationResult {
         val permutationCount = permutations.coerceAtLeast(1)
-        if (eventValues.size < 4 || controlValues.size < 4) return insufficient(eventValues, controlValues, permutationCount)
+        if (eventValues.size < 4 || controlValues.size < 4) return insufficient(eventValues, controlValues, permutationCount, featureName)
 
         val resolvedSeed = seed ?: Random.Default.nextInt()
         val eventMean = eventValues.average()
@@ -55,7 +58,7 @@ object AssociationEngine {
         val persistent = splitHalfPersistence(eventValues, controlValues, delta)
         return buildResult(
             eventValues, controlValues, delta, effect, ci.first, ci.second, p, p,
-            resolvedSeed, permutationCount, persistent, comparisonsTested = 1, comparisonsEligible = 1
+            resolvedSeed, permutationCount, persistent, comparisonsTested = 1, comparisonsEligible = 1, featureName = featureName
         )
     }
 
@@ -67,7 +70,7 @@ object AssociationEngine {
     ): Map<String, AssociationResult> {
         val rootSeed = seed ?: Random.Default.nextInt()
         val raw = values.mapValues { (metric, groups) ->
-            compare(groups.first, groups.second, permutations, rootSeed xor metric.hashCode(), bootstrapIterations)
+            compare(groups.first, groups.second, permutations, rootSeed xor metric.hashCode(), bootstrapIterations, metric)
         }
         val eligible = raw.filterValues { it.permutationP != null }.toList().sortedBy { it.second.permutationP }
         if (eligible.isEmpty()) return raw.mapValues { (_, result) -> result.withComparisonScope(values.size, 0) }
@@ -94,14 +97,15 @@ object AssociationEngine {
                     q,
                     result.permutationSeed!!,
                     result.permutationCount,
-                    result.persistentDirection,
-                    comparisonsTested = values.size,
-                    comparisonsEligible = eligible.size
+                result.persistentDirection,
+                comparisonsTested = values.size,
+                comparisonsEligible = eligible.size,
+                featureName = metric
                 )
         }
     }
 
-    private fun insufficient(events: List<Double>, controls: List<Double>, permutations: Int) = AssociationResult(
+    private fun insufficient(events: List<Double>, controls: List<Double>, permutations: Int, featureName: String) = AssociationResult(
         eventCount = events.size,
         controlCount = controls.size,
         eventMean = events.averageOrNull(),
@@ -127,6 +131,8 @@ object AssociationEngine {
         effectMagnitude = "not estimated",
         evidence = "insufficient data",
         strength = "insufficient data",
+        plainLanguageSummary = "Interesting, not yet established: ${readableFeature(featureName)} has only ${events.size} matched event captures and ${controls.size} matched controls; at least 4 of each are needed.",
+        smallSample = true,
         summary = "Need at least 4 matched event captures and 4 matched control captures. ${comparisonDisclosure(1, 0)}"
     )
 
@@ -143,10 +149,13 @@ object AssociationEngine {
         permutations: Int,
         persistent: Boolean,
         comparisonsTested: Int,
-        comparisonsEligible: Int
+        comparisonsEligible: Int,
+        featureName: String
     ): AssociationResult {
         val magnitude = effectMagnitude(effect)
         val evidence = when {
+            (events.size < 10 || controls.size < 10) && adjustedP > 0.10 -> "interesting, not yet established · indistinguishable from noise"
+            events.size < 10 || controls.size < 10 -> "interesting, not yet established"
             adjustedP > 0.10 -> "indistinguishable from noise"
             events.size >= 10 && controls.size >= 10 && adjustedP <= 0.05 && abs(effect) >= 0.50 && persistent ->
                 "repeatable association worth investigating"
@@ -187,9 +196,40 @@ object AssociationEngine {
             magnitude,
             evidence,
             evidence,
+            plainLanguage(featureName, events, controls, delta, adjustedP),
+            events.size < 10 || controls.size < 10,
             summary
         )
     }
+
+    private fun plainLanguage(featureName: String, events: List<Double>, controls: List<Double>, delta: Double, adjustedP: Double): String {
+        val feature = readableFeature(featureName)
+        val isBinary = (events + controls).all { it == 0.0 || it == 1.0 }
+        val comparison = if (isBinary) {
+            val eventRate = events.average()
+            val controlRate = controls.average()
+            val relative = when {
+                controlRate > 0.0 -> "${formatRatio(eventRate / controlRate)}× as common"
+                eventRate > 0.0 -> "seen at events but not in matched controls"
+                else -> "absent in both groups"
+            }
+            "$feature was present in ${formatPercent(eventRate)} of event windows versus ${formatPercent(controlRate)} of matched controls ($relative)."
+        } else {
+            val direction = if (delta >= 0) "higher" else "lower"
+            "$feature averaged ${format(events.average())} at event windows versus ${format(controls.average())} in matched controls (${format(abs(delta))} $direction)."
+        }
+        val honesty = when {
+            adjustedP > 0.10 && (events.size < 10 || controls.size < 10) -> " Good news: this pattern doesn't hold up against your controls. Interesting, not yet established; the sample is still small."
+            adjustedP > 0.10 -> " Good news: this pattern doesn't hold up against your controls."
+            events.size < 10 || controls.size < 10 -> " Interesting, not yet established; the sample is still small."
+            else -> " This corrected association is worth investigating, not a causal conclusion."
+        }
+        return comparison + honesty
+    }
+
+    private fun readableFeature(featureName: String): String = featureName.replace('_',' ')
+    private fun formatPercent(value: Double): String = "%.0f%%".format(value * 100.0)
+    private fun formatRatio(value: Double): String = if (value >= 10) "%.0f".format(value) else "%.1f".format(value)
 
     private fun AssociationResult.withComparisonScope(tested: Int, eligible: Int): AssociationResult {
         val base = summary.substringBefore(" Multiple-comparisons scope:")

@@ -32,7 +32,7 @@ object HypothesisEvaluator {
         }
         val prefix = when (outcome) {
             HypothesisOutcome.CONFIRMED -> "Confirmed against this registered direction and window."
-            HypothesisOutcome.REFUTED -> "Refuted: the corrected result points against the registered direction."
+            HypothesisOutcome.REFUTED -> "Good news: this pattern doesn't hold up against your controls. Refuted: the corrected result points against the registered direction."
             HypothesisOutcome.NOT_YET_SUPPORTED -> "Not yet supported after multiple-comparisons correction."
         }
         val signature = analysisSignature(hypothesis.id, result)

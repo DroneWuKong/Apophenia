@@ -74,6 +74,9 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Schema v9 hypothesis pre-registrations for an exact event cohort, context metric, expected direction, and instant/pre-event window.
 - Append-only confirmed/not-yet-supported/refuted evaluation snapshots; the first eligible result locks a registration, while insufficient data does not.
 - An analysis-view ledger that refuses retroactive pre-registration for an exact cohort/feature already viewed; legacy free-form hypothesis notes remain visibly distinct.
+- A separate descriptive ambient-difference scan that surfaces possible confounders from the first matched event/control pair without presenting them as adjusted evidence.
+- Plain-language baseline comparisons, including event/control percentages and relative frequency for binary device-presence features.
+- Required small-sample wording (**interesting, not yet established**) and refutation-as-win copy: **Good news: this pattern doesn't hold up against your controls.**
 
 ### Validation
 

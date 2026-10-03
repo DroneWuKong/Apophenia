@@ -55,6 +55,7 @@ UI / widget / tile / external intent / Garmin
 | `CaptureMatcher` | Selects one-to-one controls in the same local four-hour and weekday/weekend stratum |
 | `AssociationEngine` | Matched event/control summaries, robust spread, effect interval, seeded permutation, persistence, tested-feature disclosure, and FDR-adjusted results |
 | `HypothesisEvaluator` | Exact registration-to-feature mapping, corrected direction outcome, deterministic snapshot signature, and append-only evaluation creation |
+| `ConfounderSurfacer` | Day-one descriptive event/control differences ranked separately from inference and correction |
 | `HardwareGates` | Compile/runtime boundary for phone sensors, location, weather, and Garmin |
 | `HealthConnectProvider` | Optional read-only historical wearable context |
 | `HomeContextProvider` | Optional read-only aggregate Home Assistant/SmartThings/Wyze context through Octopod |
@@ -155,6 +156,8 @@ The engine describes associations rather than causes. Its unit of comparison is 
 VIBE egress and high-bad-vibe-without-egress are separate cohorts. BLE/Wi-Fi hashed identities become binary presence features per capture. A 0 is generated only when the corresponding channel emitted its aggregate count for that capture; a missing/gated/failed channel is omitted, not recoded as absence. See [ENGINE_CREDIBILITY.md](ENGINE_CREDIBILITY.md).
 
 Schema v9 pre-registration binds a timestamp to cohort, exact metric, expected direction, and instant or ten-minute pre-event window. Opening an eligible Patterns feature records an analysis-view boundary. The same exact feature can no longer be backdated as a pre-registration. An existing earlier registration locks on its first eligible evaluation; later data may append a new signed analysis snapshot without altering the registered claim. See [HYPOTHESIS_PREREGISTRATION.md](HYPOTHESIS_PREREGISTRATION.md).
+
+`ConfounderSurfacer` accepts the same one-to-one matched values but allows a single pair. It ranks descriptive normalized differences to suggest context worth checking; it never supplies p-values, corrected evidence, or causal labels. `AssociationEngine` separately emits a plain-language baseline comparison while retaining the technical seed, interval, p-value, resolution, and comparison disclosure. See [PLAIN_LANGUAGE_AND_CONFOUNDERS.md](PLAIN_LANGUAGE_AND_CONFOUNDERS.md).
 
 The current matcher does not control for activity, location, sleep/wake state, or attention. Optional prompted neutral check-ins reduce reliance on passive random times but do not remove self-selection bias.
 

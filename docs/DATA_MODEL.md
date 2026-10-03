@@ -108,6 +108,10 @@ The analysis surface derives two first-class semantic cohorts without rewriting 
 
 Each `AssociationResult` records `comparisonsTested`, `comparisonsEligible`, the Benjamini-Hochberg method name, and `indistinguishableFromNoise`. The tested count includes insufficient-data features, while adjustment operates only on features with permutation p-values. Every result summary states both counts.
 
+`AssociationResult.plainLanguageSummary` is presentation derived from the same matched values. Binary features report event/control percentages and relative frequency; continuous features report both group averages and the directional difference. Fewer than ten captures in either group is always labeled `interesting, not yet established`. Corrected weak results use the explicit controls-based refutation copy while technical details remain available underneath.
+
+`AmbientDifference` is not persisted and is not an association result. It contains feature, group counts/means, a descriptive ranking score, and a mandatory `descriptive only, not adjusted evidence` statement. Rows require at least one matched value in both groups; missing baselines are omitted rather than invented.
+
 ## Identifier hashes
 
 Raw MAC addresses, Wi-Fi BSSIDs, adapter/system identifiers, Field-Kit device IDs, and TAK UIDs must not enter durable evidence rows. Providers pass a raw identifier directly to the Keystore-backed HMAC utility and persist only the returned `idhash:v<generation>:...` token. A channel namespace is included in the HMAC input. Formatting-equivalent MAC/BSSID values normalize to the same token, and rotating the local key advances the generation and intentionally invalidates future comparisons with older hashes.

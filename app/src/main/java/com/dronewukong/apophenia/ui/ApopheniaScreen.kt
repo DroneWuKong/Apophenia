@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dronewukong.apophenia.correlation.AssociationEngine
 import com.dronewukong.apophenia.correlation.CaptureMatcher
+import com.dronewukong.apophenia.correlation.ConfounderSurfacer
 import com.dronewukong.apophenia.correlation.HypothesisEvaluator
 import com.dronewukong.apophenia.bluetooth.BluetoothContextProvider
 import com.dronewukong.apophenia.data.*
@@ -674,6 +675,7 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
     var selected by remember { mutableStateOf<String?>(null) }
     var results by remember { mutableStateOf<List<Pair<String, com.dronewukong.apophenia.correlation.AssociationResult>>>(emptyList()) }
     var registrationRows by remember { mutableStateOf<List<Pair<Hypothesis, HypothesisEvaluation?>>>(emptyList()) }
+    var ambientDifferences by remember { mutableStateOf<List<com.dronewukong.apophenia.correlation.AmbientDifference>>(emptyList()) }
     LaunchedEffect(refresh) {
         cohorts = withContext(Dispatchers.IO) { repo.db().analysisCohorts() }
         if (selected !in cohorts.map { it.id }) selected = cohorts.firstOrNull()?.id
@@ -713,10 +715,11 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
                 }
             }
             val refreshed = repo.db().hypotheses(10_000).filter { it.enabled && it.metric.isNotBlank() && it.cohortId == selectedCohort }
-            resultRows to refreshed.map { it to repo.db().latestHypothesisEvaluation(it.id) }
+            Triple(resultRows, refreshed.map { it to repo.db().latestHypothesisEvaluation(it.id) }, ConfounderSurfacer.scan(values).take(6))
         }
         results = analysis.first
         registrationRows = analysis.second
+        ambientDifferences = analysis.third
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { ScreenHeader("Patterns", "Explicit event classes compared with one-to-one matched control windows.") }
@@ -766,6 +769,19 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
                     }
                 }
             }
+            if (ambientDifferences.isNotEmpty()) {
+                item { SectionLabel("Ambient differences to check") }
+                item {
+                    Surface(color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f), shape = RoundedCornerShape(14.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Text("These descriptive differences surface possible confounders from the first matched capture. They are not significance tests or causes.", fontSize = 12.sp)
+                            ambientDifferences.forEach { difference ->
+                                Text("• ${difference.summary} (${difference.eventCount} event / ${difference.controlCount} control)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
             if (results.isEmpty()) item { EmptyState("Insufficient context", "More event and control windows are needed for this category.") }
             items(results) { (metric, result) ->
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -775,7 +791,8 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
                             StatusPill(result.strength, MaterialTheme.colorScheme.secondary)
                         }
                         Text("${result.eventCount} events · ${result.controlCount} controls", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 7.dp))
-                        Text(result.summary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 5.dp))
+                        Text(result.plainLanguageSummary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 5.dp))
+                        Text(result.summary, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 7.dp))
                     }
                 }
             }
