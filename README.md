@@ -198,6 +198,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Data model and statistical boundaries](docs/DATA_MODEL.md)
+- [Capture gates and consent tiers](docs/CAPTURE_GATES.md)
 - [Install and remote test guide](docs/INSTALL_AND_TEST.md)
 - [Garmin Epix Pro integration](docs/GARMIN_EPIX_PRO.md)
 - [Optional Octopod home context](docs/HOME_CONTEXT.md)

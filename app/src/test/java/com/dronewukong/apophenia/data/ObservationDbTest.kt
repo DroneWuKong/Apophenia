@@ -7,6 +7,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -112,6 +113,67 @@ class ObservationDbTest {
     }
 
     @Test
+    fun vibeAndEgressAreFirstClassTimestampedEvidence() {
+        val timestamp = 1_780_123_456_789L
+        val id = db.insertObservation(
+            Observation(
+                timestampMs = timestamp,
+                kind = ObservationKind.VIBE,
+                label = VibeGrade.EGRESS_LABEL,
+                origin = ObservationOrigin.WIDGET,
+                vibeRating = 5,
+                egress = true
+            )
+        )
+
+        val stored = db.observations().single()
+        assertEquals(id, stored.id)
+        assertEquals(timestamp, stored.timestampMs)
+        assertEquals(ObservationKind.VIBE, stored.kind)
+        assertEquals(5, stored.vibeRating)
+        assertTrue(stored.egress)
+    }
+
+    @Test
+    fun vibeModelRejectsInvalidOrLeakedFields() {
+        assertThrows(IllegalArgumentException::class.java) {
+            Observation(timestampMs = 1, kind = ObservationKind.VIBE, label = "Bad vibe")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            Observation(
+                timestampMs = 1,
+                kind = ObservationKind.OBSERVATION,
+                label = "Not a vibe",
+                vibeRating = 2
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            Observation(
+                timestampMs = 1,
+                kind = ObservationKind.VIBE,
+                label = "Stayed",
+                vibeRating = 4,
+                egress = true
+            )
+        }
+    }
+
+    @Test
+    fun vibePresentationContractIsExact() {
+        assertEquals(
+            listOf(
+                "Vibe good 🙂",
+                "Tolerable 😐",
+                "Bad 🙁",
+                "Fucked 😖",
+                "Fucky 😵‍💫"
+            ),
+            (1..5).map { VibeGrade.fromRating(it).renderedLabel }
+        )
+        assertEquals("FUCK THIS, I'M OUT", VibeGrade.EGRESS_LABEL)
+    }
+
+    @Test
     fun upgradesVersionTwoDataWithoutLosingRows() {
         db.close()
         context.deleteDatabase("apophenia.db")
@@ -124,7 +186,7 @@ class ObservationDbTest {
         legacy.close()
 
         db = ObservationDb(context)
-        assertEquals(3, db.readableDatabase.version)
+        assertEquals(4, db.readableDatabase.version)
         assertEquals("Legacy", db.observations().single().label)
         assertEquals(ObservationOrigin.ANDROID, db.observations().single().origin)
     }
@@ -132,7 +194,12 @@ class ObservationDbTest {
     @Test
     fun jsonExportIncludesEvidenceHypothesesControlsAndPhases() {
         val observationId = db.insertObservation(
-            Observation(timestampMs = 500, kind = ObservationKind.WEIRD, label = "That was weird")
+            Observation(
+                timestampMs = 500,
+                kind = ObservationKind.VIBE,
+                label = VibeGrade.FUCKED.renderedLabel,
+                vibeRating = VibeGrade.FUCKED.rating
+            )
         )
         db.insertContext(listOf(sample(490, 1009.2).copy(observationId = observationId, phase = ContextPhase.PRE)))
         db.insertContext(listOf(control(600, 1008.0, "control:export")))
@@ -142,8 +209,11 @@ class ObservationDbTest {
         val exported = ExportManager.exportJson(db, outputDirectory)
         val json = JSONObject(exported.readText())
 
-        assertEquals(3, json.getInt("schema"))
-        assertEquals("PRE", json.getJSONArray("observations").getJSONObject(0).getJSONArray("context").getJSONObject(0).getString("phase"))
+        assertEquals(4, json.getInt("schema"))
+        val observation = json.getJSONArray("observations").getJSONObject(0)
+        assertEquals(4, observation.getInt("vibeRating"))
+        assertFalse(observation.getBoolean("egress"))
+        assertEquals("PRE", observation.getJSONArray("context").getJSONObject(0).getString("phase"))
         assertEquals(1, json.getJSONArray("hypotheses").length())
         assertEquals("CONTROL", json.getJSONArray("controls").getJSONObject(0).getString("phase"))
         outputDirectory.deleteRecursively()

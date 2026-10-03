@@ -8,7 +8,7 @@ import com.dronewukong.apophenia.correlation.TimedCaptureValue
 
 data class ObservationInsertResult(val id: Long, val inserted: Boolean)
 
-class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 3) {
+class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 4) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -25,7 +25,9 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
               severity INTEGER,
               confidence INTEGER NOT NULL DEFAULT 3,
               origin TEXT NOT NULL DEFAULT 'ANDROID',
-              external_event_id TEXT
+              external_event_id TEXT,
+              vibe_rating INTEGER CHECK(vibe_rating BETWEEN 1 AND 5),
+              egress INTEGER NOT NULL DEFAULT 0 CHECK(egress IN (0,1))
             )
         """.trimIndent())
         createObservationIndexes(db)
@@ -50,6 +52,10 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
             db.execSQL("ALTER TABLE hypotheses ADD COLUMN note TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE hypotheses ADD COLUMN source TEXT NOT NULL DEFAULT 'ANDROID'")
             createObservationIndexes(db)
+        }
+        if (oldVersion < 4) {
+            db.execSQL("ALTER TABLE observations ADD COLUMN vibe_rating INTEGER CHECK(vibe_rating BETWEEN 1 AND 5)")
+            db.execSQL("ALTER TABLE observations ADD COLUMN egress INTEGER NOT NULL DEFAULT 0 CHECK(egress IN (0,1))")
         }
     }
 
@@ -125,6 +131,8 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
                 if (o.severity == null) putNull("severity") else put("severity", o.severity)
                 put("confidence", o.confidence); put("origin", o.origin.name)
                 if (o.externalEventId == null) putNull("external_event_id") else put("external_event_id", o.externalEventId)
+                if (o.vibeRating == null) putNull("vibe_rating") else put("vibe_rating", o.vibeRating)
+                put("egress", if (o.egress) 1 else 0)
             }
             val insertedId = db.insertWithOnConflict("observations", null, values, SQLiteDatabase.CONFLICT_IGNORE)
             val result = if (insertedId != -1L) ObservationInsertResult(insertedId, true) else {
@@ -239,13 +247,14 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
     fun observations(limit:Int=250):List<Observation>{
         val out=mutableListOf<Observation>()
         readableDatabase.rawQuery(
-            "SELECT id,timestamp_ms,kind,label,note,severity,confidence,origin,external_event_id FROM observations ORDER BY timestamp_ms DESC LIMIT ?",
+            "SELECT id,timestamp_ms,kind,label,note,severity,confidence,origin,external_event_id,vibe_rating,egress FROM observations ORDER BY timestamp_ms DESC LIMIT ?",
             arrayOf(limit.toString())
         ).use { c -> while(c.moveToNext()) out += Observation(
             id=c.getLong(0),timestampMs=c.getLong(1),kind=ObservationKind.valueOf(c.getString(2)),label=c.getString(3),note=c.getString(4),
             severity=if(c.isNull(5))null else c.getInt(5),confidence=c.getInt(6),
             origin=runCatching{ObservationOrigin.valueOf(c.getString(7))}.getOrDefault(ObservationOrigin.ANDROID),
-            externalEventId=if(c.isNull(8))null else c.getString(8)
+            externalEventId=if(c.isNull(8))null else c.getString(8),
+            vibeRating=if(c.isNull(9))null else c.getInt(9),egress=c.getInt(10)==1
         ) }
         return out
     }

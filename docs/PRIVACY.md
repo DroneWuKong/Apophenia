@@ -24,3 +24,11 @@ Not collected by default: radio surveys, microphone recordings, camera recording
 JSON export and delete-all controls are available in Settings. Exported files leave the app's local boundary only when the user chooses a share destination.
 
 Do not attach an unredacted export to a public issue. Use GitHub's private security-advisory channel for an unintended disclosure or permission bypass.
+
+## Total-capture posture
+
+> **This is a personal total-capture instrument.** It records what you authorize, which can include audio, video from every camera, screen contents, messages, notifications, calendar, location, physiology, your vehicle, your aircraft, and the RF spectrum your own receivers can observe. It has no opinions about what you point it at. Nothing leaves your device automatically: exports are explicit, previewed, and tiered; a local export log records every export; an EJECT action exports everything and optionally wipes the store. Recording indicators show when capture is live. Where a capability is restricted, the app discloses the restriction rather than pretending the channel doesn't exist. You are the operator, owner, and only data subject.
+
+That paragraph states the v0.3 target posture. Until the corresponding channel and export steps are merged, the current implementation remains bounded by the capability list and validation evidence in `PROJECT_HANDOFF.md`. Gate presence is not evidence that a capture adapter, Android permission flow, physical device, or export route has been validated.
+
+Device identifiers use a locally keyed, versioned HMAC. Raw MAC addresses, BSSIDs, and adapter/system identifiers are not durable fields. Key rotation deliberately breaks future linkage to older hashes.

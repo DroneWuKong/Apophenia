@@ -3,11 +3,28 @@
 ## Observation
 A human timestamped report. The record is intentionally descriptive rather than interpretive.
 
-Evidence kinds: `OBSERVATION`, `COINCIDENCE`, `WEIRD`. Hypothesis input is routed into the separate hypothesis table even though `HYPOTHESIS_NOTE` remains a compatible input kind.
+Evidence kinds: `OBSERVATION`, `COINCIDENCE`, `WEIRD`, and `VIBE`. Hypothesis input is routed into the separate hypothesis table even though `HYPOTHESIS_NOTE` remains a compatible input kind.
 
 `origin` identifies Android, widget, tile, external intent, Garmin, or simulation input. `external_event_id` is optional and uniquely deduplicates replayable external events within an origin.
 
 A Garmin-originated observation keeps the watch timestamp, rather than replacing it with phone receive time.
+
+### Vibe evidence
+
+`VIBE` is an ordinal, descriptive state captured at tap time. Schema v4 adds:
+
+- `vibe_rating`: required for `VIBE`, integer 1 through 5
+- `egress`: boolean, valid only with `VIBE=5`
+
+The stable presentation mapping is:
+
+1. **Vibe good 🙂**
+2. **Tolerable 😐**
+3. **Bad 🙁**
+4. **Fucked 😖**
+5. **Fucky 😵‍💫**
+
+**FUCK THIS, I'M OUT** records `VIBE=5` plus `egress=true`. Egress is intentionally distinct from rating 5 without departure so later analysis can compare moments the operator left with moments they stayed. Non-VIBE rows cannot contain either VIBE field.
 
 ## Context sample
 A scalar measurement with timestamp, source, metric, value and unit. It may be attached to an observation or marked as a random control.
@@ -31,3 +48,7 @@ An optional neutral check-in notification can create a `prompted-control` when t
 Before analysis, event and control captures are matched one-to-one within a local four-hour time block and weekday/weekend stratum. A control is never reused, and events without an eligible control are excluded from that comparison. This reduces obvious calendar confounding but does not match activity, location, sleep/wake state, or attention.
 
 Analysis aggregates dense values once per event or control capture. Post-event samples and hypothesis rows are excluded from predictor calculations. Results include means, medians, median absolute deviation, standardized effect size with a bootstrap 95% interval, a recorded permutation seed and attainable p-value resolution, split-half directional persistence, and Benjamini-Hochberg false-discovery-rate adjustment. Effect magnitude and strength of evidence are reported separately.
+
+## Identifier hashes
+
+Raw MAC addresses, Wi-Fi BSSIDs, and adapter/system identifiers must not enter durable rows. Providers pass a raw identifier directly to the Keystore-backed HMAC utility and persist only the returned `idhash:v<generation>:...` token. A channel namespace is included in the HMAC input. Formatting-equivalent MAC/BSSID values normalize to the same token, and rotating the local key advances the generation and intentionally invalidates future comparisons with older hashes.

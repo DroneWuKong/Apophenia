@@ -27,9 +27,22 @@ class ObservationRepository(context: Context) {
         timestampMs: Long = System.currentTimeMillis(),
         origin: ObservationOrigin = if (HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION) ObservationOrigin.SIMULATION else ObservationOrigin.ANDROID,
         externalEventId: String? = null,
+        vibeRating: Int? = null,
+        egress: Boolean = false,
         onSaved: ((Long)->Unit)? = null
     ) = log(
-        ObservationCaptureRequest(timestampMs, kind, label, note, severity, confidence, origin, externalEventId),
+        ObservationCaptureRequest(
+            timestampMs = timestampMs,
+            kind = kind,
+            label = label,
+            note = note,
+            severity = severity,
+            confidence = confidence,
+            origin = origin,
+            externalEventId = externalEventId,
+            vibeRating = vibeRating,
+            egress = egress
+        ),
         onSaved
     )
 
@@ -62,7 +75,9 @@ class ObservationRepository(context: Context) {
                     severity = request.severity,
                     confidence = request.confidence,
                     origin = request.origin,
-                    externalEventId = request.externalEventId
+                    externalEventId = request.externalEventId,
+                    vibeRating = request.vibeRating,
+                    egress = request.egress
                 )
             )
             val id = insert.id

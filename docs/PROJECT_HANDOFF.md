@@ -14,7 +14,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - Android min SDK 26
 - explicit hardware/simulation gates
 - local SQLite database
-- observation types: observation, coincidence, hypothesis note, weird
+- observation types: observation, coincidence, hypothesis note, weird, and schema-backed VIBE/egress evidence
 - immediate timestamp-first logging
 - widget and Quick Settings tile
 - random control sampling
@@ -29,7 +29,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - JSON export
 - optional, permission-gated Health Connect reads
 - first-run context onboarding with visible location, notification, weather, and Health Connect status
-- database schema v3 with observation origin, external-event deduplication, and explicit context phase
+- database schema v4 with observation origin, external-event deduplication, explicit context phase, VIBE rating, and egress
 - application-scoped observation repository shared by UI, widget, tile, external intent, and Garmin ingest
 - optional privacy-reduced Octopod home context shared by event and control captures
 - optional privacy-reduced Wi-Fi/BLE/cellular radio snapshots shared by event and control captures
@@ -76,7 +76,7 @@ The Android Garmin bridge uses app id:
 
 ## Hardware boundary
 
-`HardwareGates.kt` is the explicit boundary.
+`HardwareGates.kt` is the explicit boundary. The v0.3 foundation enumerates every planned live channel, persists authorization, and enforces three consent tiers. Authorization is separate from runtime capability: permission denial, platform restriction, absent hardware, and statutory lock remain explicit gap reasons.
 
 Build gates:
 - `LIVE_SENSOR_CAPTURE`
@@ -85,6 +85,10 @@ Build gates:
 - `LIVE_GARMIN_BRIDGE`
 
 Runtime `SIMULATION` bypasses physical adapters while preserving storage and analysis behavior.
+
+Raw MAC addresses, BSSIDs, and adapter/system IDs must pass through `DeviceIdentifierHasher` before persistence. The Android implementation uses a generation-versioned Keystore HMAC and deletes the prior local key on rotation. Pure-key unit tests cover stability, namespace separation, normalization, and rotation invalidation.
+
+See [CAPTURE_GATES.md](CAPTURE_GATES.md) for the complete inventory and confirmation contract.
 
 ## Build
 
@@ -127,6 +131,21 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 - Octopod parsing and simulation are tested; cluster reachability from the physical phone is not yet proven.
 
 ## Next work
+
+The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Step 1 establishes gates, identifier hashing, and schema v4; a gate in this foundation does not claim its adapter has been implemented or physically validated.
+
+### Next physical-validation checklist — 3 October 2026
+
+Run each item only after its implementation PR and software fixtures pass. Record device/firmware, Android version, adapter identity hash, app commit, start/end time, and observed gaps. Simulator evidence never satisfies these items.
+
+- Exercise mic, main/front camera, supported concurrent camera combinations, screen capture, encrypted pre/post freeze, persistent indicator, retention, and scrub on representative phones.
+- Exercise BLE, Wi-Fi, Wi-Fi Direct, NFC, cellular/network state, notification/calendar/contact/message gates, and OEM/API throttling behavior on representative Android versions.
+- Exercise an owned ELM327-compatible adapter through a real ignition cycle, including supported PIDs, unsupported manufacturer PIDs, voltage, and DTC behavior.
+- Exercise MAVLink over each available owned transport, confirm `FLIGHT_SESSION` identity, telemetry-age staleness, STATUSTEXT fidelity, and link-loss recovery without claiming flight validation.
+- Exercise CRSF/GHST and Field-Kit decode paths against representative owned hardware and compare stored link values with the source display/log.
+- Exercise an owned RTL-SDR/OTG receiver, prove raw-IQ window bounds and purge behavior, and record Android USB/power limits.
+- Re-test Garmin/watch delivery, durable receipt behavior, physiology timestamps, disconnect/replay, and one representative physical event-to-phone capture.
+- Only after the preceding gates independently pass, run bounded drive/field/flight sessions and document those results separately from software and bench evidence.
 
 1. Disconnect USB, open Apophenia on the watch, and confirm the v0.3 replacement launches.
 2. Install the `0.3.0-preview.3` debug APK on the physical phone.

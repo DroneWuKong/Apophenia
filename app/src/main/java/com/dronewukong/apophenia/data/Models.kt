@@ -1,8 +1,23 @@
 package com.dronewukong.apophenia.data
 
-enum class ObservationKind { OBSERVATION, COINCIDENCE, HYPOTHESIS_NOTE, WEIRD }
+enum class ObservationKind { OBSERVATION, COINCIDENCE, HYPOTHESIS_NOTE, WEIRD, VIBE }
 enum class ObservationOrigin { ANDROID, WIDGET, TILE, EXTERNAL, GARMIN, SIMULATION }
 enum class ContextPhase { INSTANT, PRE, POST, CONTROL }
+
+enum class VibeGrade(val rating: Int, val renderedLabel: String) {
+    GOOD(1, "Vibe good 🙂"),
+    TOLERABLE(2, "Tolerable 😐"),
+    BAD(3, "Bad 🙁"),
+    FUCKED(4, "Fucked 😖"),
+    FUCKY(5, "Fucky 😵‍💫");
+
+    companion object {
+        const val EGRESS_LABEL = "FUCK THIS, I'M OUT"
+
+        fun fromRating(rating: Int): VibeGrade = entries.firstOrNull { it.rating == rating }
+            ?: throw IllegalArgumentException("Vibe rating must be between 1 and 5")
+    }
+}
 
 data class ObservationCaptureRequest(
     val timestampMs: Long,
@@ -12,8 +27,14 @@ data class ObservationCaptureRequest(
     val severity: Int? = null,
     val confidence: Int = 3,
     val origin: ObservationOrigin = ObservationOrigin.ANDROID,
-    val externalEventId: String? = null
-)
+    val externalEventId: String? = null,
+    val vibeRating: Int? = null,
+    val egress: Boolean = false
+) {
+    init {
+        validateVibe(kind, vibeRating, egress)
+    }
+}
 
 data class Observation(
     val id: Long = 0,
@@ -24,8 +45,14 @@ data class Observation(
     val severity: Int? = null,
     val confidence: Int = 3,
     val origin: ObservationOrigin = ObservationOrigin.ANDROID,
-    val externalEventId: String? = null
-)
+    val externalEventId: String? = null,
+    val vibeRating: Int? = null,
+    val egress: Boolean = false
+) {
+    init {
+        validateVibe(kind, vibeRating, egress)
+    }
+}
 
 data class ContextSample(
     val id: Long = 0,
@@ -51,3 +78,14 @@ data class Hypothesis(
     val note: String = "",
     val source: ObservationOrigin = ObservationOrigin.ANDROID
 )
+
+private fun validateVibe(kind: ObservationKind, vibeRating: Int?, egress: Boolean) {
+    if (kind == ObservationKind.VIBE) {
+        require(vibeRating != null && vibeRating in 1..5) {
+            "VIBE observations require vibeRating from 1 through 5"
+        }
+        require(!egress || vibeRating == 5) { "Egress is a first-class VIBE=5 event" }
+    } else {
+        require(vibeRating == null && !egress) { "Vibe fields are valid only for VIBE observations" }
+    }
+}

@@ -38,6 +38,16 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 
 ## [Unreleased]
 
+### Added
+
+- Total Circumstances gate inventory with standard, deliberate, and capability-conditional consent contracts plus explicit runtime gap reasons.
+- Keystore-backed, generation-versioned HMAC identifiers for MAC addresses, BSSIDs, and adapter/system IDs.
+- Schema v4 `VIBE` evidence with exact 1–5 presentation labels and a first-class `egress` flag.
+
+### Validation
+
+- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, and export coverage run in the software-only unit suite.
+
 ## [0.3.0-preview.2] - 2026-10-02
 
 ### Fixed
