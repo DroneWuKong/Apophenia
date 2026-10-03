@@ -51,6 +51,7 @@ class MainActivitySmokeTest {
         compose.onNodeWithText("Phone sensors").assertIsDisplayed()
         compose.onNodeWithText("Location + weather").assertIsDisplayed()
         compose.onNodeWithText("Health Connect").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Octopod observer").performScrollTo().assertIsDisplayed()
     }
 
     private fun dismissContextIntroIfPresent() {

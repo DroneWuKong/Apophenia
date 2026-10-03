@@ -13,7 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.dronewukong.apophenia.R
-import com.dronewukong.apophenia.data.ObservationDb
+import com.dronewukong.apophenia.data.ObservationStore
 import com.dronewukong.apophenia.hardware.DeviceContextCollector
 import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.hardware.SensorSnapshotCollector
@@ -135,7 +135,7 @@ class RollingRecorderService : Service() {
                 runCatching {
                     val samples = SensorSnapshotCollector(applicationContext).collect(null, false, windowMs = 300)
                         .map { it.copy(source = "buffer/${it.source}", metadata = appendMetadata(it.metadata, "rolling=true")) }
-                    val db = ObservationDb(applicationContext)
+                    val db = ObservationStore.repository(applicationContext).db()
                     db.insertRolling(samples, RollingRecorderConfig.RETENTION_MS)
                     db.captureActivePostWindows(System.currentTimeMillis(), RollingRecorderConfig.POST_WINDOW_MS)
                     samples.size
@@ -148,7 +148,7 @@ class RollingRecorderService : Service() {
                 runCatching {
                     val samples = DeviceContextCollector(applicationContext).collect(null, false)
                         .map { it.copy(source = "buffer/${it.source}", metadata = appendMetadata(it.metadata, "rolling=true")) }
-                    val db = ObservationDb(applicationContext)
+                    val db = ObservationStore.repository(applicationContext).db()
                     db.insertRolling(samples, RollingRecorderConfig.RETENTION_MS)
                     db.captureActivePostWindows(System.currentTimeMillis(), RollingRecorderConfig.POST_WINDOW_MS)
                     samples.size

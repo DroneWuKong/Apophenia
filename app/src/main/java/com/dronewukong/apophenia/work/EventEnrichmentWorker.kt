@@ -2,13 +2,14 @@ package com.dronewukong.apophenia.work
 import android.content.Context
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import com.dronewukong.apophenia.data.ObservationDb
+import com.dronewukong.apophenia.data.ObservationStore
 import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.hardware.DeviceContextCollector
 import com.dronewukong.apophenia.hardware.SensorSnapshotCollector
 import com.dronewukong.apophenia.health.HealthConnectProvider
+import com.dronewukong.apophenia.home.HomeContextProvider
 import kotlinx.coroutines.runBlocking
 class EventEnrichmentWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
- override fun doWork():Result{val id=inputData.getLong(KEY_OBSERVATION_ID,-1L);if(id<=0)return Result.failure();val db=ObservationDb(applicationContext);val samples=mutableListOf<com.dronewukong.apophenia.data.ContextSample>();samples+=runCatching{SensorSnapshotCollector(applicationContext).collect(id,false)}.getOrDefault(emptyList());samples+=runCatching{DeviceContextCollector(applicationContext).collect(id,false)}.getOrDefault(emptyList());samples+=runCatching{EnvironmentProvider(applicationContext).collect(id,false)}.getOrDefault(emptyList());samples+=runBlocking{HealthConnectProvider(applicationContext).collect(id,false)};db.insertContext(samples);return Result.success()}
+ override fun doWork():Result{val id=inputData.getLong(KEY_OBSERVATION_ID,-1L);if(id<=0)return Result.failure();val db=ObservationStore.repository(applicationContext).db();val samples=mutableListOf<com.dronewukong.apophenia.data.ContextSample>();samples+=runCatching{SensorSnapshotCollector(applicationContext).collect(id,false)}.getOrDefault(emptyList());samples+=runCatching{DeviceContextCollector(applicationContext).collect(id,false)}.getOrDefault(emptyList());samples+=runCatching{EnvironmentProvider(applicationContext).collect(id,false)}.getOrDefault(emptyList());samples+=runBlocking{HealthConnectProvider(applicationContext).collect(id,false)};samples+=runCatching{HomeContextProvider(applicationContext).collect(id,false)}.getOrDefault(emptyList());db.insertContext(samples);return Result.success()}
  companion object{const val KEY_OBSERVATION_ID="observation_id"}
 }

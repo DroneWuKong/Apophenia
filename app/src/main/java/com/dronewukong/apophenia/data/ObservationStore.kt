@@ -10,4 +10,11 @@ object ObservationStore {
         instance ?: synchronized(this) {
             instance ?: ObservationRepository(context.applicationContext).also { instance = it }
         }
+
+    /** Test-only lifecycle hook for Robolectric process reuse. */
+    @Synchronized
+    internal fun resetForTests() {
+        instance?.db()?.close()
+        instance = null
+    }
 }

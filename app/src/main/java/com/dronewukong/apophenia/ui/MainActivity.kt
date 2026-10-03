@@ -18,9 +18,6 @@ import androidx.core.content.FileProvider
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
-import com.dronewukong.apophenia.data.ObservationKind
-import com.dronewukong.apophenia.data.ObservationOrigin
-import com.dronewukong.apophenia.data.ObservationStore
 import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import kotlinx.coroutines.launch
@@ -69,12 +66,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleDeepLink(intent)
         GarminBridge.initialize(this)
         setContent { ApopheniaScreen(this) }
     }
-
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); handleDeepLink(intent) }
 
     override fun onResume() {
         super.onResume()
@@ -170,16 +164,6 @@ class MainActivity : ComponentActivity() {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }, "Share Apophenia export"))
-    }
-
-    private fun handleDeepLink(intent: Intent?) {
-        val uri = intent?.data ?: return
-        if (uri.scheme == "apophenia" && uri.host == "log") {
-            val label = uri.getQueryParameter("label") ?: "External observation"
-            val note = uri.getQueryParameter("note") ?: ""
-            val capturedAt = System.currentTimeMillis()
-            ObservationStore.repository(this).log(ObservationKind.OBSERVATION, label, note, timestampMs = capturedAt, origin = ObservationOrigin.EXTERNAL)
-        }
     }
 
     companion object {

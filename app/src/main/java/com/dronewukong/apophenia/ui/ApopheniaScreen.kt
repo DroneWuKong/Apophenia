@@ -27,6 +27,8 @@ import com.dronewukong.apophenia.export.ExportManager
 import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.health.HealthConnectAccess
+import com.dronewukong.apophenia.home.HomeContextProvider
+import com.dronewukong.apophenia.home.HomeContextSettings
 import com.dronewukong.apophenia.rolling.RollingRecorderService
 import com.dronewukong.apophenia.rolling.RollingRecorderHealth
 import com.dronewukong.apophenia.rolling.RollingRecorderState
@@ -308,6 +310,9 @@ private fun LogTab(repo: ObservationRepository, onSaved: () -> Unit, onOpenSetti
 private fun TimelineTab(repo: ObservationRepository, refresh: Int) {
     var rows by remember { mutableStateOf<List<Observation>>(emptyList()) }
     var hypotheses by remember { mutableStateOf<List<Hypothesis>>(emptyList()) }
+    var expandedId by remember { mutableStateOf<Long?>(null) }
+    var contextByObservation by remember { mutableStateOf<Map<Long, List<ContextSample>>>(emptyMap()) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(refresh) {
         val loaded = withContext(Dispatchers.IO) { repo.observations() to repo.hypotheses() }
         rows = loaded.first
@@ -325,15 +330,47 @@ private fun TimelineTab(repo: ObservationRepository, refresh: Int) {
         if (rows.isNotEmpty()) {
             item { SectionLabel("Observations") }
             items(rows, key = { "o-${it.id}" }) { observation ->
-                TimelineCard(observation.label, observation.kind.name.replace('_', ' '), observation.timestampMs, observation.note, MaterialTheme.colorScheme.primary)
+                val expanded = expandedId == observation.id
+                TimelineCard(
+                    title = observation.label,
+                    type = observation.kind.name.replace('_', ' '),
+                    timestampMs = observation.timestampMs,
+                    note = observation.note,
+                    accent = MaterialTheme.colorScheme.primary,
+                    origin = observation.origin.name,
+                    expanded = expanded,
+                    context = contextByObservation[observation.id],
+                    onClick = {
+                        expandedId = if (expanded) null else observation.id
+                        if (!expanded && observation.id !in contextByObservation) {
+                            scope.launch {
+                                val samples = withContext(Dispatchers.IO) { repo.db().contextForObservation(observation.id) }
+                                contextByObservation = contextByObservation + (observation.id to samples)
+                            }
+                        }
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun TimelineCard(title: String, type: String, timestampMs: Long, note: String, accent: Color) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+private fun TimelineCard(
+    title: String,
+    type: String,
+    timestampMs: Long,
+    note: String,
+    accent: Color,
+    origin: String? = null,
+    expanded: Boolean = false,
+    context: List<ContextSample>? = null,
+    onClick: (() -> Unit)? = null
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        onClick = onClick ?: {}
+    ) {
         Column(Modifier.fillMaxWidth().padding(15.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(color = accent.copy(alpha = 0.14f), shape = RoundedCornerShape(8.dp)) {
@@ -344,6 +381,47 @@ private fun TimelineCard(title: String, type: String, timestampMs: Long, note: S
             }
             Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 10.dp))
             if (note.isNotBlank()) Text(note, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp))
+            if (origin != null) {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("$origin · timestamp $timestampMs", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (expanded) {
+                HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                when {
+                    context == null -> Text("Loading context capsule…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    context.isEmpty() -> Text("No context values yet. Enrichment may still be running.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    else -> {
+                        val phases = context.groupingBy { it.phase }.eachCount()
+                        val sources = context.map { it.source.substringBefore('/') }.distinct().sorted()
+                        Text("CONTEXT CAPSULE", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp, color = accent)
+                        Text(
+                            buildList {
+                                phases[ContextPhase.PRE]?.let { add("$it pre") }
+                                phases[ContextPhase.INSTANT]?.let { add("$it instant") }
+                                phases[ContextPhase.POST]?.let { add("$it post") }
+                            }.joinToString(" · ").ifBlank { "${context.size} values" },
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 5.dp)
+                        )
+                        Text(sources.joinToString(" · "), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 3.dp))
+                        context.filter { it.phase != ContextPhase.POST }
+                            .distinctBy { it.metric }
+                            .take(8)
+                            .forEach { sample ->
+                                Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                                    Text(sample.metric.replace('_', ' '), fontSize = 12.sp, modifier = Modifier.weight(1f))
+                                    Text("${"%.2f".format(sample.value)} ${sample.unit}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        if (context.any { it.phase == ContextPhase.POST }) {
+                            Text("Post-event values are visible here but never used as predictors.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -431,6 +509,10 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var notificationsAllowed by remember { mutableStateOf(activity.hasNotificationPermission()) }
     var weatherStatus by remember { mutableStateOf(if (locationAllowed) "Ready to check" else "Location off") }
     var weatherChecking by remember { mutableStateOf(false) }
+    var homeEnabled by remember { mutableStateOf(HomeContextSettings.isEnabled(activity)) }
+    var homeEndpoint by remember { mutableStateOf(HomeContextSettings.endpoint(activity)) }
+    var homeStatus by remember { mutableStateOf(if (homeEnabled) "Ready to check" else "Off") }
+    var homeChecking by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -467,6 +549,28 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
             weatherChecking = false
             onMessage(weatherStatus)
+        }
+    }
+
+    fun testHomeContext() {
+        if (homeChecking) return
+        val saved = runCatching { HomeContextSettings.setEndpoint(activity, homeEndpoint) }.isSuccess
+        if (!saved) {
+            homeStatus = "Use an http:// or https:// cluster address"
+            onMessage(homeStatus)
+            return
+        }
+        homeChecking = true
+        homeStatus = "Checking Octopod…"
+        scope.launch {
+            val samples = withContext(Dispatchers.IO) { HomeContextProvider(activity).collect(null, false, force = true) }
+            homeStatus = if (samples.isEmpty()) {
+                "No cluster response · check Wi-Fi, DNS, and Octopod"
+            } else {
+                "Connected · ${samples.size} aggregate context signals"
+            }
+            homeChecking = false
+            onMessage(homeStatus)
         }
     }
 
@@ -562,6 +666,37 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { GarminBridge.refresh(activity); onMessage(GarminBridge.statusText) }, modifier = Modifier.weight(1f)) { Text("Refresh") }
                     Button(onClick = { GarminBridge.openWatchLogger(activity); onMessage(GarminBridge.statusText) }, modifier = Modifier.weight(1f)) { Text("Open logger") }
+                }
+            }
+        }
+
+        item { SectionLabel("Home context") }
+        item {
+            SettingsCard(Icons.Default.Home, "Octopod observer", "Optional read-only context from your home cluster.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = homeEnabled, onCheckedChange = { enabled ->
+                        homeEnabled = enabled
+                        HomeContextSettings.setEnabled(activity, enabled)
+                        homeStatus = if (enabled) "Enabled · test the cluster connection" else "Off"
+                    })
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (homeEnabled) "Included in events and controls" else "Not collecting", fontWeight = FontWeight.SemiBold)
+                        Text(homeStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                }
+                OutlinedTextField(
+                    value = homeEndpoint,
+                    onValueChange = { homeEndpoint = it },
+                    label = { Text("Octopod cluster address") },
+                    supportingText = { Text("Aggregates only · no names, video, audio, or service tokens") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedButton(onClick = ::testHomeContext, enabled = !homeChecking, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.WifiFind, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (homeChecking) "Checking…" else "Save and test")
                 }
             }
         }

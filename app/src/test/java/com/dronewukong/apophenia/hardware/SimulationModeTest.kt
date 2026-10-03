@@ -7,6 +7,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import com.dronewukong.apophenia.data.Observation
 import com.dronewukong.apophenia.data.ObservationDb
 import com.dronewukong.apophenia.data.ObservationKind
+import com.dronewukong.apophenia.data.ObservationStore
 import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.work.EventEnrichmentWorker
 import com.dronewukong.apophenia.work.ControlSampleWorker
@@ -28,6 +29,7 @@ class SimulationModeTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        ObservationStore.resetForTests()
         context.deleteDatabase("apophenia.db")
         HardwareGates.setRuntimeMode(context, HardwareGates.RuntimeMode.SIMULATION)
     }
@@ -35,6 +37,7 @@ class SimulationModeTest {
     @After
     fun tearDown() {
         HardwareGates.setRuntimeMode(context, HardwareGates.RuntimeMode.LIVE)
+        ObservationStore.resetForTests()
         context.deleteDatabase("apophenia.db")
     }
 
