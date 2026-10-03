@@ -15,9 +15,9 @@ import com.dronewukong.apophenia.work.PostEventWindowWorker
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-class ObservationRepository(context: Context) {
+class ObservationRepository(context: Context, databaseName: String = "apophenia.db") {
     private val app = context.applicationContext
-    private val db = ObservationDb(app)
+    private val db = ObservationDb(app, databaseName)
     private val main = Handler(Looper.getMainLooper())
 
     fun log(
@@ -107,13 +107,13 @@ class ObservationRepository(context: Context) {
 
             WorkManager.getInstance(app).enqueue(
                 OneTimeWorkRequestBuilder<EventEnrichmentWorker>()
-                    .setInputData(Data.Builder().putLong(EventEnrichmentWorker.KEY_OBSERVATION_ID, id).build())
+                    .setInputData(Data.Builder().putLong(EventEnrichmentWorker.KEY_OBSERVATION_ID, id).putBoolean(EventEnrichmentWorker.KEY_DEMO_DATABASE, db.isDemoDatabase).build())
                     .build()
             )
             WorkManager.getInstance(app).enqueue(
                 OneTimeWorkRequestBuilder<PostEventWindowWorker>()
                     .setInitialDelay(RollingRecorderConfig.POST_WINDOW_MS + 60_000L, TimeUnit.MILLISECONDS)
-                    .setInputData(Data.Builder().putLong(PostEventWindowWorker.KEY_OBSERVATION_ID, id).putLong(PostEventWindowWorker.KEY_EVENT_TS, request.timestampMs).build())
+                    .setInputData(Data.Builder().putLong(PostEventWindowWorker.KEY_OBSERVATION_ID, id).putLong(PostEventWindowWorker.KEY_EVENT_TS, request.timestampMs).putBoolean(PostEventWindowWorker.KEY_DEMO_DATABASE, db.isDemoDatabase).build())
                     .build()
             )
             if (onSaved != null) main.post { onSaved.invoke(id, true) }

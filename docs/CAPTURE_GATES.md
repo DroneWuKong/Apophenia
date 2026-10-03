@@ -14,6 +14,8 @@ Current capability gap reasons are `GATE_OFF`, `PERMISSION_DENIED`, `PLATFORM_RE
 
 FIELD, DRIVE, HOME, EVERYTHING, and TOTAL_EVIDENCE use a measured 1.5-second hold as deliberate bulk authorization. They never grant an Android permission or start a device/session. Every capture preset excludes `LIVE_EXPORT_LAN`, so capture arming cannot become data movement. See [TOTAL_EVIDENCE.md](TOTAL_EVIDENCE.md).
 
+Demo mode forces `SIMULATION` and switches to a separate database. Gate state and simulated values remain visible, but no fixture is a live-channel or hardware claim. See [DEMO_MODE.md](DEMO_MODE.md).
+
 ## Tier 1 — standard
 
 - `LIVE_SENSOR_CAPTURE`

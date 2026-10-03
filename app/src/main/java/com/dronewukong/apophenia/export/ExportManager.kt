@@ -8,6 +8,7 @@ import org.json.JSONObject
 
 object ExportManager {
     fun exportJson(db: ObservationDb, dir: File): File {
+        require(!db.isDemoDatabase) { "DEMO DATA is excluded from live exports" }
         dir.mkdirs()
         val root = JSONObject().put("schema", 9).put("exportedAtMs", System.currentTimeMillis())
         val observations = JSONArray()

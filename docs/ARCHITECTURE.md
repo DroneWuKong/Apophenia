@@ -90,6 +90,7 @@ UI / widget / tile / external intent / Garmin
 | `MediaEvidenceReader` | Ciphertext/hash verification plus memory-only PCM or MJPEG decryption for the in-app player |
 | `OmniprobeInspector` | Per-event join across ordinary context, encrypted Tier-2 rows, media inventory, purge history, gate capability, and explicit gap accounting |
 | `EvidencePresetManager` | Deliberate bulk gate authorization, active-mode persistence, and bounded audio pre-buffer selection without permission or service side effects |
+| `DemoModeManager` / `DemoFixtureInstaller` | Repository isolation, forced simulation, deterministic fixture installation, and live-mode restoration for the separate demo database |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -172,6 +173,10 @@ The overlay separately collects the current process-wide AV ring state. It label
 ## Evidence modes
 
 `EvidencePresetManager` is a gate-selection layer, not a hardware orchestrator. A successful 1.5-second hold applies the standard, deliberate, or capability-conditional proof required by each target gate, records the mode, and selects the next audio pre-buffer duration. It never invokes an Activity Result permission contract or starts a service. The always-visible status strip joins that persisted mode with the live `AudioRingCaptureManager` and `VideoRingCaptureManager` flows, keeping authorization and actual buffering distinct. See [TOTAL_EVIDENCE.md](TOTAL_EVIDENCE.md).
+
+## Demo repository boundary
+
+`ObservationStore` owns one canonical live repository and one lazy demo repository. The demo database uses the same schema and analysis code but a different SQLite filename. UI repository selection follows `DemoModeManager.state`; background repository lookups follow the same process state. Demo activation forces SIMULATION and deactivation restores the previous runtime. `ExportManager` rejects the demo database even if called directly. See [DEMO_MODE.md](DEMO_MODE.md).
 
 ## Software-only boundary
 

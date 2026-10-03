@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -40,6 +41,7 @@ import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.presets.EvidencePreset
 import com.dronewukong.apophenia.presets.EvidencePresetManager
 import com.dronewukong.apophenia.video.VideoRingCaptureManager
+import com.dronewukong.apophenia.demo.DemoModeManager
 
 @Composable
 internal fun EvidenceMasterStatus(activity: MainActivity) {
@@ -47,6 +49,7 @@ internal fun EvidenceMasterStatus(activity: MainActivity) {
     val revision by HardwareGates.authorizationRevision.collectAsState()
     val audio by AudioRingCaptureManager.state.collectAsState()
     val video by VideoRingCaptureManager.state.collectAsState()
+    val demo by DemoModeManager.state.collectAsState()
     val armed = remember(revision) { HardwareGates.Gate.entries.count { HardwareGates.isAuthorized(activity, it) } }
     val mode = when {
         evidence.totalEvidenceActive -> "TOTAL EVIDENCE"
@@ -57,7 +60,7 @@ internal fun EvidenceMasterStatus(activity: MainActivity) {
         if (audio.active) add("audio ${audio.preSeconds}s")
         if (video.active) add("video ${video.activeStreams.size}")
     }.joinToString(" + ").ifBlank { "rings off" }
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant, tonalElevation = 1.dp) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, tonalElevation = 1.dp, modifier = if (demo.active) Modifier.semantics { contentDescription = "Demo data badge" } else Modifier) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -69,7 +72,7 @@ internal fun EvidenceMasterStatus(activity: MainActivity) {
                 tint = if (audio.active || video.active) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.width(12.dp)
             )
-            Text("$mode · $armed gates armed · $ring", fontSize = 11.sp, maxLines = 1, modifier = Modifier.weight(1f))
+            Text("${if (demo.active) "DEMO DATA · " else ""}$mode · $armed gates armed · $ring", fontSize = 11.sp, maxLines = 1, modifier = Modifier.weight(1f), color = if (demo.active) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface)
         }
     }
 }

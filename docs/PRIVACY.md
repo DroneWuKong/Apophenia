@@ -43,6 +43,8 @@ Omniprobe is a local inspection surface, not an export route. It may decrypt an 
 
 TOTAL_EVIDENCE and the session presets are capture-only controls. Even EVERYTHING excludes the LAN export gate. Arming a preset requests no Android permission, starts no connection or recording service, and sends no data; live services and screen consent remain separate operator actions. The persistent status strip distinguishes gate count from actual AV ring state.
 
+Demo fixtures live in a separate SQLite database and are labeled **DEMO DATA** across the app. The live exporter refuses that database; while demo mode is active, export still reads the canonical live store. Synthetic rows therefore cannot be mistaken for or bundled with live evidence through the current JSON route.
+
 Do not attach an unredacted export to a public issue. Use GitHub's private security-advisory channel for an unintended disclosure or permission bypass.
 
 ## Total-capture posture

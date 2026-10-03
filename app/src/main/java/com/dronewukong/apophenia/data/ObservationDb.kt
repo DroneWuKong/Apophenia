@@ -8,7 +8,8 @@ import com.dronewukong.apophenia.correlation.TimedCaptureValue
 
 data class ObservationInsertResult(val id: Long, val inserted: Boolean)
 
-class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 9) {
+class ObservationDb(context: Context, databaseName: String = "apophenia.db") : SQLiteOpenHelper(context, databaseName, null, 9) {
+    val isDemoDatabase: Boolean = databaseName == "apophenia-demo.db"
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)

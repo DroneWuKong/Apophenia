@@ -233,6 +233,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Plain-language results and confounder surfacing](docs/PLAIN_LANGUAGE_AND_CONFOUNDERS.md)
 - [Omniprobe event inventory](docs/OMNIPROBE.md)
 - [TOTAL_EVIDENCE and session presets](docs/TOTAL_EVIDENCE.md)
+- [Isolated demo mode and fixtures](docs/DEMO_MODE.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)

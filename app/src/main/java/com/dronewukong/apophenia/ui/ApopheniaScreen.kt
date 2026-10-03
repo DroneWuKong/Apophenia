@@ -25,6 +25,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -73,6 +75,9 @@ import com.dronewukong.apophenia.rf.RfSurveyContextProvider
 import com.dronewukong.apophenia.rf.RfSurveySettings
 import com.dronewukong.apophenia.audio.AudioRingCaptureManager
 import com.dronewukong.apophenia.audio.AudioRingCaptureService
+import com.dronewukong.apophenia.demo.DemoFixtureInstaller
+import com.dronewukong.apophenia.demo.DemoFixtureSummary
+import com.dronewukong.apophenia.demo.DemoModeManager
 import com.dronewukong.apophenia.video.CallAudioCapability
 import com.dronewukong.apophenia.video.CallConsentJurisdiction
 import com.dronewukong.apophenia.video.CameraCaptureService
@@ -129,7 +134,8 @@ private val appTypography = Typography(
 
 @Composable
 fun ApopheniaScreen(activity: MainActivity) {
-    val repo = remember { ObservationStore.repository(activity) }
+    val demoMode by DemoModeManager.state.collectAsState()
+    val repo = remember(demoMode.active) { ObservationStore.repository(activity, demoMode.active) }
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var tab by remember { mutableStateOf(Tab.LOG) }
@@ -137,6 +143,7 @@ fun ApopheniaScreen(activity: MainActivity) {
     val introPrefs = remember { activity.getSharedPreferences("onboarding", Context.MODE_PRIVATE) }
     var showContextIntro by remember { mutableStateOf(!introPrefs.getBoolean("context_intro_v1", false)) }
     fun message(text: String) { scope.launch { snackbar.showSnackbar(text) } }
+    LaunchedEffect(demoMode.active) { refresh++ }
 
     MaterialTheme(colorScheme = appColors, typography = appTypography) {
         Scaffold(
@@ -903,6 +910,8 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var videoFrameIndex by remember { mutableIntStateOf(0) }
     var videoTitle by remember { mutableStateOf("") }
     var showOmniprobe by remember { mutableStateOf(false) }
+    val demoMode by DemoModeManager.state.collectAsState()
+    var demoSummary by remember { mutableStateOf<DemoFixtureSummary?>(null) }
     val permissionRevision = activity.permissionRevision
 
     fun refreshGateToggles() {
@@ -954,6 +963,11 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             mediaAssets = snapshot.first
             purgeLedger = snapshot.second
         }
+    }
+
+    fun refreshDemoSummary() {
+        if (!demoMode.active) { demoSummary = null; return }
+        scope.launch { demoSummary = withContext(Dispatchers.IO) { DemoFixtureInstaller.summary(ObservationStore.demoRepository(activity).db()) } }
     }
 
     fun testWeather() {
@@ -1155,7 +1169,8 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     }
 
     LaunchedEffect(permissionRevision) { refreshPermissionState() }
-    LaunchedEffect(Unit) { refreshRolling(); refreshMedia() }
+    LaunchedEffect(Unit) { refreshRolling(); refreshMedia(); refreshDemoSummary() }
+    LaunchedEffect(demoMode.active) { simulation = HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION; refreshDemoSummary() }
     DisposableEffect(Unit) {
         onDispose { runCatching { audioTrack?.stop() }; audioTrack?.release(); audioTrack = null }
     }
@@ -2143,6 +2158,47 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
 
         item { SectionLabel("Testing") }
         item {
+            SettingsCard(Icons.Default.Dataset, "Demo mode", "A separate synthetic database: 60 days, 45 events, 120 controls, six credibility stories, and no live-export eligibility.") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(if (demoMode.active) "DEMO DATA active" else "Live data active", fontWeight = FontWeight.SemiBold)
+                        val summary = demoSummary
+                        if (summary != null) Text("${summary.eventCount} events · ${summary.controlCaptureCount} controls · ${summary.registeredHypothesisCount} registration · ${summary.flightSessionCount} flight session", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                        else Text("Fixtures remain isolated in apophenia-demo.db.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                    Switch(checked = demoMode.active, modifier = Modifier.semantics { contentDescription = "Toggle demo mode" }, onCheckedChange = { enabled ->
+                        if (audioRingState.active || audioRingState.pendingEvents > 0 || videoRingState.active || videoRingState.pendingEvents > 0 || driveState.active || flightState.armed || controlLinkState.active) {
+                            onMessage("Disarm AV, drive, flight, and control-link sessions before changing the demo/live database boundary")
+                            return@Switch
+                        }
+                        if (enabled) {
+                            scope.launch {
+                                val summary = withContext(Dispatchers.IO) { DemoFixtureInstaller.ensureInstalled(ObservationStore.demoRepository(activity).db()) }
+                                DemoModeManager.enable(activity)
+                                simulation = true
+                                demoSummary = summary
+                                onMessage("DEMO DATA active · ${summary.eventCount} synthetic events · live database untouched")
+                            }
+                        } else {
+                            DemoModeManager.disable(activity)
+                            simulation = HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION
+                            demoSummary = null
+                            onMessage("Demo mode off · returned to the live database")
+                        }
+                    })
+                }
+                if (demoMode.active) {
+                    OutlinedButton(onClick = {
+                        scope.launch {
+                            demoSummary = withContext(Dispatchers.IO) { DemoFixtureInstaller.reset(ObservationStore.demoRepository(activity).db()) }
+                            onMessage("Demo fixtures reset to the deterministic 60-day corpus")
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Reset demo fixtures") }
+                }
+                Text("The badge stays visible on every tab. Demo mode forces SIMULATION; disabling it restores the previous runtime mode.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
+        item {
             SettingsCard(Icons.Default.Science, "Simulation mode", "Runs the complete pipeline without physical sensors or services.") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = simulation, onCheckedChange = { enabled ->
@@ -2151,7 +2207,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                         GarminBridge.shutdown(activity)
                         GarminBridge.initialize(activity)
                         onMessage(if (enabled) "Simulation mode enabled" else "Live mode enabled")
-                    })
+                    }, enabled = !demoMode.active)
                     Spacer(Modifier.width(12.dp))
                     StatusPill(if (simulation) "SIMULATION" else "LIVE", if (simulation) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary)
                 }
@@ -2171,15 +2227,15 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(onClick = {
                         scope.launch {
-                            val file = withContext(Dispatchers.IO) { ExportManager.exportJson(repo.db(), File(activity.cacheDir, "exports")) }
+                            val file = withContext(Dispatchers.IO) { ExportManager.exportJson(ObservationStore.liveRepository(activity).db(), File(activity.cacheDir, "exports")) }
                             onMessage("Created ${file.name}")
                             activity.shareExport(file)
                         }
                     }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.IosShare, null); Spacer(Modifier.width(8.dp)); Text("Export JSON")
+                        Icon(Icons.Default.IosShare, null); Spacer(Modifier.width(8.dp)); Text(if (demoMode.active) "Export live JSON (demo excluded)" else "Export JSON")
                     }
-                    OutlinedButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                        Icon(Icons.Default.Delete, null); Spacer(Modifier.width(8.dp)); Text("Delete all local data")
+                    OutlinedButton(onClick = { confirmDelete = true }, enabled = !demoMode.active, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                        Icon(Icons.Default.Delete, null); Spacer(Modifier.width(8.dp)); Text(if (demoMode.active) "Live delete unavailable in demo" else "Delete all local data")
                     }
                 }
             }

@@ -72,6 +72,9 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Honest `NO_SAMPLE_IN_WINDOW` and `NO_ACTIVE_SESSION` states so an empty authorized window is not mislabeled as permission denial or absent hardware.
 - An always-visible evidence-mode strip plus deliberate FIELD, DRIVE, HOME, EVERYTHING, and TOTAL_EVIDENCE arming. Presets never request Android permissions, start hardware sessions, or authorize the LAN export gate.
 - Preset-aware microphone pre-buffer selection: FIELD, DRIVE, EVERYTHING, and TOTAL_EVIDENCE use the supported 120-second maximum when the audio service is explicitly started.
+- A structurally isolated `apophenia-demo.db` mode with a persistent DEMO DATA badge, 45 events across about 60 days, 120 control groups, rolling samples, one registration, a flight session, and a purged AV fixture.
+- Six deterministic credibility stories covering corrected BLE presence, a refuted poor-sleep registration, small-n weather, egress, cross-domain flight context, and retained-then-purged AV-derived evidence.
+- Hard live-export exclusion for demo databases; the Settings exporter continues to target the canonical live database while demo mode is active.
 - First-class **Egress · bailed** and **Bad vibes · stayed** analysis cohorts, kept separate from ordinary label cohorts.
 - Binary hashed-device presence features for every observed BLE/Wi-Fi identity, with missing channel windows excluded rather than treated as absence.
 - Required multiple-comparisons scope on every result: total features tested, eligible features, Benjamini-Hochberg method, and explicit **indistinguishable from noise** labeling after correction.

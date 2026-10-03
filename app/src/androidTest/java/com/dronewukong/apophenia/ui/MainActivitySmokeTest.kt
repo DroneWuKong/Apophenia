@@ -5,12 +5,14 @@ import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.dronewukong.apophenia.data.ObservationDb
+import com.dronewukong.apophenia.demo.DemoModeManager
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -24,12 +26,17 @@ class MainActivitySmokeTest {
 
     @Before
     fun clearData() {
+        DemoModeManager.disable(compose.activity)
         ObservationDb(compose.activity).apply { deleteAllData(); close() }
+        ObservationDb(compose.activity, DemoModeManager.DATABASE_NAME).apply { deleteAllData(); close() }
+        compose.waitForIdle()
     }
 
     @After
     fun cleanUp() {
+        DemoModeManager.disable(compose.activity)
         ObservationDb(compose.activity).apply { deleteAllData(); close() }
+        ObservationDb(compose.activity, DemoModeManager.DATABASE_NAME).apply { deleteAllData(); close() }
     }
 
     @Test
@@ -106,9 +113,23 @@ class MainActivitySmokeTest {
         dismissContextIntroIfPresent()
         compose.onNodeWithText("Settings").performClick()
         scrollSettingsTo("Omniprobe")
-        compose.onNodeWithText("Open Omniprobe").performClick()
+        compose.onNodeWithText("Open Omniprobe").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithText("Every planned gate, every stored value, every explained gap").assertIsDisplayed()
         compose.onNodeWithText("No events yet. Log an observation, then return to inspect its circumstances.").assertIsDisplayed()
+    }
+
+    @Test
+    fun demoModeLoadsIsolatedFixturesAndShowsPersistentBadge() {
+        dismissContextIntroIfPresent()
+        compose.onNodeWithText("Settings").performClick()
+        scrollSettingsTo("Demo mode")
+        compose.onNodeWithContentDescription("Toggle demo mode").performClick()
+        compose.waitUntil(timeoutMillis = 30_000) {
+            compose.onAllNodesWithText("DEMO DATA", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithContentDescription("Demo data badge").assertIsDisplayed()
+        compose.onNodeWithText("Timeline").performClick()
+        compose.onNodeWithContentDescription("Demo data badge").assertIsDisplayed()
     }
 
     private fun dismissContextIntroIfPresent() {
