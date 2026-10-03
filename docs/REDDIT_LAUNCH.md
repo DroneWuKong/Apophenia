@@ -19,7 +19,7 @@ Alternative titles:
 >
 > The core interaction is intentionally simple: tap **THAT WAS WEIRD** (or a specific category) and the app saves the exact timestamp immediately. Any slower sensor, device, location, weather, Health Connect, or Garmin enrichment happens afterward.
 >
-> If you explicitly enable the rolling recorder, it keeps a bounded 30-minute local context buffer. When you log something, the preceding window is copied into durable event context and the app continues collecting a labeled post-event window. It also creates random control windows through the same pipeline, so event conditions can be compared with ordinary baseline conditions.
+> If you explicitly enable the rolling recorder, it keeps a bounded 30-minute local context buffer. When you log something, the preceding window is copied into durable event context and the app continues collecting a labeled post-event window. It creates random controls through the same pipeline and matches them one-to-one by time block and weekday/weekend. Optional neutral check-ins let you explicitly record “nothing unusual” without turning an unanswered notification into data.
 >
 > A few boundaries mattered to me:
 >
@@ -36,7 +36,7 @@ Alternative titles:
 >
 > Source: https://github.com/DroneWuKong/Apophenia
 >
-> Download: [REPLACE WITH PUBLIC GITHUB RELEASE LINK]
+> Download: https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.1
 >
 > I’d especially appreciate feedback on the one-tap flow, permission onboarding, battery behavior on different Android vendors, and whether the analysis language feels appropriately cautious. Please don’t post real location or health exports in public issues.
 
@@ -57,8 +57,8 @@ Do not use a screenshot containing real locations, health values, device identif
 ## Before posting
 
 - [ ] Merge the release commit to `main`.
-- [ ] Publish a GitHub pre-release with the APK and SHA-256 checksum.
-- [ ] Replace the download placeholder above.
+- [x] Publish a GitHub pre-release with the APK and SHA-256 checksum.
+- [x] Replace the download placeholder above.
 - [ ] Verify the link while signed out of GitHub.
 - [ ] State exactly which physical devices were tested.
 - [ ] Keep “development preview” in the post until physical acceptance is complete.

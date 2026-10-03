@@ -4,6 +4,8 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 
 ## [Unreleased]
 
+## [0.3.0-preview.1] - 2026-10-02
+
 ### Added
 
 - Public contribution, security, conduct, installation, architecture, release, and launch documentation.

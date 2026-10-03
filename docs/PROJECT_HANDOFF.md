@@ -113,6 +113,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 - Native Android location and notification permission prompts were exercised on the emulator. Weather returned a live Open-Meteo result after location approval.
 - Health Connect's permission controller was exercised end-to-end on the emulator, including the required privacy-rationale declaration, six read permissions, and optional background access. The app returned to a connected state.
 - APK produced at `app/build/outputs/apk/debug/app-debug.apk`.
+- Development pre-release published at `https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.1` from tested commit `49b2992f480cf8cee67ae777aafd439d5ac87948`; attached APK SHA-256 is `87335C2812B5C1553C4FA007AE101BFCCAA44D839D3E46C146AE7C43C12D4924`.
 - Connect IQ SDK 9.2.0: all three Epix Pro targets compiled.
 - Garmin Run No Evil: all four pending-queue tests passed on the Epix Pro 47 mm simulator.
 - None of the above is physical Android or Garmin hardware validation.
@@ -126,5 +127,5 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 5. Validate each available physical sensor and confirm unavailable values are omitted.
 6. Validate Health Connect permission and data behavior on supported physical devices.
 7. Validate weather enrichment with real permission/network/location conditions.
-8. Merge the accepted release commit, publish a pre-release APK with its SHA-256 checksum, and replace the placeholder in `docs/REDDIT_LAUNCH.md`.
+8. Merge the accepted release/documentation commits to `main` after review; the development pre-release already points to the tested branch commit.
 9. Add external observer nodes / Home Assistant / ESP32 ingestion only as later scoped work.

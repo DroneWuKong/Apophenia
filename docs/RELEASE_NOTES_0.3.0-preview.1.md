@@ -19,4 +19,6 @@ The attached APK uses an Android debug signature. Export anything you need befor
 
 The Android unit/lint/build suite and emulator UI tests are the software gate. Connect IQ compilation and simulator queue tests are separate Garmin software evidence. Follow [PHYSICAL_ACCEPTANCE.md](PHYSICAL_ACCEPTANCE.md) before describing any phone/watch combination as hardware validated.
 
-The APK SHA-256 is recorded on the GitHub release page.
+Download: https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.1
+
+Attached `app-debug.apk` SHA-256: `87335C2812B5C1553C4FA007AE101BFCCAA44D839D3E46C146AE7C43C12D4924`.
