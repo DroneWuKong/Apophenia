@@ -122,6 +122,15 @@ class ObservationRepository(context: Context) {
 
     fun observations(limit: Int = 250): List<Observation> = db.observations(limit)
     fun hypotheses(limit: Int = 250): List<Hypothesis> = db.hypotheses(limit)
+    fun registerHypothesis(hypothesis: Hypothesis, featureKey: String, onSaved: ((Long?) -> Unit)? = null) {
+        require(hypothesis.eventLabel.isNotBlank()) { "A registration needs an event class" }
+        require(hypothesis.metric.isNotBlank()) { "A registration needs an exact metric" }
+        require(hypothesis.note.isNotBlank()) { "A registration needs an expected association" }
+        executor.execute {
+            val id = db.insertHypothesisIfUnviewed(hypothesis, featureKey)
+            if (onSaved != null) main.post { onSaved(id) }
+        }
+    }
     fun insertContext(samples: List<ContextSample>) = db.insertContext(samples)
     fun db(): ObservationDb = db
 

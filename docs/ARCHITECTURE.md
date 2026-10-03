@@ -54,6 +54,7 @@ UI / widget / tile / external intent / Garmin
 | `PromptedCheckInWorker` | Optionally asks for a neutral “nothing unusual” response without fabricating a control from an unanswered prompt |
 | `CaptureMatcher` | Selects one-to-one controls in the same local four-hour and weekday/weekend stratum |
 | `AssociationEngine` | Matched event/control summaries, robust spread, effect interval, seeded permutation, persistence, tested-feature disclosure, and FDR-adjusted results |
+| `HypothesisEvaluator` | Exact registration-to-feature mapping, corrected direction outcome, deterministic snapshot signature, and append-only evaluation creation |
 | `HardwareGates` | Compile/runtime boundary for phone sensors, location, weather, and Garmin |
 | `HealthConnectProvider` | Optional read-only historical wearable context |
 | `HomeContextProvider` | Optional read-only aggregate Home Assistant/SmartThings/Wyze context through Octopod |
@@ -152,6 +153,8 @@ Raw audio and video remain encrypted, app-private artifacts. Schema v8 registers
 The engine describes associations rather than causes. Its unit of comparison is an event/control capture, not every dense sensor row. Controls are used at most once and matched on local four-hour block plus weekday/weekend. Effect magnitude is kept separate from evidence strength so a large but uncertain estimate is not mislabeled as a strong finding. The engine records its random seed, permutation count and p-value resolution; reports a bootstrap 95% effect interval; and adjusts families of eligible metric comparisons with Benjamini-Hochberg FDR. Every result discloses the full feature count tested and eligible count. Corrected weak hits are labeled **indistinguishable from noise**. These labels remain exploratory and do not establish clinical or causal meaning.
 
 VIBE egress and high-bad-vibe-without-egress are separate cohorts. BLE/Wi-Fi hashed identities become binary presence features per capture. A 0 is generated only when the corresponding channel emitted its aggregate count for that capture; a missing/gated/failed channel is omitted, not recoded as absence. See [ENGINE_CREDIBILITY.md](ENGINE_CREDIBILITY.md).
+
+Schema v9 pre-registration binds a timestamp to cohort, exact metric, expected direction, and instant or ten-minute pre-event window. Opening an eligible Patterns feature records an analysis-view boundary. The same exact feature can no longer be backdated as a pre-registration. An existing earlier registration locks on its first eligible evaluation; later data may append a new signed analysis snapshot without altering the registered claim. See [HYPOTHESIS_PREREGISTRATION.md](HYPOTHESIS_PREREGISTRATION.md).
 
 The current matcher does not control for activity, location, sleep/wake state, or attention. Optional prompted neutral check-ins reduce reliance on passive random times but do not remove self-selection bias.
 

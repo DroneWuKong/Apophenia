@@ -70,6 +70,7 @@ Long-duration survival and OEM battery restrictions are physical-device validati
 - Log several observations and wait for control generation.
 - Expected: the normal timeline/database/analysis path works without physical sensor, GPS, weather, Health Connect, or Garmin access.
 - In **Patterns**, confirm **Egress · bailed** and **Bad vibes · stayed** appear as separate event classes when those fixtures exist. Every result must state how many features were tested and how many were eligible for Benjamini-Hochberg correction; weak corrected results must say **indistinguishable from noise**.
+- Before opening a result, use **Hypothesis** on the Log screen to register a cohort, exact metric, direction, window, and expected association. Open that event class in **Patterns**: an eligible result must lock and report confirmed/not yet supported/refuted. Try registering the same exact feature after viewing it; the app must refuse to call it a pre-registration. Insufficient data must leave the earlier registration unlocked.
 
 ## Physical soak and watch delivery
 

@@ -89,7 +89,11 @@ These rows are captured only when both the deliberate app gate and the correspon
 - post-event samples: durable for exploration, excluded from predictor calculations
 
 ## Hypothesis
-Kept separate from observations so theories can change without rewriting evidence.
+Kept separate from observations so theories never rewrite evidence. Legacy free-form notes may have an empty metric and are labeled as notes, not pre-registrations.
+
+Schema v9 registrations add `cohort_id`, `window_start_ms`, `window_end_ms`, and nullable `locked_at_ms` to the existing timestamp, event label, metric, direction, note, enabled flag, and source. Direction is `HIGHER`, `LOWER`, or `ANY`; supported windows are instant, 0–10, 10–20, or 20–30 minutes before the event. `analysis_views` stores the first time an exact cohort/feature result was opened and prevents a later insert from being called a pre-registration.
+
+`hypothesis_evaluations` is append-only by `(hypothesis_id, analysis_signature)`. It records evaluation time, outcome (`CONFIRMED`, `NOT_YET_SUPPORTED`, or `REFUTED`), matched counts, adjusted p, delta, comparison count, and honest summary. An eligible corrected result locks the registration. Insufficient data creates no evaluation and does not lock. Corrected `p<=0.05` in the registered direction confirms; the opposite direction refutes; otherwise the result is not yet supported. These are association outcomes, not causal proof.
 
 ## Controls
 Random control samples are scheduled at jittered intervals and assigned a capture ID. They copy the same 30-minute rolling window used for events and then collect the same instantaneous providers. They provide a baseline so common conditions are not mistaken for meaningful associations.

@@ -87,6 +87,17 @@ class MainActivitySmokeTest {
         ).forEach(::scrollSettingsTo)
     }
 
+    @Test
+    fun hypothesisActionOpensStructuredPreregistration() {
+        dismissContextIntroIfPresent()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Hypothesis"))
+        compose.onNodeWithText("Hypothesis").performClick()
+        compose.onNodeWithText("Record hypothesis").assertIsDisplayed()
+        compose.onNodeWithText("Register the expectation before opening results. Once an eligible result is viewed, this registration locks.").assertIsDisplayed()
+        compose.onNodeWithText("Exact context metric").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Expected direction").performScrollTo().assertIsDisplayed()
+    }
+
     private fun dismissContextIntroIfPresent() {
         if (compose.onAllNodesWithText("Not now").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithText("Not now").performClick()

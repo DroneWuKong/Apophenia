@@ -91,6 +91,7 @@ The app explains what works without a prompt and lets you review optional access
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 - Explicit egress/stayed event classes, hashed per-device presence features, and a visible count of every feature tested so weak hits are labeled indistinguishable from noise
+- Timestamped hypothesis pre-registration for cohort, metric, direction, and window, with post-result locking and confirmed/not-yet-supported/refuted evaluations
 
 There is no account, advertising SDK, analytics, or automatic upload. Microphone capture exists only behind its deliberate gate and explicit armed state, with a persistent Android indicator.
 
@@ -227,6 +228,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Video, screen, and call-audio capability](docs/VIDEO_SCREEN_CALL.md)
 - [AV retention and encrypted evidence player](docs/AV_RETENTION.md)
 - [Association-engine credibility](docs/ENGINE_CREDIBILITY.md)
+- [Hypothesis pre-registration](docs/HYPOTHESIS_PREREGISTRATION.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)

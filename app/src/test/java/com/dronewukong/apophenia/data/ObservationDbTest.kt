@@ -186,7 +186,7 @@ class ObservationDbTest {
         legacy.close()
 
         db = ObservationDb(context)
-        assertEquals(8, db.readableDatabase.version)
+        assertEquals(9, db.readableDatabase.version)
         assertEquals("Legacy", db.observations().single().label)
         assertEquals(ObservationOrigin.ANDROID, db.observations().single().origin)
     }
@@ -244,7 +244,7 @@ class ObservationDbTest {
         val exported = ExportManager.exportJson(db, outputDirectory)
         val json = JSONObject(exported.readText())
 
-        assertEquals(8, json.getInt("schema"))
+        assertEquals(9, json.getInt("schema"))
         val observation = json.getJSONArray("observations").getJSONObject(0)
         assertEquals(4, observation.getInt("vibeRating"))
         assertFalse(observation.getBoolean("egress"))
@@ -345,6 +345,49 @@ class ObservationDbTest {
         assertEquals(listOf(1.0, 0.0), alpha.second.map { it.value })
         assertEquals(2, alpha.first.size)
         assertTrue(features.containsKey("bluetooth device presence · idhash:v1:beta"))
+    }
+
+    @Test
+    fun hypothesisRegistrationLocksOnFirstEligibleEvaluationAndKeepsHistoryImmutable() {
+        val id = db.insertHypothesis(Hypothesis(
+            createdAtMs = 1_000, eventLabel = "Egress · bailed", cohortId = AnalysisCohort.EGRESS,
+            metric = "network_signal_dbm", direction = HypothesisDirection.LOWER,
+            windowStartMs = 0, windowEndMs = 600_000, note = "Egress follows weaker signal"
+        ))
+        val original = db.hypotheses().single()
+        assertTrue(db.updateHypothesisRegistration(original.copy(note = "Clarified before results")))
+        val evaluation = HypothesisEvaluation(
+            hypothesisId = id, evaluatedAtMs = 2_000, analysisSignature = "snapshot-one",
+            outcome = HypothesisOutcome.CONFIRMED, eventCount = 12, controlCount = 12,
+            adjustedP = 0.02, delta = -18.0, comparisonsTested = 24, summary = "Confirmed test result"
+        )
+        assertTrue(db.recordHypothesisEvaluation(evaluation))
+        assertFalse(db.recordHypothesisEvaluation(evaluation.copy(evaluatedAtMs = 3_000)))
+        assertFalse(db.updateHypothesisRegistration(db.hypotheses().single().copy(note = "Too late")))
+        assertThrows(android.database.sqlite.SQLiteException::class.java) {
+            db.writableDatabase.execSQL("UPDATE hypotheses SET note='raw rewrite' WHERE id=?", arrayOf(id))
+        }
+
+        val locked = db.hypotheses().single()
+        assertEquals(2_000L, locked.lockedAtMs)
+        assertEquals("Clarified before results", locked.note)
+        assertEquals(HypothesisOutcome.CONFIRMED, db.latestHypothesisEvaluation(id)?.outcome)
+        assertEquals(1, db.hypothesisEvaluations(id).size)
+    }
+
+    @Test
+    fun anAlreadyViewedExactResultCannotBeBackdatedAsAPreregistration() {
+        val registration = Hypothesis(
+            createdAtMs = 5_000, eventLabel = "Egress · bailed", cohortId = AnalysisCohort.EGRESS,
+            metric = "pressure_hpa", direction = HypothesisDirection.HIGHER, note = "Pressure rises before egress"
+        )
+        assertTrue(db.insertHypothesisIfUnviewed(registration, "pressure_hpa") != null)
+        db.recordAnalysisView(AnalysisCohort.EGRESS, "pressure_hpa · 0-10m pre", 6_000, "view-one")
+        assertTrue(db.hasAnalysisView(AnalysisCohort.EGRESS, "pressure_hpa · 0-10m pre"))
+        assertEquals(null, db.insertHypothesisIfUnviewed(
+            registration.copy(createdAtMs = 7_000, windowStartMs = 0, windowEndMs = 600_000),
+            "pressure_hpa · 0-10m pre"
+        ))
     }
 
     private fun sample(timestamp: Long, value: Double) = ContextSample(

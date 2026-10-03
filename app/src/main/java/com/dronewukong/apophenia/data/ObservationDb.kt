@@ -8,7 +8,7 @@ import com.dronewukong.apophenia.correlation.TimedCaptureValue
 
 data class ObservationInsertResult(val id: Long, val inserted: Boolean)
 
-class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 8) {
+class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 9) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -34,6 +34,8 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         createContextTable(db)
         createRollingTable(db)
         createHypothesisTable(db)
+        createHypothesisEvaluationTable(db)
+        createAnalysisViewTable(db)
         createSensitiveContextTable(db)
         createCaptureSessionTable(db)
         createSessionEventTable(db)
@@ -69,6 +71,15 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         }
         if (oldVersion < 7) createSessionEventTable(db)
         if (oldVersion < 8) createMediaTables(db)
+        if (oldVersion < 9) {
+            db.execSQL("ALTER TABLE hypotheses ADD COLUMN cohort_id TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE hypotheses ADD COLUMN window_start_ms INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE hypotheses ADD COLUMN window_end_ms INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE hypotheses ADD COLUMN locked_at_ms INTEGER")
+            db.execSQL("UPDATE hypotheses SET cohort_id='label:' || event_label WHERE cohort_id=''")
+            createHypothesisEvaluationTable(db)
+            createAnalysisViewTable(db)
+        }
     }
 
     private fun createObservationIndexes(db: SQLiteDatabase) {
@@ -129,7 +140,53 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
               direction TEXT NOT NULL DEFAULT 'ANY',
               enabled INTEGER NOT NULL DEFAULT 1,
               note TEXT NOT NULL DEFAULT '',
-              source TEXT NOT NULL DEFAULT 'ANDROID'
+              source TEXT NOT NULL DEFAULT 'ANDROID',
+              cohort_id TEXT NOT NULL DEFAULT '',
+              window_start_ms INTEGER NOT NULL DEFAULT 0,
+              window_end_ms INTEGER NOT NULL DEFAULT 0,
+              locked_at_ms INTEGER
+            )
+        """.trimIndent())
+    }
+
+    private fun createHypothesisEvaluationTable(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS hypothesis_evaluations(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              hypothesis_id INTEGER NOT NULL,
+              evaluated_at_ms INTEGER NOT NULL,
+              analysis_signature TEXT NOT NULL,
+              outcome TEXT NOT NULL,
+              event_count INTEGER NOT NULL,
+              control_count INTEGER NOT NULL,
+              adjusted_p REAL,
+              delta REAL,
+              comparisons_tested INTEGER NOT NULL,
+              summary TEXT NOT NULL,
+              UNIQUE(hypothesis_id,analysis_signature),
+              FOREIGN KEY(hypothesis_id) REFERENCES hypotheses(id) ON DELETE CASCADE
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_hypothesis_evaluation ON hypothesis_evaluations(hypothesis_id,evaluated_at_ms)")
+        db.execSQL("""
+            CREATE TRIGGER IF NOT EXISTS prevent_locked_hypothesis_update
+            BEFORE UPDATE OF event_label,metric,direction,enabled,note,cohort_id,window_start_ms,window_end_ms ON hypotheses
+            WHEN OLD.locked_at_ms IS NOT NULL
+            BEGIN
+              SELECT RAISE(ABORT,'locked hypothesis registrations are immutable');
+            END
+        """.trimIndent())
+    }
+
+    private fun createAnalysisViewTable(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS analysis_views(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              cohort_id TEXT NOT NULL,
+              feature_key TEXT NOT NULL,
+              first_viewed_at_ms INTEGER NOT NULL,
+              latest_signature TEXT NOT NULL,
+              UNIQUE(cohort_id,feature_key)
             )
         """.trimIndent())
     }
@@ -254,21 +311,96 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
 
     fun insertHypothesis(h: Hypothesis): Long = writableDatabase.insertOrThrow("hypotheses", null, ContentValues().apply {
         put("created_at_ms", h.createdAtMs); put("event_label", h.eventLabel); put("metric", h.metric)
-        put("direction", h.direction); put("enabled", if (h.enabled) 1 else 0); put("note", h.note); put("source", h.source.name)
+        put("direction", h.direction.name); put("enabled", if (h.enabled) 1 else 0); put("note", h.note); put("source", h.source.name)
+        put("cohort_id", h.cohortId); put("window_start_ms", h.windowStartMs); put("window_end_ms", h.windowEndMs)
+        if (h.lockedAtMs == null) putNull("locked_at_ms") else put("locked_at_ms", h.lockedAtMs)
     })
+
+    fun insertHypothesisIfUnviewed(h: Hypothesis, featureKey: String): Long? {
+        val database = writableDatabase
+        database.beginTransaction()
+        try {
+            val viewed = database.rawQuery("SELECT 1 FROM analysis_views WHERE cohort_id=? AND feature_key=? LIMIT 1", arrayOf(h.cohortId, featureKey)).use { it.moveToFirst() }
+            if (viewed) return null
+            val id = insertHypothesis(h)
+            database.setTransactionSuccessful()
+            return id
+        } finally { database.endTransaction() }
+    }
+
+    fun recordAnalysisView(cohortId: String, featureKey: String, viewedAtMs: Long, signature: String) {
+        val database = writableDatabase
+        database.beginTransaction()
+        try {
+            database.insertWithOnConflict("analysis_views", null, ContentValues().apply {
+                put("cohort_id", cohortId); put("feature_key", featureKey); put("first_viewed_at_ms", viewedAtMs); put("latest_signature", signature)
+            }, SQLiteDatabase.CONFLICT_IGNORE)
+            database.update("analysis_views", ContentValues().apply { put("latest_signature", signature) }, "cohort_id=? AND feature_key=?", arrayOf(cohortId, featureKey))
+            database.setTransactionSuccessful()
+        } finally { database.endTransaction() }
+    }
+
+    fun hasAnalysisView(cohortId: String, featureKey: String): Boolean = readableDatabase.rawQuery(
+        "SELECT 1 FROM analysis_views WHERE cohort_id=? AND feature_key=? LIMIT 1", arrayOf(cohortId, featureKey)
+    ).use { it.moveToFirst() }
 
     fun hypotheses(limit: Int = 250): List<Hypothesis> {
         val out = mutableListOf<Hypothesis>()
         readableDatabase.rawQuery(
-            "SELECT id,created_at_ms,event_label,metric,direction,enabled,note,source FROM hypotheses ORDER BY created_at_ms DESC LIMIT ?",
+            "SELECT id,created_at_ms,event_label,metric,direction,enabled,note,source,cohort_id,window_start_ms,window_end_ms,locked_at_ms FROM hypotheses ORDER BY created_at_ms DESC LIMIT ?",
             arrayOf(limit.toString())
         ).use { c -> while (c.moveToNext()) out += Hypothesis(
             id=c.getLong(0), createdAtMs=c.getLong(1), eventLabel=c.getString(2), metric=c.getString(3),
-            direction=c.getString(4), enabled=c.getInt(5)==1, note=c.getString(6),
-            source=runCatching { ObservationOrigin.valueOf(c.getString(7)) }.getOrDefault(ObservationOrigin.ANDROID)
+            direction=runCatching { HypothesisDirection.valueOf(c.getString(4)) }.getOrDefault(HypothesisDirection.ANY), enabled=c.getInt(5)==1, note=c.getString(6),
+            source=runCatching { ObservationOrigin.valueOf(c.getString(7)) }.getOrDefault(ObservationOrigin.ANDROID),
+            cohortId=c.getString(8).ifBlank { AnalysisCohort.labelId(c.getString(2)) }, windowStartMs=c.getLong(9), windowEndMs=c.getLong(10),
+            lockedAtMs=if(c.isNull(11))null else c.getLong(11)
         ) }
         return out
     }
+
+    fun updateHypothesisRegistration(h: Hypothesis): Boolean = writableDatabase.update(
+        "hypotheses",
+        ContentValues().apply {
+            put("event_label", h.eventLabel); put("metric", h.metric); put("direction", h.direction.name); put("enabled", if(h.enabled)1 else 0)
+            put("note", h.note); put("cohort_id", h.cohortId); put("window_start_ms", h.windowStartMs); put("window_end_ms", h.windowEndMs)
+        },
+        "id=? AND locked_at_ms IS NULL",
+        arrayOf(h.id.toString())
+    ) > 0
+
+    fun recordHypothesisEvaluation(evaluation: HypothesisEvaluation): Boolean {
+        val database = writableDatabase
+        database.beginTransaction()
+        try {
+            val inserted = database.insertWithOnConflict("hypothesis_evaluations", null, ContentValues().apply {
+                put("hypothesis_id", evaluation.hypothesisId); put("evaluated_at_ms", evaluation.evaluatedAtMs)
+                put("analysis_signature", evaluation.analysisSignature); put("outcome", evaluation.outcome.name)
+                put("event_count", evaluation.eventCount); put("control_count", evaluation.controlCount)
+                if (evaluation.adjustedP == null) putNull("adjusted_p") else put("adjusted_p", evaluation.adjustedP)
+                if (evaluation.delta == null) putNull("delta") else put("delta", evaluation.delta)
+                put("comparisons_tested", evaluation.comparisonsTested); put("summary", evaluation.summary)
+            }, SQLiteDatabase.CONFLICT_IGNORE)
+            database.execSQL("UPDATE hypotheses SET locked_at_ms=COALESCE(locked_at_ms,?) WHERE id=?", arrayOf(evaluation.evaluatedAtMs, evaluation.hypothesisId))
+            database.setTransactionSuccessful()
+            return inserted != -1L
+        } finally { database.endTransaction() }
+    }
+
+    fun hypothesisEvaluations(hypothesisId: Long, limit: Int = 100): List<HypothesisEvaluation> {
+        val out = mutableListOf<HypothesisEvaluation>()
+        readableDatabase.rawQuery(
+            "SELECT id,hypothesis_id,evaluated_at_ms,analysis_signature,outcome,event_count,control_count,adjusted_p,delta,comparisons_tested,summary FROM hypothesis_evaluations WHERE hypothesis_id=? ORDER BY evaluated_at_ms DESC,id DESC LIMIT ?",
+            arrayOf(hypothesisId.toString(), limit.toString())
+        ).use { c -> while(c.moveToNext()) out += HypothesisEvaluation(
+            id=c.getLong(0), hypothesisId=c.getLong(1), evaluatedAtMs=c.getLong(2), analysisSignature=c.getString(3), outcome=HypothesisOutcome.valueOf(c.getString(4)),
+            eventCount=c.getInt(5), controlCount=c.getInt(6), adjustedP=if(c.isNull(7))null else c.getDouble(7), delta=if(c.isNull(8))null else c.getDouble(8),
+            comparisonsTested=c.getInt(9), summary=c.getString(10)
+        ) }
+        return out
+    }
+
+    fun latestHypothesisEvaluation(hypothesisId: Long): HypothesisEvaluation? = hypothesisEvaluations(hypothesisId, 1).firstOrNull()
 
     fun observationTimestamp(id: Long): Long? = readableDatabase.rawQuery(
         "SELECT timestamp_ms FROM observations WHERE id=?", arrayOf(id.toString())
@@ -809,7 +941,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
 
     fun deleteAllData(){
         writableDatabase.beginTransaction()
-        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("session_events",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("media_assets",null,null); writableDatabase.delete("purge_ledger",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.setTransactionSuccessful() }
+        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("session_events",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypothesis_evaluations",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("analysis_views",null,null); writableDatabase.delete("media_assets",null,null); writableDatabase.delete("purge_ledger",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.setTransactionSuccessful() }
         finally { writableDatabase.endTransaction() }
     }
 

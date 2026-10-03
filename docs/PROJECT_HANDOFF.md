@@ -30,7 +30,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - JSON export
 - optional, permission-gated Health Connect reads
 - first-run context onboarding with visible location, notification, weather, and Health Connect status
-- database schema v8 with observation origin, external-event deduplication, explicit context phase/session identity, VIBE rating, egress, capture-session lifecycle/events, an isolated encrypted Tier-2 content table, and AV media/purge inventory
+- database schema v9 with observation origin, external-event deduplication, explicit context phase/session identity, VIBE rating, egress, capture-session lifecycle/events, an isolated encrypted Tier-2 content table, AV media/purge inventory, and immutable hypothesis registration/evaluation history
 - application-scoped observation repository shared by UI, widget, tile, external intent, and Garmin ingest
 - optional privacy-reduced Octopod home context shared by event and control captures
 - optional privacy-reduced Wi-Fi/cellular aggregate snapshots shared by event and control captures
@@ -45,6 +45,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - expandable timeline context capsules with explicit pre/instant/post phases
 - schema-backed encrypted AV retention with configurable new-capture deadlines, per-event keep-forever/scrub, startup/service expiry, anti-resurrection, purge ledger, and memory-only evidence playback
 - explicit egress/stayed analysis cohorts, per-hashed-device BLE/Wi-Fi presence features, and mandatory tested/eligible feature counts with corrected noise labeling
+- exact cohort/metric/direction/window hypothesis pre-registration, analysis-view anti-backdating, and append-only confirmed/not-yet-supported/refuted evaluations
 
 ## Garmin Epix Pro (Gen 2)
 
@@ -128,7 +129,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 ## Validation status — 2026-10-03
 
 - `./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug`: passed locally on JDK 17.
-- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v8 migration, rolling pre/post separation, control/session grouping and matching, egress/stayed cohorts, per-device presence/missing-channel handling, prompted neutral controls, hypothesis separation, data-only JSON export, AES-GCM/AAD integrity, Tier-2 isolation, ELM327 response/PID/DTC/session behavior, Automotive property provenance/gap behavior, MAVLink 1/2 framing/CRC/session/filtering/STATUSTEXT/staleness behavior, CRSF/GHST CRC/link layouts, Field-Kit hashing/triggers, TAK own/full filtering, AV retention/keep/scrub/path-containment/anti-resurrection behavior, multiple-comparison disclosures, association statistics, Garmin packet parsing/ingest/retry behavior, and the full simulated enrichment/database path.
+- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v9 migration, rolling pre/post separation, control/session grouping and matching, egress/stayed cohorts, per-device presence/missing-channel handling, prompted neutral controls, hypothesis separation/pre-registration/locking/anti-backdating/evaluation outcomes, data-only JSON export, AES-GCM/AAD integrity, Tier-2 isolation, ELM327 response/PID/DTC/session behavior, Automotive property provenance/gap behavior, MAVLink 1/2 framing/CRC/session/filtering/STATUSTEXT/staleness behavior, CRSF/GHST CRC/link layouts, Field-Kit hashing/triggers, TAK own/full filtering, AV retention/keep/scrub/path-containment/anti-resurrection behavior, multiple-comparison disclosures, association statistics, Garmin packet parsing/ingest/retry behavior, and the full simulated enrichment/database path.
 - `./gradlew.bat connectedDebugAndroidTest`: three tests passed on an API 36.1 Android emulator; they cover the logging surface, **THAT WAS WEIRD**, VIBE/egress capture, the timeline, and the expanded optional-context/Tier-2 settings surface.
 - Native Android location and notification permission prompts were exercised on the emulator. Weather returned a live Open-Meteo result after location approval.
 - Health Connect's permission controller was exercised end-to-end on the emulator, including the required privacy-rationale declaration, six read permissions, and optional background access. The app returned to a connected state.
@@ -143,7 +144,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 
 ## Next work
 
-The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Steps 1–13 now cover gates/hashing/VIBE, quick capture, Bluetooth, phone/Tier-2 context, OBD-II drive sessions, native Automotive properties, MAVLink flight sessions, CRSF/GHST, Field-Kit, TAK, ground context, bounded RTL-SDR survey windows, audio, camera/multicam, screen rings, derived AV metrics, the call-audio capability stub, durable AV retention/player controls, and the first engine-credibility pass. These are software and simulator results, not physical validation.
+The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Steps 1–14 now cover gates/hashing/VIBE, quick capture, Bluetooth, phone/Tier-2 context, OBD-II drive sessions, native Automotive properties, MAVLink flight sessions, CRSF/GHST, Field-Kit, TAK, ground context, bounded RTL-SDR survey windows, audio, camera/multicam, screen rings, derived AV metrics, the call-audio capability stub, durable AV retention/player controls, engine-credibility disclosures, and hypothesis pre-registration. These are software and simulator results, not physical validation.
 
 ### Next physical-validation checklist — 3 October 2026
 

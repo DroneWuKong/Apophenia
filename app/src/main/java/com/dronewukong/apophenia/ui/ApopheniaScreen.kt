@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.AudioTrack
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dronewukong.apophenia.correlation.AssociationEngine
 import com.dronewukong.apophenia.correlation.CaptureMatcher
+import com.dronewukong.apophenia.correlation.HypothesisEvaluator
 import com.dronewukong.apophenia.bluetooth.BluetoothContextProvider
 import com.dronewukong.apophenia.data.*
 import com.dronewukong.apophenia.environment.EnvironmentProvider
@@ -198,6 +201,12 @@ private fun LogTab(repo: ObservationRepository, onSaved: () -> Unit, onOpenSetti
     var label by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf(ObservationKind.OBSERVATION) }
+    var hypothesisMetric by remember { mutableStateOf("") }
+    var hypothesisDirection by remember { mutableStateOf(HypothesisDirection.ANY) }
+    var hypothesisWindow by remember { mutableStateOf(HypothesisWindow.INSTANT) }
+    var hypothesisCohort by remember { mutableStateOf("label") }
+    var hypothesisSaving by remember { mutableStateOf(false) }
+    var hypothesisError by remember { mutableStateOf<String?>(null) }
     var pendingVibeNote by remember { mutableStateOf<PendingVibeNote?>(null) }
     var vibeNote by remember { mutableStateOf("") }
     var common by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -318,7 +327,11 @@ private fun LogTab(repo: ObservationRepository, onSaved: () -> Unit, onOpenSetti
                         FilledTonalButton(
                             onClick = {
                                 kind = action.kind
-                                label = action.captureLabel
+                                label = if (action.kind == ObservationKind.HYPOTHESIS_NOTE) "" else action.captureLabel
+                                if (action.kind == ObservationKind.HYPOTHESIS_NOTE) {
+                                    note = ""; hypothesisMetric = ""; hypothesisDirection = HypothesisDirection.ANY
+                                    hypothesisWindow = HypothesisWindow.INSTANT; hypothesisCohort = "label"; hypothesisError = null
+                                }
                                 showForm = true
                             },
                             modifier = Modifier.weight(1f).height(62.dp),
@@ -371,23 +384,52 @@ private fun LogTab(repo: ObservationRepository, onSaved: () -> Unit, onOpenSetti
             onDismissRequest = { showForm = false },
             title = { Text(title) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        label = { Text(if (kind == ObservationKind.HYPOTHESIS_NOTE) "What is the hypothesis?" else "What did you notice?") },
-                        value = label,
-                        onValueChange = { label = it },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(label = { Text("Optional note") }, value = note, onValueChange = { note = it }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (kind == ObservationKind.HYPOTHESIS_NOTE) {
+                        Text("Register the expectation before opening results. Once an eligible result is viewed, this registration locks.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                        Text("Event class", fontWeight = FontWeight.SemiBold)
+                        listOf("label" to "Named label", AnalysisCohort.EGRESS to "Egress · bailed", AnalysisCohort.BAD_VIBE_STAYED to "Bad vibes · stayed").forEach { (id, title) ->
+                            FilterChip(selected = hypothesisCohort == id, onClick = { hypothesisCohort = id }, label = { Text(title) }, modifier = Modifier.fillMaxWidth())
+                        }
+                        if (hypothesisCohort == "label") OutlinedTextField(label = { Text("Exact event label") }, value = label, onValueChange = { label = it }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(label = { Text("Exact context metric") }, value = hypothesisMetric, onValueChange = { hypothesisMetric = it.trim() }, supportingText = { Text("Example: pressure_hpa or bt_nearby_count") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        Text("Expected direction", fontWeight = FontWeight.SemiBold)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            HypothesisDirection.entries.forEach { direction -> FilterChip(selected = hypothesisDirection == direction, onClick = { hypothesisDirection = direction }, label = { Text(direction.name.lowercase()) }, modifier = Modifier.weight(1f)) }
+                        }
+                        Text("Window", fontWeight = FontWeight.SemiBold)
+                        HypothesisWindow.entries.forEach { window -> FilterChip(selected = hypothesisWindow == window, onClick = { hypothesisWindow = window }, label = { Text(window.displayName) }, modifier = Modifier.fillMaxWidth()) }
+                        OutlinedTextField(label = { Text("Expected association") }, value = note, onValueChange = { note = it }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                        hypothesisError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+                    } else {
+                        OutlinedTextField(label = { Text("What did you notice?") }, value = label, onValueChange = { label = it }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(label = { Text("Optional note") }, value = note, onValueChange = { note = it }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                    }
                 }
             },
             confirmButton = {
-                Button(onClick = {
+                Button(enabled = !hypothesisSaving && (kind != ObservationKind.HYPOTHESIS_NOTE || (hypothesisMetric.isNotBlank() && note.isNotBlank() && (hypothesisCohort != "label" || label.isNotBlank()))), onClick = {
                     val capturedAt = System.currentTimeMillis()
-                    repo.log(kind, label, note, timestampMs = capturedAt, onSaved = { onSaved() })
-                    showForm = false
-                    note = ""
-                }) { Text("Log now") }
+                    if (kind == ObservationKind.HYPOTHESIS_NOTE) {
+                        val cohortId = if (hypothesisCohort == "label") AnalysisCohort.labelId(label.trim()) else hypothesisCohort
+                        val eventLabel = when (cohortId) {
+                            AnalysisCohort.EGRESS -> "Egress · bailed"
+                            AnalysisCohort.BAD_VIBE_STAYED -> "Bad vibes · stayed"
+                            else -> label.trim()
+                        }
+                        val registration = Hypothesis(createdAtMs = capturedAt, eventLabel = eventLabel, metric = hypothesisMetric, direction = hypothesisDirection, note = note.trim(), cohortId = cohortId, windowStartMs = hypothesisWindow.fromBeforeMs, windowEndMs = hypothesisWindow.toBeforeMs)
+                        hypothesisSaving = true
+                        repo.registerHypothesis(registration, HypothesisEvaluator.resultKey(registration)) { id ->
+                            hypothesisSaving = false
+                            if (id == null) hypothesisError = "Results for this exact cohort, metric, and window were already viewed. This cannot be labeled a pre-registration."
+                            else { showForm = false; note = ""; hypothesisError = null; onSaved() }
+                        }
+                    } else {
+                        repo.log(kind, label, note, timestampMs = capturedAt, onSaved = { onSaved() })
+                        showForm = false
+                        note = ""
+                    }
+                }) { Text(if (hypothesisSaving) "Registering…" else if (kind == ObservationKind.HYPOTHESIS_NOTE) "Register now" else "Log now") }
             },
             dismissButton = { TextButton(onClick = { showForm = false }) { Text("Cancel") } }
         )
@@ -493,13 +535,18 @@ private fun EgressCaptureButton(onCapture: () -> Unit, onNote: () -> Unit) {
 private fun TimelineTab(repo: ObservationRepository, refresh: Int) {
     var rows by remember { mutableStateOf<List<Observation>>(emptyList()) }
     var hypotheses by remember { mutableStateOf<List<Hypothesis>>(emptyList()) }
+    var hypothesisEvaluations by remember { mutableStateOf<Map<Long, HypothesisEvaluation>>(emptyMap()) }
     var expandedId by remember { mutableStateOf<Long?>(null) }
     var contextByObservation by remember { mutableStateOf<Map<Long, List<ContextSample>>>(emptyMap()) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(refresh) {
-        val loaded = withContext(Dispatchers.IO) { repo.observations() to repo.hypotheses() }
+        val loaded = withContext(Dispatchers.IO) {
+            val hypotheses = repo.hypotheses()
+            Triple(repo.observations(), hypotheses, hypotheses.mapNotNull { hypothesis -> repo.db().latestHypothesisEvaluation(hypothesis.id)?.let { hypothesis.id to it } }.toMap())
+        }
         rows = loaded.first
         hypotheses = loaded.second
+        hypothesisEvaluations = loaded.third
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { ScreenHeader("Timeline", "Observations and interpretations stay separate.") }
@@ -507,7 +554,18 @@ private fun TimelineTab(repo: ObservationRepository, refresh: Int) {
         if (hypotheses.isNotEmpty()) {
             item { SectionLabel("Hypotheses") }
             items(hypotheses, key = { "h-${it.id}" }) { hypothesis ->
-                TimelineCard(hypothesis.eventLabel, "HYPOTHESIS", hypothesis.createdAtMs, hypothesis.note, MaterialTheme.colorScheme.secondary)
+                val evaluation = hypothesisEvaluations[hypothesis.id]
+                val window = HypothesisWindow.fromBounds(hypothesis.windowStartMs, hypothesis.windowEndMs)
+                val detail = buildString {
+                    append(hypothesis.note)
+                    if (hypothesis.metric.isNotBlank()) {
+                        append("\n${hypothesis.metric} · ${hypothesis.direction.name.lowercase()} · ${window.displayName}")
+                        if (evaluation != null) append("\n${evaluation.outcome.name.replace('_',' ')} · ${evaluation.summary}")
+                        else append("\nRegistered · not evaluated")
+                    }
+                }
+                val type = if (hypothesis.metric.isBlank()) "HYPOTHESIS NOTE" else if (hypothesis.lockedAtMs == null) "REGISTERED HYPOTHESIS" else "LOCKED REGISTRATION"
+                TimelineCard(hypothesis.eventLabel, type, hypothesis.createdAtMs, detail, MaterialTheme.colorScheme.secondary)
             }
         }
         if (rows.isNotEmpty()) {
@@ -615,13 +673,14 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
     var cohorts by remember { mutableStateOf<List<AnalysisCohort>>(emptyList()) }
     var selected by remember { mutableStateOf<String?>(null) }
     var results by remember { mutableStateOf<List<Pair<String, com.dronewukong.apophenia.correlation.AssociationResult>>>(emptyList()) }
+    var registrationRows by remember { mutableStateOf<List<Pair<Hypothesis, HypothesisEvaluation?>>>(emptyList()) }
     LaunchedEffect(refresh) {
         cohorts = withContext(Dispatchers.IO) { repo.db().analysisCohorts() }
         if (selected !in cohorts.map { it.id }) selected = cohorts.firstOrNull()?.id
     }
     LaunchedEffect(selected, refresh) {
         val selectedCohort = selected ?: return@LaunchedEffect
-        results = withContext(Dispatchers.IO) {
+        val analysis = withContext(Dispatchers.IO) {
             val values = linkedMapOf<String, Pair<List<Double>, List<Double>>>()
             fun addMatched(name: String, events: List<com.dronewukong.apophenia.correlation.TimedCaptureValue>, controls: List<com.dronewukong.apophenia.correlation.TimedCaptureValue>) {
                 val matched = CaptureMatcher.match(events, controls)
@@ -641,8 +700,23 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
             repo.db().devicePresenceCapturesForCohort(selectedCohort).forEach { (feature, captures) ->
                 addMatched(feature, captures.first, captures.second)
             }
-            AssociationEngine.compareAll(values).toList().sortedByDescending { kotlin.math.abs(it.second.standardizedEffect ?: 0.0) }
+            val resultRows = AssociationEngine.compareAll(values, seed = selectedCohort.hashCode()).toList().sortedByDescending { kotlin.math.abs(it.second.standardizedEffect ?: 0.0) }
+            val byFeature = resultRows.toMap()
+            val viewedAt = System.currentTimeMillis()
+            resultRows.filter { it.second.permutationP != null }.forEach { (feature, result) ->
+                repo.db().recordAnalysisView(selectedCohort, feature, viewedAt, HypothesisEvaluator.analysisSignature(0, result))
+            }
+            val registrations = repo.db().hypotheses(10_000).filter { it.enabled && it.metric.isNotBlank() && it.cohortId == selectedCohort }
+            registrations.forEach { hypothesis ->
+                byFeature[HypothesisEvaluator.resultKey(hypothesis)]?.let { result ->
+                    HypothesisEvaluator.evaluate(hypothesis, result)?.let { repo.db().recordHypothesisEvaluation(it) }
+                }
+            }
+            val refreshed = repo.db().hypotheses(10_000).filter { it.enabled && it.metric.isNotBlank() && it.cohortId == selectedCohort }
+            resultRows to refreshed.map { it to repo.db().latestHypothesisEvaluation(it.id) }
         }
+        results = analysis.first
+        registrationRows = analysis.second
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { ScreenHeader("Patterns", "Explicit event classes compared with one-to-one matched control windows.") }
@@ -674,6 +748,22 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
                         modifier = Modifier.padding(12.dp),
                         fontSize = 12.sp
                     )
+                }
+            }
+            if (registrationRows.isNotEmpty()) {
+                item { SectionLabel("Registered hypotheses") }
+                items(registrationRows, key = { "registration-${it.first.id}" }) { (hypothesis, evaluation) ->
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f))) {
+                        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(hypothesis.note, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                                StatusPill(evaluation?.outcome?.name?.replace('_',' ') ?: "REGISTERED", MaterialTheme.colorScheme.secondary)
+                            }
+                            Text("${hypothesis.metric} · ${hypothesis.direction.name.lowercase()} · ${HypothesisWindow.fromBounds(hypothesis.windowStartMs,hypothesis.windowEndMs).displayName}", fontSize = 12.sp)
+                            Text("Registered ${DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT).format(Date(hypothesis.createdAtMs))}${if(hypothesis.lockedAtMs!=null) " · immutable after results" else " · awaiting eligible result"}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            evaluation?.let { Text(it.summary, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        }
+                    }
                 }
             }
             if (results.isEmpty()) item { EmptyState("Insufficient context", "More event and control windows are needed for this category.") }

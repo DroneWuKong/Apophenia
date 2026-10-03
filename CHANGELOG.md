@@ -71,6 +71,9 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - First-class **Egress · bailed** and **Bad vibes · stayed** analysis cohorts, kept separate from ordinary label cohorts.
 - Binary hashed-device presence features for every observed BLE/Wi-Fi identity, with missing channel windows excluded rather than treated as absence.
 - Required multiple-comparisons scope on every result: total features tested, eligible features, Benjamini-Hochberg method, and explicit **indistinguishable from noise** labeling after correction.
+- Schema v9 hypothesis pre-registrations for an exact event cohort, context metric, expected direction, and instant/pre-event window.
+- Append-only confirmed/not-yet-supported/refuted evaluation snapshots; the first eligible result locks a registration, while insufficient data does not.
+- An analysis-view ledger that refuses retroactive pre-registration for an exact cohort/feature already viewed; legacy free-form hypothesis notes remain visibly distinct.
 
 ### Validation
 

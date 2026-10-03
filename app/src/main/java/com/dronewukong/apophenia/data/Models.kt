@@ -152,15 +152,48 @@ data class SensitiveContextRecord(
     val captureId: String
 )
 
+enum class HypothesisDirection { HIGHER, LOWER, ANY }
+enum class HypothesisOutcome { CONFIRMED, NOT_YET_SUPPORTED, REFUTED }
+
+enum class HypothesisWindow(val fromBeforeMs: Long, val toBeforeMs: Long, val displayName: String) {
+    INSTANT(0, 0, "At the event"),
+    PRE_0_10_MIN(0, 600_000, "0–10 min before"),
+    PRE_10_20_MIN(600_000, 1_200_000, "10–20 min before"),
+    PRE_20_30_MIN(1_200_000, 1_800_000, "20–30 min before");
+
+    companion object {
+        fun fromBounds(fromBeforeMs: Long, toBeforeMs: Long): HypothesisWindow =
+            entries.firstOrNull { it.fromBeforeMs == fromBeforeMs && it.toBeforeMs == toBeforeMs } ?: INSTANT
+    }
+}
+
 data class Hypothesis(
     val id: Long = 0,
     val createdAtMs: Long,
     val eventLabel: String,
     val metric: String,
-    val direction: String = "ANY",
+    val direction: HypothesisDirection = HypothesisDirection.ANY,
     val enabled: Boolean = true,
     val note: String = "",
-    val source: ObservationOrigin = ObservationOrigin.ANDROID
+    val source: ObservationOrigin = ObservationOrigin.ANDROID,
+    val cohortId: String = AnalysisCohort.labelId(eventLabel),
+    val windowStartMs: Long = 0,
+    val windowEndMs: Long = 0,
+    val lockedAtMs: Long? = null
+)
+
+data class HypothesisEvaluation(
+    val id: Long = 0,
+    val hypothesisId: Long,
+    val evaluatedAtMs: Long,
+    val analysisSignature: String,
+    val outcome: HypothesisOutcome,
+    val eventCount: Int,
+    val controlCount: Int,
+    val adjustedP: Double?,
+    val delta: Double?,
+    val comparisonsTested: Int,
+    val summary: String
 )
 
 private fun validateVibe(kind: ObservationKind, vibeRating: Int?, egress: Boolean) {
