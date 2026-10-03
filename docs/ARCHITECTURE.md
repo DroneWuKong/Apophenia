@@ -89,6 +89,7 @@ UI / widget / tile / external intent / Garmin
 | `MediaRetentionManager` | Contained artifact/key deletion, fixed-deadline expiry, keep-forever, event scrub, anti-resurrection, and purge-ledger writes |
 | `MediaEvidenceReader` | Ciphertext/hash verification plus memory-only PCM or MJPEG decryption for the in-app player |
 | `OmniprobeInspector` | Per-event join across ordinary context, encrypted Tier-2 rows, media inventory, purge history, gate capability, and explicit gap accounting |
+| `EvidencePresetManager` | Deliberate bulk gate authorization, active-mode persistence, and bounded audio pre-buffer selection without permission or service side effects |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -167,6 +168,10 @@ The current matcher does not control for activity, location, sleep/wake state, o
 `OmniprobeInspector` reads one already-persisted observation and joins its `context_samples`, `sensitive_context`, `media_assets`, and `purge_ledger` rows. Channel matching never creates evidence. Stored values win over a later permission or gate-state change because they describe what existed at capture time; absent values use the current gate/capability state only to explain the gap. Unrecognized context rows are rendered separately instead of discarded. See [OMNIPROBE.md](OMNIPROBE.md).
 
 The overlay separately collects the current process-wide AV ring state. It labels that state as live/current rather than attributing it to the historical event. It does not read or invent an export audit table before that schema exists.
+
+## Evidence modes
+
+`EvidencePresetManager` is a gate-selection layer, not a hardware orchestrator. A successful 1.5-second hold applies the standard, deliberate, or capability-conditional proof required by each target gate, records the mode, and selects the next audio pre-buffer duration. It never invokes an Activity Result permission contract or starts a service. The always-visible status strip joins that persisted mode with the live `AudioRingCaptureManager` and `VideoRingCaptureManager` flows, keeping authorization and actual buffering distinct. See [TOTAL_EVIDENCE.md](TOTAL_EVIDENCE.md).
 
 ## Software-only boundary
 

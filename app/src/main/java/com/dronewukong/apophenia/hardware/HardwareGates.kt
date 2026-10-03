@@ -3,6 +3,8 @@ package com.dronewukong.apophenia.hardware
 import android.content.Context
 import com.dronewukong.apophenia.BuildConfig
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The single authorization boundary for live capture.
@@ -109,6 +111,8 @@ object HardwareGates {
     private val authorizations = ConcurrentHashMap<Gate, Boolean>().apply {
         Gate.entries.forEach { put(it, it.defaultAuthorized) }
     }
+    private val revisionFlow = MutableStateFlow(0L)
+    val authorizationRevision: StateFlow<Long> = revisionFlow
 
     @Volatile
     var runtimeMode: RuntimeMode = RuntimeMode.LIVE
@@ -124,6 +128,7 @@ object HardwareGates {
         Gate.entries.forEach { gate ->
             authorizations[gate] = preferences.getBoolean(KEY_GATE_PREFIX + gate.name, gate.defaultAuthorized)
         }
+        revisionFlow.value++
     }
 
     fun setRuntimeMode(context: Context, mode: RuntimeMode) {
@@ -132,6 +137,7 @@ object HardwareGates {
             .edit()
             .putString(KEY_MODE, mode.name)
             .apply()
+        revisionFlow.value++
     }
 
     fun isAuthorized(context: Context, gate: Gate): Boolean =
@@ -190,6 +196,7 @@ object HardwareGates {
             .edit()
             .putBoolean(KEY_GATE_PREFIX + gate.name, authorized)
             .apply()
+        revisionFlow.value++
     }
 
     private fun buildAllows(gate: Gate): Boolean = when (gate) {
@@ -212,5 +219,6 @@ object HardwareGates {
         context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().clear().commit()
         runtimeMode = RuntimeMode.LIVE
         Gate.entries.forEach { authorizations[it] = it.defaultAuthorized }
+        revisionFlow.value++
     }
 }

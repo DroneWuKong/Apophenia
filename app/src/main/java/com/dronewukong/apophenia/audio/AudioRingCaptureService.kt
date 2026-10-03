@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat
 import com.dronewukong.apophenia.R
 import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.media.MediaRetentionManager
+import com.dronewukong.apophenia.presets.EvidencePresetManager
 import com.dronewukong.apophenia.ui.MainActivity
 import kotlin.concurrent.thread
 import kotlin.math.PI
@@ -56,14 +57,15 @@ class AudioRingCaptureService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        AudioRingCaptureManager.arm(this, simulation)
+        val preSeconds = EvidencePresetManager.audioPreSeconds(this)
+        AudioRingCaptureManager.arm(this, simulation, preSeconds = preSeconds)
         running = true
         captureThread = thread(name = "apophenia-audio-ring") {
             runCatching { if (simulation) simulationLoop() else microphoneLoop() }
                 .onFailure { if (!operatorStop) AudioRingCaptureManager.fail(it.message ?: "Audio capture failed") }
             if (!operatorStop) stopSelf()
         }
-        updateNotification(if (simulation) "SIMULATION · 60s pre / 30s post" else "Microphone · 60s pre / 30s post")
+        updateNotification(if (simulation) "SIMULATION · ${preSeconds}s pre / 30s post" else "Microphone · ${preSeconds}s pre / 30s post")
         return START_STICKY
     }
 

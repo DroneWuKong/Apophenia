@@ -12,6 +12,8 @@ Disabling any gate is immediate. All new v0.3 gates default off. The four pre-ex
 
 Current capability gap reasons are `GATE_OFF`, `PERMISSION_DENIED`, `PLATFORM_RESTRICTED`, `HARDWARE_ABSENT`, `LOCKED_BY_STATUTE`, `BUILD_DISABLED`, and `SIMULATION_MODE`. Omniprobe renders them and adds `NO_SAMPLE_IN_WINDOW` plus `NO_ACTIVE_SESSION` for authorized channels whose absence does not prove a capability failure. See [OMNIPROBE.md](OMNIPROBE.md).
 
+FIELD, DRIVE, HOME, EVERYTHING, and TOTAL_EVIDENCE use a measured 1.5-second hold as deliberate bulk authorization. They never grant an Android permission or start a device/session. Every capture preset excludes `LIVE_EXPORT_LAN`, so capture arming cannot become data movement. See [TOTAL_EVIDENCE.md](TOTAL_EVIDENCE.md).
+
 ## Tier 1 — standard
 
 - `LIVE_SENSOR_CAPTURE`

@@ -35,8 +35,9 @@ class MainActivitySmokeTest {
     @Test
     fun launchesAndLogsOneTapObservation() {
         dismissContextIntroIfPresent()
-        compose.onNodeWithText("Observation").assertIsDisplayed()
         compose.onNodeWithText("THAT WAS WEIRD").assertIsDisplayed()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Observation"))
+        compose.onNodeWithText("Observation").assertIsDisplayed()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Sound / noise"))
         compose.onNodeWithText("Sound / noise").assertIsDisplayed()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("THAT WAS WEIRD"))
@@ -70,11 +71,13 @@ class MainActivitySmokeTest {
     @Test
     fun settingsExposeOptionalContextPermissions() {
         dismissContextIntroIfPresent()
+        compose.onNode(hasText("gates armed", substring = true)).assertIsDisplayed()
         compose.onNodeWithText("Settings").performClick()
-        compose.onNodeWithText("Phone sensors").assertIsDisplayed()
-        compose.onNodeWithText("Location + weather").assertIsDisplayed()
+        scrollSettingsTo("Phone sensors")
+        scrollSettingsTo("Location + weather")
         listOf(
             "Health Connect",
+            "Total evidence + presets",
             "Bluetooth presence",
             "Wi-Fi presence",
             "Network state",

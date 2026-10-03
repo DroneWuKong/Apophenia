@@ -145,7 +145,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 
 ## Next work
 
-The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Steps 1–16 now cover gates/hashing/VIBE, quick capture, Bluetooth, phone/Tier-2 context, OBD-II drive sessions, native Automotive properties, MAVLink flight sessions, CRSF/GHST, Field-Kit, TAK, ground context, bounded RTL-SDR survey windows, audio, camera/multicam, screen rings, derived AV metrics, the call-audio capability stub, durable AV retention/player controls, engine-credibility disclosures, hypothesis pre-registration, confounder surfacing, honest plain-language results, and the per-event Omniprobe inventory. These are software and simulator results, not physical validation.
+The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Steps 1–17 now cover gates/hashing/VIBE, quick capture, Bluetooth, phone/Tier-2 context, OBD-II drive sessions, native Automotive properties, MAVLink flight sessions, CRSF/GHST, Field-Kit, TAK, ground context, bounded RTL-SDR survey windows, audio, camera/multicam, screen rings, derived AV metrics, the call-audio capability stub, durable AV retention/player controls, engine-credibility disclosures, hypothesis pre-registration, confounder surfacing, honest plain-language results, the per-event Omniprobe inventory, and deliberate TOTAL_EVIDENCE/session presets with a persistent master strip. These are software and simulator results, not physical validation.
 
 ### Next physical-validation checklist — 3 October 2026
 
@@ -159,6 +159,7 @@ Run each item only after its implementation PR and software fixtures pass. Recor
 - Exercise an owned RTL-SDR/OTG receiver, prove raw-IQ window bounds and purge behavior, and record Android USB/power limits.
 - Re-test Garmin/watch delivery, durable receipt behavior, physiology timestamps, disconnect/replay, and one representative physical event-to-phone capture.
 - On representative Android versions, compare each Omniprobe permission/platform/hardware gap against the actual OS setting and attached device; verify that empty event windows remain `NO_SAMPLE_IN_WINDOW` or `NO_ACTIVE_SESSION` rather than being promoted into hardware claims.
+- Verify every preset on-device: the hold duration, no permission-dialog side effect, no unintended service start, exact gate membership, persistent master strip, 120-second audio pre-buffer where specified, and `LIVE_EXPORT_LAN` exclusion.
 - Only after the preceding gates independently pass, run bounded drive/field/flight sessions and document those results separately from software and bench evidence.
 
 1. Disconnect USB, open Apophenia on the watch, and confirm the v0.3 replacement launches.

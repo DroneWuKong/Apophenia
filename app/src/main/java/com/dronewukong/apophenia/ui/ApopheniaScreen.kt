@@ -160,12 +160,15 @@ fun ApopheniaScreen(activity: MainActivity) {
                 }
             }
         ) { padding ->
-            Box(Modifier.padding(padding).fillMaxSize()) {
-                when (tab) {
-                    Tab.LOG -> LogTab(repo, onSaved = { refresh++ }, onOpenSettings = { tab = Tab.SETTINGS })
-                    Tab.TIMELINE -> TimelineTab(repo, refresh)
-                    Tab.PATTERNS -> PatternsTab(repo, refresh)
-                    Tab.SETTINGS -> SettingsTab(activity, repo, scope, ::message)
+            Column(Modifier.padding(padding).fillMaxSize()) {
+                EvidenceMasterStatus(activity)
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    when (tab) {
+                        Tab.LOG -> LogTab(repo, onSaved = { refresh++ }, onOpenSettings = { tab = Tab.SETTINGS })
+                        Tab.TIMELINE -> TimelineTab(repo, refresh)
+                        Tab.PATTERNS -> PatternsTab(repo, refresh)
+                        Tab.SETTINGS -> SettingsTab(activity, repo, scope, ::message)
+                    }
                 }
             }
         }
@@ -902,6 +905,27 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var showOmniprobe by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
+    fun refreshGateToggles() {
+        bluetoothEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_BLUETOOTH_CAPTURE)
+        wifiEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_WIFI_CAPTURE)
+        networkEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_NETWORK_STATE_CAPTURE)
+        vehicleEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_VEHICLE_CAPTURE)
+        mavlinkEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_MAVLINK_CAPTURE)
+        controlLinkEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_CRSF_GHST_CAPTURE)
+        fieldKitEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_FIELD_KIT_CAPTURE)
+        takEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_TAK_CAPTURE)
+        takFullEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_TAK_CAPTURE_FULL)
+        groundEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_GROUND_CONTEXT_CAPTURE)
+        rfSurveyEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_RF_SURVEY_CAPTURE)
+        audioGateEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_AUDIO_CAPTURE)
+        mainVideoEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_VIDEO_CAPTURE)
+        frontVideoEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_VIDEO_SELFCAPTURE)
+        multicamEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_MULTICAM_CAPTURE)
+        screenVideoEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_SCREENRECORD_CAPTURE)
+        callAudioEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_CALL_AUDIO_CAPTURE)
+        gateRevision++
+    }
+
     fun refreshRolling() {
         scope.launch {
             val (snapshot, health) = withContext(Dispatchers.IO) { repo.db().rollingStatus() to RollingRecorderHealth.snapshot(activity) }
@@ -1139,6 +1163,11 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 30.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { ScreenHeader("Settings", "Everything stays local unless you enable an optional source.") }
         item { SectionLabel("Recorder") }
+        item {
+            SettingsCard(Icons.Default.AllInclusive, "Total evidence + presets", "Deliberately arm capture gates for a bounded investigation without silently granting OS permissions or starting hardware sessions.") {
+                EvidencePresetControls(activity, onMessage, ::refreshGateToggles)
+            }
+        }
         item {
             SettingsCard(Icons.Default.Storage, "Rolling black box", "Keeps a bounded 30-minute pre-event buffer.") {
                 Row(verticalAlignment = Alignment.CenterVertically) {

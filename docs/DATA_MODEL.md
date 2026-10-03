@@ -35,6 +35,8 @@ A scalar measurement with timestamp, source, metric, value and unit. It may be a
 
 Omniprobe does not add a duplicate observation table. It projects one event across `context_samples`, `sensitive_context`, `media_assets`, and `purge_ledger`. Each displayed ordinary or protected value keeps its persisted `capture_id`; raw-media inventory uses the explicit display identity `event:<observation_id>:media` and remains backed by the schema-v8 media row. Unmatched ordinary rows are retained in a separate display section.
 
+Evidence-mode state is local configuration rather than event evidence: active preset, TOTAL_EVIDENCE flag, activation timestamp, and future microphone pre-buffer duration live in private preferences. The status strip reads gate authorizations and live AV state directly. No preset row is inserted into `context_samples`, and a preset is not evidence that any hardware channel ran.
+
 Schema v5 adds scalar phone-context metrics for Wi-Fi presence, connectivity/network state, audio routing and volume, display/interaction state, power/thermal state, local time/solar phase, Wi-Fi Direct, and NFC adapter state. Identifying Wi-Fi values use only locally keyed BSSID hashes. Active playback package identity is marked `platform_restricted` because Android's public playback API exposes active configurations but not their owning UID/package.
 
 Schema v6 adds nullable `session_id` to scalar context. When a drive session is active, OBD values and concurrently captured phone/Bluetooth context carry the same ID. Session-stream rows use a unique `capture_id` per polling instant; event/control rows retain their event/control capture identity. Dense stream rows therefore remain distinguishable from independent human observations.

@@ -70,6 +70,8 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - An in-app encrypted evidence library for PCM playback and per-stream MJPEG frame review; plaintext exists only in memory and is never written as a playback file.
 - A Settings Omniprobe that inventories every planned gate per event, including stored values and `capture_id`, encrypted Tier-2 inspection, explicit absence reasons, unmatched rows, live AV-ring state, raw-media retention countdowns, purge history, and the current export/audit implementation boundary.
 - Honest `NO_SAMPLE_IN_WINDOW` and `NO_ACTIVE_SESSION` states so an empty authorized window is not mislabeled as permission denial or absent hardware.
+- An always-visible evidence-mode strip plus deliberate FIELD, DRIVE, HOME, EVERYTHING, and TOTAL_EVIDENCE arming. Presets never request Android permissions, start hardware sessions, or authorize the LAN export gate.
+- Preset-aware microphone pre-buffer selection: FIELD, DRIVE, EVERYTHING, and TOTAL_EVIDENCE use the supported 120-second maximum when the audio service is explicitly started.
 - First-class **Egress · bailed** and **Bad vibes · stayed** analysis cohorts, kept separate from ordinary label cohorts.
 - Binary hashed-device presence features for every observed BLE/Wi-Fi identity, with missing channel windows excluded rather than treated as absence.
 - Required multiple-comparisons scope on every result: total features tested, eligible features, Benjamini-Hochberg method, and explicit **indistinguishable from noise** labeling after correction.

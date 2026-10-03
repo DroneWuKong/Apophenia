@@ -41,6 +41,8 @@ The current data-only JSON exporter excludes the encrypted `sensitive_context` t
 
 Omniprobe is a local inspection surface, not an export route. It may decrypt an event's authorized Tier-2 rows for on-screen review with the existing Keystore key, but it creates no plaintext file and sends nothing. Its raw-AV section is inventory only; playback remains in the memory-only evidence player. The export panel explicitly says that the legacy JSON share has no tiered manifest or audit ledger yet.
 
+TOTAL_EVIDENCE and the session presets are capture-only controls. Even EVERYTHING excludes the LAN export gate. Arming a preset requests no Android permission, starts no connection or recording service, and sends no data; live services and screen consent remain separate operator actions. The persistent status strip distinguishes gate count from actual AV ring state.
+
 Do not attach an unredacted export to a public issue. Use GitHub's private security-advisory channel for an unintended disclosure or permission bypass.
 
 ## Total-capture posture
