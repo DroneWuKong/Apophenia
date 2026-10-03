@@ -1,0 +1,59 @@
+name: Device compatibility report
+description: Share a redacted physical phone or Garmin acceptance result
+title: "[Device]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing physical hardware. Report outcomes, not personal observations or raw exports.
+  - type: input
+    id: app
+    attributes:
+      label: App version or commit
+      placeholder: 0.2.1-debug or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+      placeholder: Samsung S24, Android 16
+    validations:
+      required: true
+  - type: input
+    id: watch
+    attributes:
+      label: Watch and Connect IQ version
+      placeholder: Epix Pro 47 mm, or not tested
+  - type: checkboxes
+    id: passed
+    attributes:
+      label: Behaviors that passed
+      options:
+        - label: Fresh install and first launch
+        - label: One-tap event appears in Timeline
+        - label: Location permission and weather test
+        - label: Recorder notification and rolling capture
+        - label: Health Connect permission flow
+        - label: Widget
+        - label: Quick Settings tile
+        - label: JSON export
+        - label: Garmin connection and event delivery
+        - label: Garmin offline queue and reconnect
+  - type: textarea
+    id: unavailable
+    attributes:
+      label: Unavailable or failing behavior
+      description: Include reproduction steps without personal values.
+  - type: textarea
+    id: battery
+    attributes:
+      label: Battery/background notes
+      description: Include test duration and OEM battery mode, not raw personal context.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: This report contains no observations, coordinates, health values, exports, identifiers, or secrets.
+          required: true

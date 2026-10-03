@@ -1,2 +1,2 @@
 import com.dronewukong.apophenia.correlation.AssociationEngine
-fun main(){val same=AssociationEngine.compare(listOf(1.0,2.0,3.0,4.0,5.0),listOf(1.0,2.0,3.0,4.0,5.0),100,1);check(same.strength=="WEAK");val split=AssociationEngine.compare(listOf(9.0,10.0,11.0,12.0,13.0),listOf(1.0,2.0,3.0,4.0,5.0),100,1);check((split.standardizedEffect?:0.0)>1.0);println("AssociationEngine smoke tests passed")}
+fun main(){val same=AssociationEngine.compare(listOf(1.0,2.0,3.0,4.0,5.0),listOf(1.0,2.0,3.0,4.0,5.0),100,1);check(same.strength=="weak association");val split=AssociationEngine.compare(listOf(9.0,10.0,11.0,12.0,13.0),listOf(1.0,2.0,3.0,4.0,5.0),100,1);check((split.standardizedEffect?:0.0)>1.0);println("AssociationEngine smoke tests passed")}

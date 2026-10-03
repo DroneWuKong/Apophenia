@@ -1,0 +1,16 @@
+{
+  "fixture_version": "total-circumstances-v1",
+  "synthetic": true,
+  "duration_days": 60,
+  "event_count": 45,
+  "control_capture_count": 120,
+  "stories": [
+    "confirmed BLE device presence",
+    "refuted poor-sleep preregistration",
+    "small-n weather-front association",
+    "egress versus stayed",
+    "own-airframe flight-session join",
+    "AV transient retained then purged"
+  ],
+  "live_export_eligible": false
+}

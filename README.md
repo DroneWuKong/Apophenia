@@ -1,55 +1,286 @@
+<div align="center">
+
 # Apophenia
 
-Apophenia is an Android-first personal observation and context recorder for investigating patterns, coincidences, symptoms, environmental changes, and other things you notice in daily life.
+### Notice now. Understand later.
 
-The core principle is simple:
+**A local-first personal total-capture instrument for reconstructing what was happening around an event.**
 
-> **You record the event. The software records the circumstances.**
+[![Android CI](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml/badge.svg)](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Android 8+](https://img.shields.io/badge/Android-8%2B-3DDC84.svg)](https://developer.android.com/about/versions/oreo)
 
-## Current scope
+<img src="docs/images/apophenia-home-annotated-v03.png" alt="Annotated Apophenia capture screen showing the live-status strip, timestamp-first event button, and distinct egress action" width="900">
 
-- One-tap **THAT WAS WEIRD** logging
-- Observation, coincidence, hypothesis-note, and custom event logging
-- Home-screen widget and Quick Settings tile
-- Local SQLite event/context store
-- Phone/tablet sensor capture
-- Location and weather/environment enrichment
-- Random control observations for baseline comparison
-- 30-minute rolling pre-event black-box buffer
-- 30-minute post-event capture
-- Correlation/association analysis against controls
-- JSON export
-- Explicit hardware gates and full simulation mode
-- Garmin Epix Pro (Gen 2) Connect IQ companion
-- Direct Garmin watch-to-phone event bridge
-- Watch-side pending-event queue for temporary phone disconnects
+</div>
 
-## Repository layout
+## What Apophenia is
 
-- `app/` — native Android application
-- `garmin-epix-pro/` — Garmin Connect IQ companion for Epix Pro (Gen 2)
-- `docs/` — architecture, privacy, data model, Garmin integration, validation notes
-- `tools/` — software-only domain tests
-- `.github/workflows/` — Android CI build
+Apophenia is an Android and Garmin black box for the moments when you notice something now and want to investigate the circumstances later. You log the event first. The app freezes the authorized context around it, keeps observations separate from hypotheses, compares event windows with jittered controls, and tells you when an apparent pattern does not survive the comparison.
 
-## Important boundaries
+It is deliberately capable of being **maximum invasive**. If you authorize and arm everything, it can collect phone state, nearby radios, location, physiology, notification/calendar/contact/message contents, microphone, every camera the device can expose, screen contents, vehicle telemetry, aircraft telemetry, control-link health, owned RF-receiver windows, and related session context. That is the capability ceiling, not the default operating mode.
 
-The app is designed to test perceived patterns rather than assume they are real. Raw observations are stored separately from hypotheses and interpretation. Controls are sampled independently so an apparent relationship can be compared with ordinary baseline conditions.
+You choose each gate. Deliberate channels require deliberate confirmation. Android permissions, screen-record consent, and hardware-session starts remain separate. A persistent strip and foreground indicators show what is actually live. The app stores its evidence locally and has no account, analytics SDK, automatic cloud sync, or background uploader. Data crosses the app boundary only after you explicitly build an export, inspect its manifest, and choose a route.
 
-The rolling black-box recorder is user-enabled and bounded. It does not silently auto-start at boot. Simulation mode exercises the same persistence/correlation pipeline without physical hardware.
+The design principle is simple: **you record the event; the software records the circumstances you authorized.**
 
-## Build status
+## Why I built it
 
-Source is configured as a native Kotlin/Android project. The Garmin companion uses Connect IQ and the Android side uses Garmin's Connect IQ Companion SDK.
+I kept having moments that were easy to notice and hard to reconstruct later: a headache, a light or sound changing, an odd coincidence, or simply *that was weird*.
 
-On Windows with Garmin SDK Manager, the Epix Pro device definitions, Java 17,
-and a development signing key installed, build all three watch sizes with:
+Writing down an explanation afterward is easy. Capturing what was actually happening at the time is harder. Apophenia is my attempt to make that part nearly effortless:
 
-```powershell
-./tools/build-garmin.ps1 -KeyPath C:/path/to/developer_key.der
+1. Tap once.
+2. Save the exact event time immediately.
+3. Add whatever optional phone, environment, radio, Health Connect, Garmin, or aggregate home context is available afterward.
+4. Compare event windows with ordinary control windows instead of eyeballing a chart and declaring a pattern.
+
+The point is not to prove a story. It is to collect better evidence before telling one.
+
+## The 10-second tour
+
+<table>
+  <tr>
+    <td width="33%" align="center"><strong>Choose the context</strong></td>
+    <td width="33%" align="center"><strong>Review the evidence</strong></td>
+    <td width="33%" align="center"><strong>Test the pattern</strong></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/apophenia-settings-top-v03.png" alt="TOTAL_EVIDENCE and bounded session presets in Settings" width="260"></td>
+    <td align="center"><img src="docs/images/apophenia-timeline.png" alt="Timeline with demo observations" width="260"></td>
+    <td align="center"><img src="docs/images/apophenia-patterns.png" alt="Pattern screen honestly reporting insufficient demo data" width="260"></td>
+  </tr>
+  <tr>
+    <td>Every channel is visible behind a named gate. TOTAL_EVIDENCE and presets arm gates, but never silently grant Android permissions or start hardware sessions.</td>
+    <td>The timeline labels observations, coincidences, and hypotheses instead of mixing them together.</td>
+    <td>The analysis says “insufficient data” when that is the honest answer and excludes post-event samples from prediction.</td>
+  </tr>
+</table>
+
+<details>
+<summary><strong>First launch: no surprise permissions</strong></summary>
+
+<br>
+
+<p align="center">
+  <img src="docs/images/apophenia-onboarding-v03.png" alt="First-run optional context explanation over the current VIBE capture screen" width="360">
+</p>
+
+The app explains what works without a prompt and lets you review optional access when you are ready. Basic logging does not depend on location, weather, Health Connect, Garmin, or physical sensors.
+
+</details>
+
+> The source screens were captured from the real debug app on an Android emulator. The wide figures add documentation arrows and labels; they are explanatory artwork, not pixel-diff test evidence. Timeline entries are demo data, not personal records, and emulator captures are not physical-device validation.
+
+## What I made
+
+- A **THAT WAS WEIRD** button that timestamps first and enriches second
+- One-tap graded VIBE capture plus a distinct red **FUCK THIS, I'M OUT** egress event in the app and widget
+- Quick logging for observations, headache, sinus/congestion, light, sound, body sensations, coincidences, hypotheses, and custom entries
+- A home-screen widget and Quick Settings tile
+- Local SQLite storage plus manifest-previewed exports: canonical JSON, flat UTF-8 CSV tables, a machine-readable data dictionary, full evidence, event dossiers, HTML/PDF reports, checkpointed raw `.db` snapshots, verified restorable backups, and a separately gated one-shot LAN route
+- Global/per-event evidence seals, scrub-before-share dossiers, an honest route audit, and EJECT export-then-wipe limited to verifiable SAF/LAN completion
+- A user-enabled rolling black box with 30 minutes of pre-event context and a labeled post-event window
+- Random control captures that use the same pipeline as event captures, then match one-to-one by local time block and weekday/weekend
+- Optional neutral check-in prompts that let you record “nothing unusual” through the control pipeline
+- Optional phone sensors, device state, battery, network, location, and Open-Meteo weather context
+- Optional read-only Health Connect history
+- A Garmin Epix Pro (Gen 2) logger with watch timestamps and a bounded offline queue
+- Durable watch receipts: events leave the queue only after Android confirms local storage
+- Optional aggregate home context through an existing Octopod/Home Assistant cluster
+- Gate-backed Wi-Fi and Bluetooth presence with locally keyed identifier hashes, plus network/connectivity state
+- Independent audio-state, display/interaction, power/thermal, time/solar, Wi-Fi Direct, and NFC snapshot gates
+- Deliberate notification, calendar, contacts, and message-metadata gates with encryption before SQLite persistence
+- User-started OBD-II `DRIVE_SESSION` capture through a paired ELM327-style Bluetooth adapter, with a persistent live indicator and hashed adapter identity
+- Native Android Automotive OS property snapshots with explicit gaps on projection-only hosts
+- User-started MAVLink `FLIGHT_SESSION` capture over UDP, TCP, or class-compliant USB/SiK, with hashed airframe identity, persistent capture indication, exact `STATUSTEXT`, and explicit telemetry age/sequence gaps
+- User-started CRC-validated CRSF/GHST link statistics, bounded owned Field-Kit detector snapshots, and TAK own-track context with a separate full-visible-traffic gate
+- Ground barometer/magnetic/solar context with public NOAA Kp/F10.7 observations, plus Tier-3 bounded RTL-SDR IQ windows through an owned receiver's local `rtl_tcp` driver
+- A deliberately armed microphone ring with a persistent indicator, encrypted 60-second pre-event/30-second post-event evidence, and permanent descriptive spectral/loudness metrics
+- Deliberately armed main/front/concurrent-camera and screen rings with separate encrypted streams, persistent indicators, and permanent motion/brightness/flicker/banding metrics
+- Schema-backed AV retention with configurable deadlines, per-event keep-forever/scrub, an auditable purge ledger, and an in-app player that decrypts only in memory
+- A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
+- Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
+- Explicit egress/stayed event classes, hashed per-device presence features, and a visible count of every feature tested so weak hits are labeled indistinguishable from noise
+- Timestamped hypothesis pre-registration for cohort, metric, direction, and window, with post-result locking and confirmed/not-yet-supported/refuted evaluations
+- Day-one descriptive confounder surfacing plus plain-language event-vs-control results, small-sample honesty, and refutation presented as the machine working
+
+There is no account, advertising SDK, analytics, or automatic upload. Microphone capture exists only behind its deliberate gate and explicit armed state, with a persistent Android indicator.
+
+The illustrated [user guide](docs/USER_GUIDE.md) explains the full capture model without euphemism. Generated copies are available as [Word](docs/Apophenia_User_Guide.docx), [PDF](docs/Apophenia_User_Guide.pdf), and [self-contained HTML](docs/Apophenia_User_Guide.html). The [analysis export guide](docs/EXPORT_ANALYSIS.md) maps each export to the human and machine tools that can read it.
+
+## Try it
+
+Apophenia is currently a **development preview**, not a Play Store release.
+
+1. Prefer the tagged [0.3.0-preview.4 development pre-release](https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.4), or open the latest successful [Android workflow run](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml).
+2. Download `app-debug.apk` from the pre-release, or unzip the workflow's `apophenia-debug-apk` artifact.
+3. Open `app-debug.apk` on an Android 8.0 or newer phone.
+4. Allow installation from the browser or file manager if Android asks.
+5. Start with basic logging, then enable only the optional context you want.
+
+GitHub may require a sign-in to download Actions artifacts. Debug signatures can differ between build machines; if Android rejects an update, export anything you need, uninstall the previous debug build, and install the new one.
+
+The [install and test guide](docs/INSTALL_AND_TEST.md) has a short remote-testing checklist and a privacy-safe bug-report template. The [export contract](docs/EXPORT.md) documents content tiers, manifests, hashes, and current route boundaries; [event reports](docs/REPORTS.md) documents dossiers and HTML/PDF output.
+For recorder survival and real Garmin delivery, use the [48-hour physical acceptance checklist](docs/PHYSICAL_ACCEPTANCE.md).
+
+## Exports for people and machines
+
+Every export is built in app-private cache, hash-verified, and shown as a manifest preview before Share, Save as, or the separately gated local-LAN action becomes available.
+
+| Need | Human-readable | Machine-readable |
+| --- | --- | --- |
+| Ordinary analysis | `analysis/README.md` and spreadsheet-friendly CSV tables | canonical nested JSON, flat CSV, JSON data dictionary |
+| SQL or BI work | schema documentation | checkpointed SQLite `.db` with `schema_version` |
+| One event | plain-language dossier summary and SVG chart | event JSON, context CSV, complete inventory |
+| Selected events | self-contained HTML and PDF report | report JSON, context CSV, SVG derived-metric chart |
+| Complete portable evidence | manifest plus ordinary analysis pack | JSON/CSV plus explicitly included AV, Tier-2 contents, attachments, inventories, and hashes |
+
+The default data-only tier excludes raw audio/video, Tier-2 contents, and attachment bytes. Full evidence is intentionally plaintext-portable and requires two confirmations. See [EXPORT_ANALYSIS.md](docs/EXPORT_ANALYSIS.md) for Python, R, spreadsheet, and SQLite notes.
+
+## What is real today
+
+| Area | What has actually been verified |
+| --- | --- |
+| Android | JDK 17 build, unit tests, lint, and debug APK pass locally and in GitHub Actions |
+| UI | Eleven Jetpack Compose smoke tests pass on an API 36 emulator, including demo isolation, Omniprobe, sealed-release enforcement, export-manifest/raw-SQLite previews, Android PDF report generation, and inbound share capture |
+| Permissions | Location, notification, weather, and Health Connect flows were exercised in an emulator |
+| Garmin | All three Epix Pro targets compile with Connect IQ SDK 9.2.0 |
+| Garmin queue | Six native Monkey C tests pass in the 47 mm simulator |
+| Hardware | Broader physical phone/watch acceptance testing is still needed |
+
+I am deliberately not calling simulator evidence hardware validation. The detailed evidence boundary and remaining acceptance work live in [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md).
+
+## The part I care about most
+
+Apophenia has a few non-negotiable rules:
+
+- observations are evidence, not conclusions;
+- hypotheses stay separate from raw observations;
+- event windows are compared with one-to-one controls matched by local four-hour block and weekday/weekend;
+- dense sensor samples are grouped by window, not counted as independent events;
+- post-event samples may be explored but are not predictors of the event;
+- unavailable metrics are omitted, never invented;
+- correlation is never presented as proven causation, diagnosis, or a paranormal claim.
+
+That means the app is allowed to say **insufficient data**. In fact, it should say that a lot at first.
+
+The matching is intentionally modest: it reduces obvious time-of-day and weekday confounding, but it does not yet match activity, location, sleep/wake state, or attention. Optional neutral check-ins help measure moments when nothing unusual was noticed, but they do not eliminate self-selection bias.
+
+## Under the hood
+
+```text
+tap / widget / tile / Garmin event
+              |
+              v
+     save exact event timestamp
+              |
+              +--> freeze preceding rolling window
+              +--> collect available instant context
+              +--> schedule labeled post-event context
+              +--> store everything locally
+                           |
+                           v
+             compare event windows with controls
 ```
 
-The command writes `.prg` files and reports SHA-256 hashes under `build/garmin/`.
-Keep the signing key outside this repository.
+The Android app is native Kotlin with Jetpack Compose and SQLite. Hardware and external-service adapters sit behind explicit LIVE/SIMULATION gates so the same core pipeline can run entirely in software.
 
-Hardware validation remains separate from software validation. Do not treat simulator or unit-test results as proof of physical sensor/watch behavior.
+The Garmin companion targets:
+
+- `epix2pro42mm`
+- `epix2pro47mm`
+- `epix2pro51mm`
+
+It preserves the watch's original timestamp, omits unavailable metrics, and queues events when the phone is temporarily disconnected. A phone-storage receipt removes an event only after Android commits it; a lost receipt produces a safe deduplicated retry instead of silent loss.
+
+## Build it yourself
+
+Requirements:
+
+- JDK 17
+- Android SDK with API 37 installed
+
+Windows:
+
+```powershell
+./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug
+./gradlew.bat connectedDebugAndroidTest
+```
+
+macOS or Linux:
+
+```bash
+./gradlew testDebugUnitTest lintDebug :app:assembleDebug
+./gradlew connectedDebugAndroidTest
+```
+
+The debug APK lands at:
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+No Garmin hardware, GPS fix, weather service, or Health Connect data is required for the software test path.
+
+## Privacy
+
+Apophenia can be the most invasive app on your phone **if you deliberately authorize it to be**. That is an honest description of the product, not a hidden behavior. It exposes the channels, the gate tier, the live state, and the reason for every gap. Conservative defaults mean basic logging works without granting the invasive channels.
+
+Everything is local-first. Optional access is explicit and fail-soft. There is no automatic upload, and preparing or previewing an export does not send it. Data leaves only when you choose a sharesheet target, a Storage Access Framework destination, or the separately gated local-LAN route. Do not attach real exports, coordinates, health records, or observation notes to a public issue.
+
+Read the full [privacy and collection boundaries](docs/PRIVACY.md).
+
+## Want to poke at it?
+
+Bug reports, Android vendor compatibility results, UI feedback, cautious-analysis ideas, and focused pull requests are welcome. The most useful feedback right now is listed in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+If you want to share the project, there is a copy-ready [Reddit launch kit](docs/REDDIT_LAUNCH.md) with honest validation language and a posting checklist.
+
+## Project docs
+
+- [Illustrated user guide](docs/USER_GUIDE.md)
+- [Human and machine analysis exports](docs/EXPORT_ANALYSIS.md)
+- [Printable user guide DOCX](docs/Apophenia_User_Guide.docx)
+- [Printable user guide PDF](docs/Apophenia_User_Guide.pdf)
+- [Standalone user guide HTML](docs/Apophenia_User_Guide.html)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Data model and statistical boundaries](docs/DATA_MODEL.md)
+- [Capture gates and consent tiers](docs/CAPTURE_GATES.md)
+- [Quick VIBE capture](docs/QUICK_VIBE.md)
+- [Install and remote test guide](docs/INSTALL_AND_TEST.md)
+- [Garmin Epix Pro integration](docs/GARMIN_EPIX_PRO.md)
+- [Optional Octopod home context](docs/HOME_CONTEXT.md)
+- [Optional radio context](docs/RADIO_CONTEXT.md)
+- [Bluetooth presence channel](docs/BLUETOOTH_CONTEXT.md)
+- [Wi-Fi, network, and auxiliary presence channels](docs/PHONE_CONTEXT.md)
+- [Encrypted Tier-2 content channels](docs/TIER2_CONTENTS.md)
+- [OBD-II drive sessions](docs/VEHICLE_OBD.md)
+- [Native Automotive properties](docs/VEHICLE_AUTOMOTIVE.md)
+- [MAVLink flight sessions](docs/MAVLINK.md)
+- [Control-link, Field-Kit, and TAK context](docs/UAS_LINKS_FIELD_KIT_TAK.md)
+- [Audio ring capture](docs/AUDIO_RING.md)
+- [Video, screen, and call-audio capability](docs/VIDEO_SCREEN_CALL.md)
+- [AV retention and encrypted evidence player](docs/AV_RETENTION.md)
+- [Association-engine credibility](docs/ENGINE_CREDIBILITY.md)
+- [Hypothesis pre-registration](docs/HYPOTHESIS_PREREGISTRATION.md)
+- [Plain-language results and confounder surfacing](docs/PLAIN_LANGUAGE_AND_CONFOUNDERS.md)
+- [Omniprobe event inventory](docs/OMNIPROBE.md)
+- [TOTAL_EVIDENCE and session presets](docs/TOTAL_EVIDENCE.md)
+- [Isolated demo mode and fixtures](docs/DEMO_MODE.md)
+- [Export, raw backup/restore, and explicit LAN routes](docs/EXPORT.md)
+- [Inbound shares and Tasker/intent automation](docs/AUTOMATION.md)
+- [SQLite schema contract](docs/SCHEMA.md)
+- [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
+- [Roadmap](ROADMAP.md)
+- [Release checklist](docs/RELEASE_CHECKLIST.md)
+- [Release notes](docs/RELEASE_NOTES_0.2.1.md)
+- [0.3.0-preview.3 release notes](docs/RELEASE_NOTES_0.3.0-preview.3.md)
+- [0.3.0-preview.4 release notes](docs/RELEASE_NOTES_0.3.0-preview.4.md)
+- [0.3.0 release notes](docs/RELEASE_NOTES_0.3.0.md)
+
+## License and disclaimer
+
+The source is available under the [MIT License](LICENSE).
+
+Apophenia is an experimental personal data tool, not a medical device. It does not diagnose, treat, predict, or explain a medical or mental-health condition. Statistical output is exploratory and may reflect chance, bias, missing data, or confounding factors.

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- User-configured local HTTP endpoints are supported. Call sites still enforce their
+         own destination policy; LIVE_EXPORT_LAN accepts literal private/link-local IPs only. -->
+    <base-config cleartextTrafficPermitted="true" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">octopod.home</domain>
+    </domain-config>
+</network-security-config>

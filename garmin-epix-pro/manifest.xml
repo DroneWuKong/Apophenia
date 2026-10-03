@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
-<iq:application entry="ApopheniaApp" id="4f4d0f7b3d6f4b36b3e88b91129c70a2" launcherIcon="@Drawables.LauncherIcon" minSdkVersion="5.1.0" name="@Strings.AppName" type="watch-app" version="0.2.0">
+<iq:application entry="ApopheniaApp" id="4f4d0f7b3d6f4b36b3e88b91129c70a2" launcherIcon="@Drawables.LauncherIcon" minSdkVersion="5.1.0" name="@Strings.AppName" type="watch-app" version="0.3.0">
 <iq:products><iq:product id="epix2pro42mm"/><iq:product id="epix2pro47mm"/><iq:product id="epix2pro51mm"/></iq:products>
 <iq:permissions><iq:uses-permission id="Communications"/><iq:uses-permission id="SensorHistory"/></iq:permissions>
 <iq:languages><iq:language>eng</iq:language></iq:languages>

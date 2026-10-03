@@ -1,6 +1,7 @@
 package com.dronewukong.apophenia.correlation
 
 import kotlin.math.abs
+import kotlin.math.sign
 import kotlin.math.sqrt
 import kotlin.random.Random
 
@@ -9,50 +10,318 @@ data class AssociationResult(
     val controlCount: Int,
     val eventMean: Double?,
     val controlMean: Double?,
+    val eventMedian: Double?,
+    val controlMedian: Double?,
+    val eventMad: Double?,
+    val controlMad: Double?,
     val delta: Double?,
     val standardizedEffect: Double?,
+    val effectCiLow: Double?,
+    val effectCiHigh: Double?,
     val permutationP: Double?,
+    val adjustedP: Double?,
+    val comparisonsTested: Int,
+    val comparisonsEligible: Int,
+    val multipleComparisonsMethod: String,
+    val indistinguishableFromNoise: Boolean,
+    val permutationSeed: Int?,
+    val permutationCount: Int,
+    val pResolution: Double?,
+    val persistentDirection: Boolean,
+    val effectMagnitude: String,
+    val evidence: String,
     val strength: String,
+    val plainLanguageSummary: String,
+    val smallSample: Boolean,
     val summary: String
 )
 
 object AssociationEngine {
-    fun compare(eventValues: List<Double>, controlValues: List<Double>, permutations: Int = 600, seed: Int = 1337): AssociationResult {
-        if (eventValues.size < 4 || controlValues.size < 4) return AssociationResult(
-            eventValues.size, controlValues.size, eventValues.averageOrNull(), controlValues.averageOrNull(), null, null, null,
-            "INSUFFICIENT", "Need at least 4 event samples and 4 control samples."
+    fun compare(
+        eventValues: List<Double>,
+        controlValues: List<Double>,
+        permutations: Int = 1_000,
+        seed: Int? = null,
+        bootstrapIterations: Int = 1_000,
+        featureName: String = "feature"
+    ): AssociationResult {
+        val permutationCount = permutations.coerceAtLeast(1)
+        if (eventValues.size < 4 || controlValues.size < 4) return insufficient(eventValues, controlValues, permutationCount, featureName)
+
+        val resolvedSeed = seed ?: Random.Default.nextInt()
+        val eventMean = eventValues.average()
+        val controlMean = controlValues.average()
+        val delta = eventMean - controlMean
+        val effect = standardizedEffect(eventValues, controlValues)
+        val p = permutationP(eventValues, controlValues, permutationCount, resolvedSeed)
+        val ci = bootstrapEffectCi(eventValues, controlValues, bootstrapIterations, resolvedSeed xor 0x5F3759DF)
+        val persistent = splitHalfPersistence(eventValues, controlValues, delta)
+        return buildResult(
+            eventValues, controlValues, delta, effect, ci.first, ci.second, p, p,
+            resolvedSeed, permutationCount, persistent, comparisonsTested = 1, comparisonsEligible = 1, featureName = featureName
         )
-        val em = eventValues.average(); val cm = controlValues.average(); val delta = em - cm
-        val pooled = pooledStd(eventValues, controlValues)
-        val effect = if (pooled > 1e-12) delta / pooled else 0.0
-        val p = permutationP(eventValues, controlValues, permutations, seed)
-        val strength = when {
-            p > 0.10 || abs(effect) < 0.20 -> "WEAK"
-            abs(effect) < 0.50 -> "SMALL"
-            abs(effect) < 0.80 -> "MODERATE"
-            else -> "STRONG"
+    }
+
+    fun compareAll(
+        values: Map<String, Pair<List<Double>, List<Double>>>,
+        permutations: Int = 1_000,
+        seed: Int? = null,
+        bootstrapIterations: Int = 1_000
+    ): Map<String, AssociationResult> {
+        val rootSeed = seed ?: Random.Default.nextInt()
+        val raw = values.mapValues { (metric, groups) ->
+            compare(groups.first, groups.second, permutations, rootSeed xor metric.hashCode(), bootstrapIterations, metric)
+        }
+        val eligible = raw.filterValues { it.permutationP != null }.toList().sortedBy { it.second.permutationP }
+        if (eligible.isEmpty()) return raw.mapValues { (_, result) -> result.withComparisonScope(values.size, 0) }
+
+        val adjusted = mutableMapOf<String, Double>()
+        var runningMinimum = 1.0
+        for (index in eligible.indices.reversed()) {
+            val rank = index + 1
+            val candidate = (eligible[index].second.permutationP!! * eligible.size / rank).coerceAtMost(1.0)
+            runningMinimum = minOf(runningMinimum, candidate)
+            adjusted[eligible[index].first] = runningMinimum
+        }
+        return raw.mapValues { (metric, result) ->
+            val q = adjusted[metric]
+            if (q == null) result.withComparisonScope(values.size, eligible.size)
+            else buildResult(
+                    values.getValue(metric).first,
+                    values.getValue(metric).second,
+                    result.delta!!,
+                    result.standardizedEffect!!,
+                    result.effectCiLow!!,
+                    result.effectCiHigh!!,
+                    result.permutationP!!,
+                    q,
+                    result.permutationSeed!!,
+                    result.permutationCount,
+                result.persistentDirection,
+                comparisonsTested = values.size,
+                comparisonsEligible = eligible.size,
+                featureName = metric
+                )
+        }
+    }
+
+    private fun insufficient(events: List<Double>, controls: List<Double>, permutations: Int, featureName: String) = AssociationResult(
+        eventCount = events.size,
+        controlCount = controls.size,
+        eventMean = events.averageOrNull(),
+        controlMean = controls.averageOrNull(),
+        eventMedian = events.medianOrNull(),
+        controlMedian = controls.medianOrNull(),
+        eventMad = events.madOrNull(),
+        controlMad = controls.madOrNull(),
+        delta = null,
+        standardizedEffect = null,
+        effectCiLow = null,
+        effectCiHigh = null,
+        permutationP = null,
+        adjustedP = null,
+        comparisonsTested = 1,
+        comparisonsEligible = 0,
+        multipleComparisonsMethod = MULTIPLE_COMPARISONS_METHOD,
+        indistinguishableFromNoise = false,
+        permutationSeed = null,
+        permutationCount = permutations,
+        pResolution = null,
+        persistentDirection = false,
+        effectMagnitude = "not estimated",
+        evidence = "insufficient data",
+        strength = "insufficient data",
+        plainLanguageSummary = "Interesting, not yet established: ${readableFeature(featureName)} has only ${events.size} matched event captures and ${controls.size} matched controls; at least 4 of each are needed.",
+        smallSample = true,
+        summary = "Need at least 4 matched event captures and 4 matched control captures. ${comparisonDisclosure(1, 0)}"
+    )
+
+    private fun buildResult(
+        events: List<Double>,
+        controls: List<Double>,
+        delta: Double,
+        effect: Double,
+        ciLow: Double,
+        ciHigh: Double,
+        p: Double,
+        adjustedP: Double,
+        seed: Int,
+        permutations: Int,
+        persistent: Boolean,
+        comparisonsTested: Int,
+        comparisonsEligible: Int,
+        featureName: String
+    ): AssociationResult {
+        val magnitude = effectMagnitude(effect)
+        val evidence = when {
+            (events.size < 10 || controls.size < 10) && adjustedP > 0.10 -> "interesting, not yet established · indistinguishable from noise"
+            events.size < 10 || controls.size < 10 -> "interesting, not yet established"
+            adjustedP > 0.10 -> "indistinguishable from noise"
+            events.size >= 10 && controls.size >= 10 && adjustedP <= 0.05 && abs(effect) >= 0.50 && persistent ->
+                "repeatable association worth investigating"
+            else -> "possible association"
         }
         val direction = if (delta >= 0) "higher" else "lower"
-        val summary = "Event values were ${format(abs(delta))} $direction than controls on average; effect=${format(effect)}, permutation p=${format(p)}."
-        return AssociationResult(eventValues.size, controlValues.size, em, cm, delta, effect, p, strength, summary)
+        val persistenceText = if (persistent) " The direction persisted across early and later captures." else ""
+        val sampleText = if (events.size < 10 || controls.size < 10) " Small sample: uncertainty remains high." else ""
+        val resolution = 1.0 / (permutations + 1.0)
+        val summary = "Event captures were ${format(abs(delta))} $direction than matched controls on average. " +
+            "Effect estimate: $magnitude (d=${format(effect)}, 95% bootstrap CI ${formatInterval(ciLow, ciHigh)}). " +
+            "Permutation p=${format(p)}, FDR-adjusted p=${format(adjustedP)}, resolution=${format(resolution)}, seed=$seed.$persistenceText$sampleText " +
+            (if (adjustedP > 0.10) " This feature is indistinguishable from noise after correction." else "") +
+            " This is an association, not evidence of causation. ${comparisonDisclosure(comparisonsTested, comparisonsEligible)}"
+        return AssociationResult(
+            events.size,
+            controls.size,
+            events.average(),
+            controls.average(),
+            events.medianOrNull(),
+            controls.medianOrNull(),
+            events.madOrNull(),
+            controls.madOrNull(),
+            delta,
+            effect,
+            ciLow,
+            ciHigh,
+            p,
+            adjustedP,
+            comparisonsTested,
+            comparisonsEligible,
+            MULTIPLE_COMPARISONS_METHOD,
+            adjustedP > 0.10,
+            seed,
+            permutations,
+            resolution,
+            persistent,
+            magnitude,
+            evidence,
+            evidence,
+            plainLanguage(featureName, events, controls, delta, adjustedP),
+            events.size < 10 || controls.size < 10,
+            summary
+        )
+    }
+
+    private fun plainLanguage(featureName: String, events: List<Double>, controls: List<Double>, delta: Double, adjustedP: Double): String {
+        val feature = readableFeature(featureName)
+        val isBinary = (events + controls).all { it == 0.0 || it == 1.0 }
+        val comparison = if (isBinary) {
+            val eventRate = events.average()
+            val controlRate = controls.average()
+            val relative = when {
+                controlRate > 0.0 -> "${formatRatio(eventRate / controlRate)}× as common"
+                eventRate > 0.0 -> "seen at events but not in matched controls"
+                else -> "absent in both groups"
+            }
+            "$feature was present in ${formatPercent(eventRate)} of event windows versus ${formatPercent(controlRate)} of matched controls ($relative)."
+        } else {
+            val direction = if (delta >= 0) "higher" else "lower"
+            "$feature averaged ${format(events.average())} at event windows versus ${format(controls.average())} in matched controls (${format(abs(delta))} $direction)."
+        }
+        val honesty = when {
+            adjustedP > 0.10 && (events.size < 10 || controls.size < 10) -> " Good news: this pattern doesn't hold up against your controls. Interesting, not yet established; the sample is still small."
+            adjustedP > 0.10 -> " Good news: this pattern doesn't hold up against your controls."
+            events.size < 10 || controls.size < 10 -> " Interesting, not yet established; the sample is still small."
+            else -> " This corrected association is worth investigating, not a causal conclusion."
+        }
+        return comparison + honesty
+    }
+
+    private fun readableFeature(featureName: String): String = featureName.replace('_',' ')
+    private fun formatPercent(value: Double): String = "%.0f%%".format(value * 100.0)
+    private fun formatRatio(value: Double): String = if (value >= 10) "%.0f".format(value) else "%.1f".format(value)
+
+    private fun AssociationResult.withComparisonScope(tested: Int, eligible: Int): AssociationResult {
+        val base = summary.substringBefore(" Multiple-comparisons scope:")
+        return copy(
+            comparisonsTested = tested,
+            comparisonsEligible = eligible,
+            multipleComparisonsMethod = MULTIPLE_COMPARISONS_METHOD,
+            summary = "$base ${comparisonDisclosure(tested, eligible)}"
+        )
+    }
+
+    private fun comparisonDisclosure(tested: Int, eligible: Int): String =
+        "Multiple-comparisons scope: $tested features tested; $eligible had enough matched captures; $MULTIPLE_COMPARISONS_METHOD applied to eligible permutation p-values."
+
+    private fun effectMagnitude(effect: Double): String = when {
+        abs(effect) < 0.20 -> "negligible effect"
+        abs(effect) < 0.50 -> "small effect"
+        abs(effect) < 0.80 -> "moderate effect"
+        else -> "large effect"
+    }
+
+    private fun standardizedEffect(a: List<Double>, b: List<Double>): Double {
+        val pooled = pooledStd(a, b)
+        return if (pooled > 1e-12) (a.average() - b.average()) / pooled else 0.0
     }
 
     private fun pooledStd(a: List<Double>, b: List<Double>): Double {
-        fun variance(xs: List<Double>): Double { val m=xs.average(); return xs.sumOf { (it-m)*(it-m) }/(xs.size-1).coerceAtLeast(1) }
-        return sqrt(((a.size-1)*variance(a)+(b.size-1)*variance(b))/(a.size+b.size-2).coerceAtLeast(1))
+        fun variance(xs: List<Double>): Double {
+            val mean = xs.average()
+            return xs.sumOf { (it - mean) * (it - mean) } / (xs.size - 1).coerceAtLeast(1)
+        }
+        return sqrt(((a.size - 1) * variance(a) + (b.size - 1) * variance(b)) / (a.size + b.size - 2).coerceAtLeast(1))
     }
 
     private fun permutationP(a: List<Double>, b: List<Double>, n: Int, seed: Int): Double {
         val observed = abs(a.average() - b.average())
-        val pool = (a+b).toMutableList(); val r = Random(seed); var extreme=0
+        val pool = (a + b).toMutableList()
+        val random = Random(seed)
+        var extreme = 0
         repeat(n) {
-            pool.shuffle(r)
-            val am = pool.take(a.size).average(); val bm = pool.drop(a.size).average()
-            if (abs(am-bm) >= observed) extreme++
+            pool.shuffle(random)
+            val eventMean = pool.take(a.size).average()
+            val controlMean = pool.drop(a.size).average()
+            if (abs(eventMean - controlMean) >= observed) extreme++
         }
-        return (extreme + 1.0)/(n + 1.0)
+        return (extreme + 1.0) / (n + 1.0)
+    }
+
+    private fun bootstrapEffectCi(a: List<Double>, b: List<Double>, iterations: Int, seed: Int): Pair<Double, Double> {
+        val random = Random(seed)
+        val estimates = DoubleArray(iterations.coerceAtLeast(200)) {
+            val sampledA = List(a.size) { a[random.nextInt(a.size)] }
+            val sampledB = List(b.size) { b[random.nextInt(b.size)] }
+            standardizedEffect(sampledA, sampledB)
+        }.sorted()
+        return percentile(estimates, 0.025) to percentile(estimates, 0.975)
+    }
+
+    private fun percentile(sorted: List<Double>, probability: Double): Double {
+        val position = probability * (sorted.size - 1)
+        val lower = position.toInt()
+        val upper = kotlin.math.ceil(position).toInt()
+        if (lower == upper) return sorted[lower]
+        val fraction = position - lower
+        return sorted[lower] * (1.0 - fraction) + sorted[upper] * fraction
+    }
+
+    private fun splitHalfPersistence(events: List<Double>, controls: List<Double>, overallDelta: Double): Boolean {
+        if (events.size < 8 || controls.size < 8 || overallDelta == 0.0) return false
+        val eventMiddle = events.size / 2
+        val controlMiddle = controls.size / 2
+        val firstDelta = events.take(eventMiddle).average() - controls.take(controlMiddle).average()
+        val secondDelta = events.drop(eventMiddle).average() - controls.drop(controlMiddle).average()
+        return firstDelta != 0.0 && secondDelta != 0.0 && firstDelta.sign == overallDelta.sign && secondDelta.sign == overallDelta.sign
     }
 
     private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
-    private fun format(v: Double) = "%.3f".format(v)
+
+    private fun List<Double>.medianOrNull(): Double? {
+        if (isEmpty()) return null
+        val sorted = sorted()
+        val middle = sorted.size / 2
+        return if (sorted.size % 2 == 0) (sorted[middle - 1] + sorted[middle]) / 2.0 else sorted[middle]
+    }
+
+    private fun List<Double>.madOrNull(): Double? {
+        val median = medianOrNull() ?: return null
+        return map { abs(it - median) }.medianOrNull()
+    }
+
+    private fun format(value: Double) = "%.4f".format(value)
+    private fun formatInterval(low: Double, high: Double) = "[${format(low)}, ${format(high)}]"
+
+    private const val MULTIPLE_COMPARISONS_METHOD = "Benjamini-Hochberg false-discovery-rate correction"
 }

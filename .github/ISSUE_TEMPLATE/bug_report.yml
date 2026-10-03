@@ -1,0 +1,76 @@
+name: Bug report
+description: Report reproducible Android, Garmin, data, or analysis behavior
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping test Apophenia. Do not attach real exports, coordinates, health records, Garmin identifiers, or secrets. Use a private security advisory for a vulnerability or unintended disclosure.
+  - type: input
+    id: version
+    attributes:
+      label: App version or commit
+      placeholder: 0.2.1-debug or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and OS
+      placeholder: Pixel 9, Android 16; Epix Pro 47 mm, Connect IQ version
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - LIVE
+        - SIMULATION
+        - Both
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: Numbered steps with optional sources and recorder state
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: optional_sources
+    attributes:
+      label: Optional sources involved
+      options:
+        - label: Rolling black box
+        - label: Location or weather
+        - label: Health Connect
+        - label: Garmin
+        - label: Widget or Quick Settings tile
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Paste only logs or screenshots that contain no personal data.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed personal observations, coordinates, health data, identifiers, and secrets.
+          required: true

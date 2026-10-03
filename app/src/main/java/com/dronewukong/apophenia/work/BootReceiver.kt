@@ -2,4 +2,4 @@ package com.dronewukong.apophenia.work
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-class BootReceiver : BroadcastReceiver() { override fun onReceive(context: Context, intent: Intent?) { if (intent?.action == Intent.ACTION_BOOT_COMPLETED) ControlScheduler.ensureScheduled(context) } }
+class BootReceiver : BroadcastReceiver() { override fun onReceive(context: Context, intent: Intent?) { if (intent?.action == Intent.ACTION_BOOT_COMPLETED) { ControlScheduler.ensureScheduled(context); PromptedCheckInScheduler.ensureScheduled(context) } } }

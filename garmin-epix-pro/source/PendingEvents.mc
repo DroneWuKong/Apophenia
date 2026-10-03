@@ -28,6 +28,28 @@ class PendingEvents {
         sentCount = 0;
     }
 
+    // A successful BLE transfer is not proof that Android committed the event.
+    // Keep the batch until the companion sends a durable-storage receipt.
+    function delivered() { sentCount = 0; }
+
+    function acknowledge(eventIds) {
+        if (!(eventIds instanceof Lang.Array) || eventIds.size() == 0) { return 0; }
+        var remaining = [];
+        var removed = 0;
+        for (var index = 0; index < events.size(); index += 1) {
+            var packet = events[index];
+            var eventId = packet instanceof Lang.Dictionary ? packet["event_id"] : null;
+            if (eventId != null && eventIds.indexOf(eventId) != -1) {
+                removed += 1;
+            } else {
+                remaining.add(packet);
+            }
+        }
+        events = remaining;
+        sentCount = 0;
+        return removed;
+    }
+
     function failed() { sentCount = 0; }
 }
 
@@ -48,7 +70,7 @@ function failedSendRetainsEverything(logger) {
     queue.begin();
     queue.append(2);
     queue.failed();
-    var retry = queue.begin();
+    var retry = queue.begin() as Lang.Array;
     return retry.size() == 2 && retry[0] == 1 && retry[1] == 2;
 }
 
@@ -67,4 +89,21 @@ function emptyAndRestoredQueues(logger) {
     restored.begin();
     restored.complete();
     return empty.begin() == null && restored.events.size() == 0;
+}
+
+(:test)
+function transportCompletionWaitsForReceipt(logger) {
+    var queue = new PendingEvents([{"event_id"=>"a"}, {"event_id"=>"b"}]);
+    queue.begin();
+    queue.delivered();
+    return queue.events.size() == 2 && queue.sentCount == 0;
+}
+
+(:test)
+function receiptRemovesOnlyDurablyStoredEvents(logger) {
+    var queue = new PendingEvents([{"event_id"=>"a"}, {"event_id"=>"b"}, {"event_id"=>"c"}]);
+    queue.begin();
+    var removed = queue.acknowledge(["a", "c"]);
+    var remaining = queue.events[0] as Lang.Dictionary;
+    return removed == 2 && queue.events.size() == 1 && remaining["event_id"].equals("b");
 }

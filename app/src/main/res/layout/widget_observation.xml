@@ -1,8 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center" android:padding="12dp" android:background="@drawable/widget_bg">
-<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="APOPHENIA" android:textColor="#AEB5C2" android:textSize="12sp" android:textStyle="bold" />
-<Button android:id="@+id/widget_weird" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="THAT WAS WEIRD" android:textAllCaps="false" android:textStyle="bold" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-<Button android:id="@+id/widget_observation" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Observation" android:textAllCaps="false" />
-<Button android:id="@+id/widget_open" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Open" android:textAllCaps="false" />
-</LinearLayout></LinearLayout>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/widget_open"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="4dp"
+        android:paddingVertical="3dp"
+        android:text="APOPHENIA · tap logs now"
+        android:textColor="#AEB5C2"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/widget_vibe_1"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:minHeight="0dp"
+            android:text="Vibe good 🙂"
+            android:textAllCaps="false"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/widget_vibe_2"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:minHeight="0dp"
+            android:text="Tolerable 😐"
+            android:textAllCaps="false"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/widget_vibe_3"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:minHeight="0dp"
+            android:text="Bad 🙁"
+            android:textAllCaps="false"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/widget_vibe_4"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:minHeight="0dp"
+            android:text="Fucked 😖"
+            android:textAllCaps="false"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/widget_vibe_5"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:minHeight="0dp"
+        android:text="Fucky 😵‍💫"
+        android:textAllCaps="false"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/widget_egress"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:backgroundTint="#B3261E"
+        android:minHeight="0dp"
+        android:text="FUCK THIS, I'M OUT"
+        android:textAllCaps="false"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+</LinearLayout>
