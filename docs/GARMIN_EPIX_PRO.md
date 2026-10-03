@@ -19,6 +19,8 @@ Android GarminBridge
 
 The watch is a fast input/context node. The Android phone remains the canonical history. A bounded 10-event queue preserves timestamps during transient phone disconnects. Protocol v3 includes a persisted installation ID and monotonic event sequence; Android uses that event ID to reject a replayed delivery without replacing the original watch timestamp.
 
+Protocol v3.1 adds a durable receipt in the reverse direction. BLE transport completion changes the watch status to **Sent - awaiting phone receipt** but does not remove the event. Android sends a receipt containing the event ID only after the observation is present in SQLite and its Garmin context is attached. The watch then removes only acknowledged IDs and displays **Saved on phone**. If the receipt is lost, a manual retry is safe because Android acknowledges both a new insert and an already-stored duplicate.
+
 Only one batch is transmitted at a time. New taps append behind the in-flight
 batch; its completion removes only the sent prefix. A failed send keeps every
 pending observation. Reopening the app or choosing **Retry queued events** retries
@@ -26,9 +28,8 @@ stored observations without recording a new event. At capacity, the app reports
 **Queue full - NOT recorded** and does not evict an older observation. The status
 appears beneath **THAT WAS WEIRD**.
 
-Transport completion is not an acknowledgement of durable Android storage.
-Ambiguous delivery or app termination can still cause replay/duplicates; this
-protocol does not claim exactly-once delivery. Physical phone/watch acceptance
+The receipt protocol is at-least-once delivery with idempotent phone storage. It
+does not claim distributed exactly-once delivery. Physical phone/watch acceptance
 remains required.
 
 ## Queue regression tests
@@ -41,9 +42,10 @@ Evil framework, not a reimplementation in another language. Compile with
 monkeydo.bat path/to/queue-tests.prg epix2pro47mm /t
 ```
 
-On 2026-10-02, all four tests passed in SDK 9.2.0's Epix Pro 47mm simulator:
+On 2026-10-03, all six tests passed in SDK 9.2.0's Epix Pro 47mm simulator:
 preserving taps during a send, retaining failed batches, rejecting overflow
-without eviction, and empty/restored queue handling. All three Epix Pro targets
+without eviction, empty/restored queue handling, retaining transport-complete
+events until receipt, and selective receipt removal. All three Epix Pro targets
 also compiled with `tools/build-garmin.ps1`. This tests queue logic and Monkey C/API compatibility, not BLE transport or Android persistence.
 
 Targets: `epix2pro42mm`, `epix2pro47mm`, `epix2pro51mm`.
@@ -56,7 +58,7 @@ Android checks whether Garmin Connect is installed before starting the Connect I
 
 Connect IQ device objects can carry stale status fields. The Android bridge therefore uses the SDK's live connected-device list and refreshes known-device status before **Open logger** decides that no watch is connected. Incoming payload decoding walks both flat and nested lists because a Monkey C array of queued dictionaries may arrive as a nested Android list.
 
-On 2026-10-02, the signed watch app was physically installed and opened on an Epix Pro 51 mm running firmware 27.18. Watch-to-phone delivery remains pending until the `0.3.0-preview.2` Android transport fixes pass the steps below.
+On 2026-10-02, the signed watch app was physically installed and opened on an Epix Pro 51 mm running firmware 27.18. On 2026-10-03, the v0.3 receipt-enabled PRG was copied to that watch over MTP; USB disconnect and an on-watch launch are still needed to prove that the watch processed the replacement. Watch-to-phone delivery remains pending until the `0.3.0-preview.3` phone/watch pair passes the steps below.
 
 ## Physical validation
 

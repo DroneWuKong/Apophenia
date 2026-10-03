@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0-preview.3] - 2026-10-03
+
+### Added
+
+- Durable phone-storage receipts: the watch retains queued events until Android confirms the observation transaction, and retries remain safe through event-ID deduplication.
+- Distinct watch haptics for local capture and confirmed phone storage.
+- Optional Octopod home context for aggregate Home Assistant/SmartThings state and Wyze camera connectivity; it stores no entity names, images, audio, or service credentials.
+- Expandable timeline context capsules showing source, phase, and compact metrics while clearly separating post-event values.
+
+### Changed
+
+- Background workers and the rolling recorder now share the application-scoped database instead of creating ad hoc SQLite helpers.
+- Native Monkey C queue coverage now includes transport-without-receipt retention and selective durable acknowledgement.
+- Removed the unauthenticated browsable logging deep link; external automation must use the existing signature-protected receiver.
+
+### Validation
+
+- Android unit tests and debug APK assembly pass locally.
+- Six native Monkey C tests pass in the Epix Pro 47 mm simulator; all three Epix Pro targets compile with Connect IQ SDK 9.2.0.
+- The 51 mm PRG was copied to a physically attached Epix Pro over Windows MTP; final watch-side processing still requires disconnecting USB and opening the app.
+
 Notable project changes are recorded here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project intends to use semantic versioning once public releases begin.
 
 ## [Unreleased]

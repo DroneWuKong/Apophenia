@@ -30,7 +30,7 @@ The roadmap is ordered by evidence, not novelty. Items move forward when the pre
 
 - Signed public distribution or Play Store packaging.
 - Additional Garmin families after capability-specific validation.
-- Optional external observer nodes such as Home Assistant or ESP32 sources.
+- Additional external observer nodes such as ESP32 sources. The first optional read-only Octopod/Home Assistant aggregate source landed in `0.3.0-preview.3` and still needs cluster/device acceptance.
 - Privacy-preserving derived acoustic features only if explicitly enabled; no raw continuous audio by default.
 
 ## Non-goals

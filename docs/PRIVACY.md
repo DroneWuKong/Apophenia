@@ -2,7 +2,7 @@
 
 Apophenia is local-first.
 
-Stored locally: manual observations, phone context, rolling black-box samples, random controls, and Garmin event context delivered through the paired-phone companion channel.
+Stored locally: manual observations, phone context, rolling black-box samples, random controls, Garmin event context delivered through the paired-phone companion channel, and optional aggregate home-state counts when explicitly enabled.
 
 Optional Health Connect reads are permission-gated and fail-soft. When authorized, Apophenia may read recent heart rate, resting heart rate, sleep, steps, SpO2, and exercise duration. The app does not write Health Connect records and logging still works when Health Connect is missing, unsupported, denied, or empty.
 
@@ -11,6 +11,7 @@ The rolling buffer is bounded and pruned. It is not an unlimited surveillance lo
 Network use:
 - Open-Meteo only when location permission and the environment gate are enabled. A weather request necessarily sends approximate latitude/longitude and time to that service; the app does not attach an account identity.
 - Garmin communication through the paired-phone Connect IQ companion service.
+- Optional Octopod requests to the user-configured local cluster. Apophenia stores aggregate counts and average temperature only—not entity/person names, camera images, raw audio/video, or Home Assistant/SmartThings/Wyze credentials.
 - Health Connect through Android's local Health Connect provider when explicitly authorized.
 
 Android cloud backup excludes the observation database. Android device-to-device transfer may copy the local database to a replacement device through the operating system's protected transfer mechanism. A user-selected JSON export is outside the app's local boundary once it is handed to another app or destination.

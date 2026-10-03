@@ -30,7 +30,7 @@ UI / widget / tile / external intent / Garmin
                       v
           asynchronous context enrichment
           phone | device | location | weather
-          Health Connect | Garmin-delivered metrics
+          Health Connect | Garmin-delivered metrics | optional Octopod aggregates
                       |
                       v
             labeled context_samples rows
@@ -56,6 +56,7 @@ UI / widget / tile / external intent / Garmin
 | `AssociationEngine` | Matched event/control summaries, robust spread, effect interval, seeded permutation, persistence, and FDR-adjusted results |
 | `HardwareGates` | Compile/runtime boundary for phone sensors, location, weather, and Garmin |
 | `HealthConnectProvider` | Optional read-only historical wearable context |
+| `HomeContextProvider` | Optional read-only aggregate Home Assistant/SmartThings/Wyze context through Octopod |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |

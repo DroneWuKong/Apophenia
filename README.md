@@ -22,7 +22,7 @@ Writing down an explanation afterward is easy. Capturing what was actually happe
 
 1. Tap once.
 2. Save the exact event time immediately.
-3. Add whatever optional phone, environment, Health Connect, or Garmin context is available afterward.
+3. Add whatever optional phone, environment, Health Connect, Garmin, or aggregate home context is available afterward.
 4. Compare event windows with ordinary control windows instead of eyeballing a chart and declaring a pattern.
 
 The point is not to prove a story. It is to collect better evidence before telling one.
@@ -74,6 +74,8 @@ The app explains what works without a prompt and lets you review optional access
 - Optional phone sensors, device state, battery, network, location, and Open-Meteo weather context
 - Optional read-only Health Connect history
 - A Garmin Epix Pro (Gen 2) logger with watch timestamps and a bounded offline queue
+- Durable watch receipts: events leave the queue only after Android confirms local storage
+- Optional aggregate home context through an existing Octopod/Home Assistant cluster
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 
@@ -83,7 +85,7 @@ There is no account, advertising SDK, analytics, continuous microphone recording
 
 Apophenia is currently a **development preview**, not a Play Store release.
 
-1. Prefer the tagged [0.3.0-preview.2 development pre-release](https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.2), or open the latest successful [Android workflow run](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml).
+1. Prefer the tagged [0.3.0-preview.3 development pre-release](https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.3), or open the latest successful [Android workflow run](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml).
 2. Download `app-debug.apk` from the pre-release, or unzip the workflow's `apophenia-debug-apk` artifact.
 3. Open `app-debug.apk` on an Android 8.0 or newer phone.
 4. Allow installation from the browser or file manager if Android asks.
@@ -102,7 +104,7 @@ For recorder survival and real Garmin delivery, use the [48-hour physical accept
 | UI | Two Jetpack Compose smoke tests pass on an API 36 emulator |
 | Permissions | Location, notification, weather, and Health Connect flows were exercised in an emulator |
 | Garmin | All three Epix Pro targets compile with Connect IQ SDK 9.2.0 |
-| Garmin queue | Four native Monkey C tests pass in the 47 mm simulator |
+| Garmin queue | Six native Monkey C tests pass in the 47 mm simulator |
 | Hardware | Broader physical phone/watch acceptance testing is still needed |
 
 I am deliberately not calling simulator evidence hardware validation. The detailed evidence boundary and remaining acceptance work live in [PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md).
@@ -148,7 +150,7 @@ The Garmin companion targets:
 - `epix2pro47mm`
 - `epix2pro51mm`
 
-It preserves the watch's original timestamp, omits unavailable metrics, and queues events when the phone is temporarily disconnected.
+It preserves the watch's original timestamp, omits unavailable metrics, and queues events when the phone is temporarily disconnected. A phone-storage receipt removes an event only after Android commits it; a lost receipt produces a safe deduplicated retry instead of silent loss.
 
 ## Build it yourself
 
@@ -197,11 +199,12 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Data model and statistical boundaries](docs/DATA_MODEL.md)
 - [Install and remote test guide](docs/INSTALL_AND_TEST.md)
 - [Garmin Epix Pro integration](docs/GARMIN_EPIX_PRO.md)
+- [Optional Octopod home context](docs/HOME_CONTEXT.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)
 - [Release notes](docs/RELEASE_NOTES_0.2.1.md)
-- [0.3.0-preview.2 release notes](docs/RELEASE_NOTES_0.3.0-preview.2.md)
+- [0.3.0-preview.3 release notes](docs/RELEASE_NOTES_0.3.0-preview.3.md)
 
 ## License and disclaimer
 
