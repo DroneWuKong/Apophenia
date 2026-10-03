@@ -86,7 +86,7 @@ class SimulationModeTest {
             .build()
 
         assertEquals(androidx.work.ListenableWorker.Result.success(), worker.doWork())
-        val controls = ObservationDb(context).allContext().filter { it.isControl }
+        val controls = ObservationDb(context).use { it.allContext().filter { sample -> sample.isControl } }
         assertTrue(controls.isNotEmpty())
         assertTrue(controls.all { it.captureId.startsWith("prompted-control:") })
         assertTrue(controls.all { it.metadata.contains("control_source=prompted") })
