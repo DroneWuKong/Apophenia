@@ -13,7 +13,7 @@ class AssociationEngineTest {
             listOf(1.0, 2.0, 3.0, 4.0, 5.0),
             seed = 42
         )
-        assertEquals("not enough evidence", result.evidence)
+        assertEquals("indistinguishable from noise", result.evidence)
         assertEquals("negligible effect", result.effectMagnitude)
         assertTrue(kotlin.math.abs(result.standardizedEffect ?: 99.0) < 0.01)
         assertTrue(result.summary.contains("not evidence of causation"))
@@ -54,6 +54,9 @@ class AssociationEngineTest {
         )
         assertTrue(results.values.all { it.adjustedP != null })
         assertTrue(results.getValue("pressure").adjustedP!! >= results.getValue("pressure").permutationP!!)
+        assertTrue(results.values.all { it.comparisonsTested == 2 && it.comparisonsEligible == 2 })
+        assertTrue(results.values.all { it.summary.contains("2 features tested") })
+        assertTrue(results.getValue("light").indistinguishableFromNoise)
     }
 
     @Test

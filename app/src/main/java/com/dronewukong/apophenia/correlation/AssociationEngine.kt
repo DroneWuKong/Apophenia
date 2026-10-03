@@ -20,6 +20,10 @@ data class AssociationResult(
     val effectCiHigh: Double?,
     val permutationP: Double?,
     val adjustedP: Double?,
+    val comparisonsTested: Int,
+    val comparisonsEligible: Int,
+    val multipleComparisonsMethod: String,
+    val indistinguishableFromNoise: Boolean,
     val permutationSeed: Int?,
     val permutationCount: Int,
     val pResolution: Double?,
@@ -51,7 +55,7 @@ object AssociationEngine {
         val persistent = splitHalfPersistence(eventValues, controlValues, delta)
         return buildResult(
             eventValues, controlValues, delta, effect, ci.first, ci.second, p, p,
-            resolvedSeed, permutationCount, persistent
+            resolvedSeed, permutationCount, persistent, comparisonsTested = 1, comparisonsEligible = 1
         )
     }
 
@@ -66,7 +70,7 @@ object AssociationEngine {
             compare(groups.first, groups.second, permutations, rootSeed xor metric.hashCode(), bootstrapIterations)
         }
         val eligible = raw.filterValues { it.permutationP != null }.toList().sortedBy { it.second.permutationP }
-        if (eligible.isEmpty()) return raw
+        if (eligible.isEmpty()) return raw.mapValues { (_, result) -> result.withComparisonScope(values.size, 0) }
 
         val adjusted = mutableMapOf<String, Double>()
         var runningMinimum = 1.0
@@ -77,20 +81,23 @@ object AssociationEngine {
             adjusted[eligible[index].first] = runningMinimum
         }
         return raw.mapValues { (metric, result) ->
-            val q = adjusted[metric] ?: return@mapValues result
-            buildResult(
-                values.getValue(metric).first,
-                values.getValue(metric).second,
-                result.delta!!,
-                result.standardizedEffect!!,
-                result.effectCiLow!!,
-                result.effectCiHigh!!,
-                result.permutationP!!,
-                q,
-                result.permutationSeed!!,
-                result.permutationCount,
-                result.persistentDirection
-            )
+            val q = adjusted[metric]
+            if (q == null) result.withComparisonScope(values.size, eligible.size)
+            else buildResult(
+                    values.getValue(metric).first,
+                    values.getValue(metric).second,
+                    result.delta!!,
+                    result.standardizedEffect!!,
+                    result.effectCiLow!!,
+                    result.effectCiHigh!!,
+                    result.permutationP!!,
+                    q,
+                    result.permutationSeed!!,
+                    result.permutationCount,
+                    result.persistentDirection,
+                    comparisonsTested = values.size,
+                    comparisonsEligible = eligible.size
+                )
         }
     }
 
@@ -109,6 +116,10 @@ object AssociationEngine {
         effectCiHigh = null,
         permutationP = null,
         adjustedP = null,
+        comparisonsTested = 1,
+        comparisonsEligible = 0,
+        multipleComparisonsMethod = MULTIPLE_COMPARISONS_METHOD,
+        indistinguishableFromNoise = false,
         permutationSeed = null,
         permutationCount = permutations,
         pResolution = null,
@@ -116,7 +127,7 @@ object AssociationEngine {
         effectMagnitude = "not estimated",
         evidence = "insufficient data",
         strength = "insufficient data",
-        summary = "Need at least 4 matched event captures and 4 matched control captures."
+        summary = "Need at least 4 matched event captures and 4 matched control captures. ${comparisonDisclosure(1, 0)}"
     )
 
     private fun buildResult(
@@ -130,11 +141,13 @@ object AssociationEngine {
         adjustedP: Double,
         seed: Int,
         permutations: Int,
-        persistent: Boolean
+        persistent: Boolean,
+        comparisonsTested: Int,
+        comparisonsEligible: Int
     ): AssociationResult {
         val magnitude = effectMagnitude(effect)
         val evidence = when {
-            adjustedP > 0.10 -> "not enough evidence"
+            adjustedP > 0.10 -> "indistinguishable from noise"
             events.size >= 10 && controls.size >= 10 && adjustedP <= 0.05 && abs(effect) >= 0.50 && persistent ->
                 "repeatable association worth investigating"
             else -> "possible association"
@@ -146,7 +159,8 @@ object AssociationEngine {
         val summary = "Event captures were ${format(abs(delta))} $direction than matched controls on average. " +
             "Effect estimate: $magnitude (d=${format(effect)}, 95% bootstrap CI ${formatInterval(ciLow, ciHigh)}). " +
             "Permutation p=${format(p)}, FDR-adjusted p=${format(adjustedP)}, resolution=${format(resolution)}, seed=$seed.$persistenceText$sampleText " +
-            "This is an association, not evidence of causation."
+            (if (adjustedP > 0.10) " This feature is indistinguishable from noise after correction." else "") +
+            " This is an association, not evidence of causation. ${comparisonDisclosure(comparisonsTested, comparisonsEligible)}"
         return AssociationResult(
             events.size,
             controls.size,
@@ -162,6 +176,10 @@ object AssociationEngine {
             ciHigh,
             p,
             adjustedP,
+            comparisonsTested,
+            comparisonsEligible,
+            MULTIPLE_COMPARISONS_METHOD,
+            adjustedP > 0.10,
             seed,
             permutations,
             resolution,
@@ -172,6 +190,19 @@ object AssociationEngine {
             summary
         )
     }
+
+    private fun AssociationResult.withComparisonScope(tested: Int, eligible: Int): AssociationResult {
+        val base = summary.substringBefore(" Multiple-comparisons scope:")
+        return copy(
+            comparisonsTested = tested,
+            comparisonsEligible = eligible,
+            multipleComparisonsMethod = MULTIPLE_COMPARISONS_METHOD,
+            summary = "$base ${comparisonDisclosure(tested, eligible)}"
+        )
+    }
+
+    private fun comparisonDisclosure(tested: Int, eligible: Int): String =
+        "Multiple-comparisons scope: $tested features tested; $eligible had enough matched captures; $MULTIPLE_COMPARISONS_METHOD applied to eligible permutation p-values."
 
     private fun effectMagnitude(effect: Double): String = when {
         abs(effect) < 0.20 -> "negligible effect"
@@ -251,4 +282,6 @@ object AssociationEngine {
 
     private fun format(value: Double) = "%.4f".format(value)
     private fun formatInterval(low: Double, high: Double) = "[${format(low)}, ${format(high)}]"
+
+    private const val MULTIPLE_COMPARISONS_METHOD = "Benjamini-Hochberg false-discovery-rate correction"
 }

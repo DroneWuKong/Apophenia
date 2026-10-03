@@ -100,6 +100,10 @@ Before analysis, event and control captures are matched one-to-one within a loca
 
 Analysis aggregates dense values once per event or control capture. Post-event samples and hypothesis rows are excluded from predictor calculations. Results include means, medians, median absolute deviation, standardized effect size with a bootstrap 95% interval, a recorded permutation seed and attainable p-value resolution, split-half directional persistence, and Benjamini-Hochberg false-discovery-rate adjustment. Effect magnitude and strength of evidence are reported separately.
 
+The analysis surface derives two first-class semantic cohorts without rewriting observations: `class:egress` selects `egress=true`; `class:vibe_bad_stayed` selects VIBE ratings 3–5 with `egress=false`. Ordinary label cohorts remain available. For BLE and Wi-Fi, hashed device/AP rows are transformed at query time into per-capture binary presence features. Channel aggregate rows establish that the radio snapshot actually ran; absent aggregate rows never become zeroes. The raw keyed hash remains the stable local feature identity.
+
+Each `AssociationResult` records `comparisonsTested`, `comparisonsEligible`, the Benjamini-Hochberg method name, and `indistinguishableFromNoise`. The tested count includes insufficient-data features, while adjustment operates only on features with permutation p-values. Every result summary states both counts.
+
 ## Identifier hashes
 
 Raw MAC addresses, Wi-Fi BSSIDs, adapter/system identifiers, Field-Kit device IDs, and TAK UIDs must not enter durable evidence rows. Providers pass a raw identifier directly to the Keystore-backed HMAC utility and persist only the returned `idhash:v<generation>:...` token. A channel namespace is included in the HMAC input. Formatting-equivalent MAC/BSSID values normalize to the same token, and rotating the local key advances the generation and intentionally invalidates future comparisons with older hashes.

@@ -612,37 +612,40 @@ private fun TimelineCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
-    var labels by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
+    var cohorts by remember { mutableStateOf<List<AnalysisCohort>>(emptyList()) }
     var selected by remember { mutableStateOf<String?>(null) }
     var results by remember { mutableStateOf<List<Pair<String, com.dronewukong.apophenia.correlation.AssociationResult>>>(emptyList()) }
     LaunchedEffect(refresh) {
-        labels = withContext(Dispatchers.IO) { repo.db().labels() }
-        if (selected == null) selected = labels.firstOrNull()?.first
+        cohorts = withContext(Dispatchers.IO) { repo.db().analysisCohorts() }
+        if (selected !in cohorts.map { it.id }) selected = cohorts.firstOrNull()?.id
     }
     LaunchedEffect(selected, refresh) {
-        val selectedLabel = selected ?: return@LaunchedEffect
+        val selectedCohort = selected ?: return@LaunchedEffect
         results = withContext(Dispatchers.IO) {
             val values = linkedMapOf<String, Pair<List<Double>, List<Double>>>()
             fun addMatched(name: String, events: List<com.dronewukong.apophenia.correlation.TimedCaptureValue>, controls: List<com.dronewukong.apophenia.correlation.TimedCaptureValue>) {
                 val matched = CaptureMatcher.match(events, controls)
                 values[name] = matched.events to matched.controls
             }
-            repo.db().metricsForLabel(selectedLabel).forEach { metric ->
-                addMatched(metric, repo.db().eventFeatureCaptures(selectedLabel, metric), repo.db().controlFeatureCaptures(metric))
-                val eventDelta = repo.db().eventBeforeDeltaCaptures(selectedLabel, metric)
+            repo.db().metricsForCohort(selectedCohort).forEach { metric ->
+                addMatched(metric, repo.db().eventFeatureCapturesForCohort(selectedCohort, metric), repo.db().controlFeatureCaptures(metric))
+                val eventDelta = repo.db().eventBeforeDeltaCapturesForCohort(selectedCohort, metric)
                 val controlDelta = repo.db().controlBeforeDeltaCaptures(metric)
                 if (eventDelta.isNotEmpty() || controlDelta.isNotEmpty()) addMatched("$metric · before delta", eventDelta, controlDelta)
                 listOf(0L to 600_000L, 600_000L to 1_200_000L, 1_200_000L to 1_800_000L).forEachIndexed { index, (from, to) ->
-                    val events = repo.db().eventLagFeatureCaptures(selectedLabel, metric, from, to)
+                    val events = repo.db().eventLagFeatureCapturesForCohort(selectedCohort, metric, from, to)
                     val controls = repo.db().controlLagFeatureCaptures(metric, from, to)
                     if (events.isNotEmpty() || controls.isNotEmpty()) addMatched("$metric · ${index * 10}-${(index + 1) * 10}m pre", events, controls)
                 }
+            }
+            repo.db().devicePresenceCapturesForCohort(selectedCohort).forEach { (feature, captures) ->
+                addMatched(feature, captures.first, captures.second)
             }
             AssociationEngine.compareAll(values).toList().sortedByDescending { kotlin.math.abs(it.second.standardizedEffect ?: 0.0) }
         }
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { ScreenHeader("Patterns", "Event windows compared with one-to-one matched control windows.") }
+        item { ScreenHeader("Patterns", "Explicit event classes compared with one-to-one matched control windows.") }
         item {
             Surface(color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f), shape = RoundedCornerShape(16.dp)) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
@@ -652,15 +655,25 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
                 }
             }
         }
-        if (labels.isEmpty()) item { EmptyState("Not enough data", "Log repeated observations and let random controls accumulate.") }
+        if (cohorts.isEmpty()) item { EmptyState("Not enough data", "Log repeated observations and let random controls accumulate.") }
         else {
             item {
                 var expanded by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-                    OutlinedTextField(value = selected.orEmpty(), onValueChange = {}, readOnly = true, label = { Text("Observation category") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) }, modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth())
+                    OutlinedTextField(value = cohorts.firstOrNull { it.id == selected }?.displayName.orEmpty(), onValueChange = {}, readOnly = true, label = { Text("Event class") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) }, modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth())
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        labels.forEach { (name, count) -> DropdownMenuItem(text = { Text("$name ($count)") }, onClick = { selected = name; expanded = false }) }
+                        cohorts.forEach { cohort -> DropdownMenuItem(text = { Text("${cohort.displayName} (${cohort.eventCount})") }, onClick = { selected = cohort.id; expanded = false }) }
                     }
+                }
+            }
+            if (results.isNotEmpty()) item {
+                val scope = results.first().second
+                Surface(color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f), shape = RoundedCornerShape(14.dp)) {
+                    Text(
+                        "${scope.comparisonsTested} features tested · ${scope.comparisonsEligible} had enough matched captures · Benjamini-Hochberg correction applied. Weak hits are labeled indistinguishable from noise.",
+                        modifier = Modifier.padding(12.dp),
+                        fontSize = 12.sp
+                    )
                 }
             }
             if (results.isEmpty()) item { EmptyState("Insufficient context", "More event and control windows are needed for this category.") }

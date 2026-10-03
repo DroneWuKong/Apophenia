@@ -307,6 +307,46 @@ class ObservationDbTest {
         assertTrue(db.sensitiveContextForObservation(observationId).isEmpty())
     }
 
+    @Test
+    fun egressAndBadStayedAreSeparateAnalysisCohorts() {
+        val egressId = db.insertObservation(Observation(timestampMs = 1_000, kind = ObservationKind.VIBE, label = VibeGrade.EGRESS_LABEL, vibeRating = 5, egress = true))
+        val stayedId = db.insertObservation(Observation(timestampMs = 2_000, kind = ObservationKind.VIBE, label = VibeGrade.FUCKED.renderedLabel, vibeRating = 4))
+        db.insertContext(listOf(
+            sample(1_000, 10.0).copy(observationId = egressId),
+            sample(2_000, 20.0).copy(observationId = stayedId)
+        ))
+
+        val cohorts = db.analysisCohorts().associateBy { it.id }
+        assertEquals(1, cohorts.getValue(AnalysisCohort.EGRESS).eventCount)
+        assertEquals("Egress · bailed", cohorts.getValue(AnalysisCohort.EGRESS).displayName)
+        assertEquals(1, cohorts.getValue(AnalysisCohort.BAD_VIBE_STAYED).eventCount)
+        assertEquals(listOf(10.0), db.eventFeatureCapturesForCohort(AnalysisCohort.EGRESS, "pressure_hpa").map { it.value })
+        assertEquals(listOf(20.0), db.eventFeatureCapturesForCohort(AnalysisCohort.BAD_VIBE_STAYED, "pressure_hpa").map { it.value })
+    }
+
+    @Test
+    fun hashedDevicePresenceUsesOnlyCapturesWhereTheChannelRan() {
+        val first = db.insertObservation(Observation(timestampMs = 1_000, kind = ObservationKind.VIBE, label = VibeGrade.EGRESS_LABEL, vibeRating = 5, egress = true))
+        val second = db.insertObservation(Observation(timestampMs = 2_000, kind = ObservationKind.VIBE, label = VibeGrade.EGRESS_LABEL, vibeRating = 5, egress = true))
+        db.insertObservation(Observation(timestampMs = 3_000, kind = ObservationKind.VIBE, label = VibeGrade.EGRESS_LABEL, vibeRating = 5, egress = true))
+        db.insertContext(listOf(
+            ContextSample(timestampMs = 1_000, observationId = first, source = "android_bluetooth", metric = "bt_nearby_count", value = 1.0, unit = "count", captureId = "event:$first:instant"),
+            ContextSample(timestampMs = 1_000, observationId = first, source = "android_bluetooth", metric = "bt_device_rssi_dbm", value = -40.0, unit = "dBm", metadata = "device_hash=idhash:v1:alpha;window=instant", captureId = "event:$first:instant"),
+            ContextSample(timestampMs = 2_000, observationId = second, source = "android_bluetooth", metric = "bt_nearby_count", value = 0.0, unit = "count", captureId = "event:$second:instant"),
+            ContextSample(timestampMs = 1_100, isControl = true, source = "android_bluetooth", metric = "bt_nearby_count", value = 1.0, unit = "count", captureId = "control:one", phase = ContextPhase.CONTROL),
+            ContextSample(timestampMs = 1_100, isControl = true, source = "android_bluetooth", metric = "bt_device_rssi_dbm", value = -50.0, unit = "dBm", metadata = "device_hash=idhash:v1:alpha;window=instant", captureId = "control:one", phase = ContextPhase.CONTROL),
+            ContextSample(timestampMs = 2_100, isControl = true, source = "android_bluetooth", metric = "bt_nearby_count", value = 1.0, unit = "count", captureId = "control:two", phase = ContextPhase.CONTROL),
+            ContextSample(timestampMs = 2_100, isControl = true, source = "android_bluetooth", metric = "bt_device_rssi_dbm", value = -60.0, unit = "dBm", metadata = "device_hash=idhash:v1:beta;window=instant", captureId = "control:two", phase = ContextPhase.CONTROL)
+        ))
+
+        val features = db.devicePresenceCapturesForCohort(AnalysisCohort.EGRESS)
+        val alpha = features.getValue("bluetooth device presence · idhash:v1:alpha")
+        assertEquals(listOf(1.0, 0.0), alpha.first.map { it.value })
+        assertEquals(listOf(1.0, 0.0), alpha.second.map { it.value })
+        assertEquals(2, alpha.first.size)
+        assertTrue(features.containsKey("bluetooth device presence · idhash:v1:beta"))
+    }
+
     private fun sample(timestamp: Long, value: Double) = ContextSample(
         timestampMs = timestamp,
         source = "sensor",

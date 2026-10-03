@@ -520,12 +520,33 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         arrayOf(observationId.toString())
     )
 
-    fun eventFeatureCaptures(label:String,metric:String):List<TimedCaptureValue>{
+    private data class CohortPredicate(val sql: String, val args: List<String>)
+
+    private fun cohortPredicate(cohortId: String, observationAlias: String = "o"): CohortPredicate = when (cohortId) {
+        AnalysisCohort.EGRESS -> CohortPredicate("$observationAlias.egress=1", emptyList())
+        AnalysisCohort.BAD_VIBE_STAYED -> CohortPredicate(
+            "$observationAlias.kind=? AND $observationAlias.vibe_rating>=3 AND $observationAlias.egress=0",
+            listOf(ObservationKind.VIBE.name)
+        )
+        else -> {
+            require(cohortId.startsWith(AnalysisCohort.LABEL_PREFIX)) { "Unknown analysis cohort" }
+            CohortPredicate(
+                "$observationAlias.label=? COLLATE NOCASE AND $observationAlias.kind<>?",
+                listOf(cohortId.removePrefix(AnalysisCohort.LABEL_PREFIX), ObservationKind.HYPOTHESIS_NOTE.name)
+            )
+        }
+    }
+
+    fun eventFeatureCaptures(label:String,metric:String):List<TimedCaptureValue> =
+        eventFeatureCapturesForCohort(AnalysisCohort.labelId(label), metric)
+
+    fun eventFeatureCapturesForCohort(cohortId:String,metric:String):List<TimedCaptureValue>{
+        val predicate = cohortPredicate(cohortId)
         val out=mutableListOf<TimedCaptureValue>()
         readableDatabase.rawQuery("""
             SELECT o.timestamp_ms,AVG(cs.value) FROM context_samples cs JOIN observations o ON o.id=cs.observation_id
-            WHERE o.label=? COLLATE NOCASE AND o.kind<>? AND cs.metric=? AND cs.is_control=0 AND cs.phase<>'POST' GROUP BY o.id ORDER BY o.timestamp_ms
-        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name,metric)).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
+            WHERE ${predicate.sql} AND cs.metric=? AND cs.is_control=0 AND cs.phase<>'POST' GROUP BY o.id ORDER BY o.timestamp_ms
+        """.trimIndent(),(predicate.args + metric).toTypedArray()).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
         return out
     }
     fun eventFeatureValues(label:String,metric:String):List<Double> = eventFeatureCaptures(label,metric).map{it.value}
@@ -540,13 +561,17 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
     }
     fun controlFeatureValues(metric:String):List<Double> = controlFeatureCaptures(metric).map{it.value}
 
-    fun eventLagFeatureCaptures(label:String,metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<TimedCaptureValue>{
+    fun eventLagFeatureCaptures(label:String,metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<TimedCaptureValue> =
+        eventLagFeatureCapturesForCohort(AnalysisCohort.labelId(label), metric, fromBeforeMs, toBeforeMs)
+
+    fun eventLagFeatureCapturesForCohort(cohortId:String,metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<TimedCaptureValue>{
+        val predicate = cohortPredicate(cohortId)
         val out=mutableListOf<TimedCaptureValue>()
         readableDatabase.rawQuery("""
             SELECT o.timestamp_ms,AVG(cs.value) FROM context_samples cs JOIN observations o ON o.id=cs.observation_id
-            WHERE o.label=? COLLATE NOCASE AND o.kind<>? AND cs.metric=? AND cs.phase='PRE'
+            WHERE ${predicate.sql} AND cs.metric=? AND cs.phase='PRE'
               AND cs.timestamp_ms>=o.timestamp_ms-? AND cs.timestamp_ms<o.timestamp_ms-? GROUP BY o.id ORDER BY o.timestamp_ms
-        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name,metric,toBeforeMs.toString(),fromBeforeMs.toString())).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
+        """.trimIndent(),(predicate.args + listOf(metric,toBeforeMs.toString(),fromBeforeMs.toString())).toTypedArray()).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
         return out
     }
     fun eventLagFeatureValues(label:String,metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<Double> = eventLagFeatureCaptures(label,metric,fromBeforeMs,toBeforeMs).map{it.value}
@@ -563,17 +588,21 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
     }
     fun controlLagFeatureValues(metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<Double> = controlLagFeatureCaptures(metric,fromBeforeMs,toBeforeMs).map{it.value}
 
-    fun eventBeforeDeltaCaptures(label:String,metric:String):List<TimedCaptureValue>{
+    fun eventBeforeDeltaCaptures(label:String,metric:String):List<TimedCaptureValue> =
+        eventBeforeDeltaCapturesForCohort(AnalysisCohort.labelId(label), metric)
+
+    fun eventBeforeDeltaCapturesForCohort(cohortId:String,metric:String):List<TimedCaptureValue>{
+        val predicate = cohortPredicate(cohortId)
         val out=mutableListOf<TimedCaptureValue>()
         readableDatabase.rawQuery("""
             SELECT o.timestamp_ms,AVG(CASE WHEN cs.timestamp_ms>=o.timestamp_ms-600000 THEN cs.value END)-
                    AVG(CASE WHEN cs.timestamp_ms<o.timestamp_ms-1200000 THEN cs.value END)
             FROM context_samples cs JOIN observations o ON o.id=cs.observation_id
-            WHERE o.label=? COLLATE NOCASE AND o.kind<>? AND cs.metric=? AND cs.phase='PRE'
+            WHERE ${predicate.sql} AND cs.metric=? AND cs.phase='PRE'
               AND cs.timestamp_ms>=o.timestamp_ms-1800000 AND cs.timestamp_ms<o.timestamp_ms
             GROUP BY o.id HAVING COUNT(CASE WHEN cs.timestamp_ms>=o.timestamp_ms-600000 THEN 1 END)>0
               AND COUNT(CASE WHEN cs.timestamp_ms<o.timestamp_ms-1200000 THEN 1 END)>0 ORDER BY o.timestamp_ms
-        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name,metric)).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
+        """.trimIndent(),(predicate.args + metric).toTypedArray()).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
         return out
     }
     fun eventBeforeDeltaValues(label:String,metric:String):List<Double> = eventBeforeDeltaCaptures(label,metric).map{it.value}
@@ -594,14 +623,81 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
     }
     fun controlBeforeDeltaValues(metric:String):List<Double> = controlBeforeDeltaCaptures(metric).map{it.value}
 
-    fun metricsForLabel(label:String):List<String>{
+    fun metricsForLabel(label:String):List<String> = metricsForCohort(AnalysisCohort.labelId(label))
+
+    fun metricsForCohort(cohortId:String):List<String>{
+        val predicate = cohortPredicate(cohortId)
         val out=mutableListOf<String>()
         readableDatabase.rawQuery("""
             SELECT DISTINCT cs.metric FROM context_samples cs JOIN observations o ON o.id=cs.observation_id
-            WHERE o.label=? COLLATE NOCASE AND o.kind<>? AND cs.phase<>'POST' ORDER BY cs.metric
-        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name)).use{c->while(c.moveToNext())out+=c.getString(0)}
+            WHERE ${predicate.sql} AND cs.phase<>'POST' ORDER BY cs.metric
+        """.trimIndent(),predicate.args.toTypedArray()).use{c->while(c.moveToNext())out+=c.getString(0)}
         return out
     }
+
+    fun analysisCohorts():List<AnalysisCohort>{
+        val out=mutableListOf<AnalysisCohort>()
+        readableDatabase.rawQuery("SELECT COUNT(*) FROM observations WHERE egress=1",emptyArray()).use { c ->
+            if (c.moveToFirst() && c.getInt(0)>0) out += AnalysisCohort(AnalysisCohort.EGRESS,"Egress · bailed",c.getInt(0))
+        }
+        readableDatabase.rawQuery("SELECT COUNT(*) FROM observations WHERE kind=? AND vibe_rating>=3 AND egress=0",arrayOf(ObservationKind.VIBE.name)).use { c ->
+            if (c.moveToFirst() && c.getInt(0)>0) out += AnalysisCohort(AnalysisCohort.BAD_VIBE_STAYED,"Bad vibes · stayed",c.getInt(0))
+        }
+        readableDatabase.rawQuery("SELECT label,COUNT(*) FROM observations WHERE kind<>? AND egress=0 GROUP BY lower(label) ORDER BY COUNT(*) DESC,label",arrayOf(ObservationKind.HYPOTHESIS_NOTE.name)).use { c ->
+            while(c.moveToNext()) out += AnalysisCohort(AnalysisCohort.labelId(c.getString(0)),c.getString(0),c.getInt(1))
+        }
+        return out
+    }
+
+    fun devicePresenceCapturesForCohort(cohortId: String): Map<String, Pair<List<TimedCaptureValue>, List<TimedCaptureValue>>> {
+        data class Window(val timestampMs: Long, val available: MutableSet<String> = mutableSetOf(), val hashes: MutableSet<String> = mutableSetOf())
+        fun applyRow(window: Window, metric: String, metadata: String) {
+            when (metric) {
+                "bt_nearby_count" -> window.available += "bluetooth"
+                "wifi_visible_count" -> window.available += "wifi"
+                "bt_device_rssi_dbm" -> metadataValue(metadata,"device_hash")?.let { window.hashes += "bluetooth:$it" }
+                "wifi_ap_rssi_dbm" -> metadataValue(metadata,"bssid_hash")?.let { window.hashes += "wifi:$it" }
+            }
+        }
+
+        val predicate = cohortPredicate(cohortId)
+        val eventWindows = linkedMapOf<Long,Window>()
+        readableDatabase.rawQuery("""
+            SELECT o.id,o.timestamp_ms,cs.metric,cs.metadata FROM observations o JOIN context_samples cs ON cs.observation_id=o.id
+            WHERE ${predicate.sql} AND cs.is_control=0 AND cs.phase<>'POST'
+              AND cs.metric IN ('bt_nearby_count','bt_device_rssi_dbm','wifi_visible_count','wifi_ap_rssi_dbm')
+            ORDER BY o.timestamp_ms
+        """.trimIndent(),predicate.args.toTypedArray()).use { c -> while(c.moveToNext()) {
+            val window=eventWindows.getOrPut(c.getLong(0)){Window(c.getLong(1))}; applyRow(window,c.getString(2),c.getString(3))
+        } }
+
+        val controlWindows = linkedMapOf<String,Window>()
+        readableDatabase.rawQuery("""
+            SELECT capture_id,timestamp_ms,metric,metadata FROM context_samples
+            WHERE is_control=1 AND phase='CONTROL'
+              AND metric IN ('bt_nearby_count','bt_device_rssi_dbm','wifi_visible_count','wifi_ap_rssi_dbm')
+            ORDER BY timestamp_ms
+        """.trimIndent(),emptyArray()).use { c -> while(c.moveToNext()) {
+            val key=c.getString(0).ifBlank{"timestamp:${c.getLong(1)}"}
+            val current=controlWindows[key]
+            val window=if(current==null) Window(c.getLong(1)).also{controlWindows[key]=it}
+                else if(c.getLong(1)>current.timestampMs) current.copy(timestampMs=c.getLong(1)).also{controlWindows[key]=it} else current
+            applyRow(window,c.getString(2),c.getString(3))
+        } }
+
+        val candidates=(eventWindows.values.flatMap{it.hashes}+controlWindows.values.flatMap{it.hashes}).toSortedSet()
+        return candidates.associateWith { candidate ->
+            val channel=candidate.substringBefore(':')
+            eventWindows.values.filter{channel in it.available}.map{TimedCaptureValue(it.timestampMs,if(candidate in it.hashes)1.0 else 0.0)} to
+                controlWindows.values.filter{channel in it.available}.map{TimedCaptureValue(it.timestampMs,if(candidate in it.hashes)1.0 else 0.0)}
+        }.mapKeys { (candidate, _) ->
+            val channel=candidate.substringBefore(':')
+            val hash=candidate.substringAfter(':')
+            "$channel device presence · $hash"
+        }
+    }
+
+    private fun metadataValue(metadata:String,key:String):String? = metadata.split(';').firstOrNull{it.startsWith("$key=")}?.substringAfter('=')?.takeIf{it.isNotBlank()}
 
     fun labels():List<Pair<String,Int>>{
         val out=mutableListOf<Pair<String,Int>>()

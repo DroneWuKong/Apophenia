@@ -69,6 +69,7 @@ Long-duration survival and OEM battery restrictions are physical-device validati
 - Enable **Simulation mode** in Settings.
 - Log several observations and wait for control generation.
 - Expected: the normal timeline/database/analysis path works without physical sensor, GPS, weather, Health Connect, or Garmin access.
+- In **Patterns**, confirm **Egress · bailed** and **Bad vibes · stayed** appear as separate event classes when those fixtures exist. Every result must state how many features were tested and how many were eligible for Benjamini-Hochberg correction; weak corrected results must say **indistinguishable from noise**.
 
 ## Physical soak and watch delivery
 

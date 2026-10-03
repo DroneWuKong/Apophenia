@@ -35,6 +35,20 @@ data class PurgeLedgerEntry(
     val derivedMetricsRetained: Boolean = true
 )
 
+data class AnalysisCohort(
+    val id: String,
+    val displayName: String,
+    val eventCount: Int
+) {
+    companion object {
+        const val EGRESS = "class:egress"
+        const val BAD_VIBE_STAYED = "class:vibe_bad_stayed"
+        const val LABEL_PREFIX = "label:"
+
+        fun labelId(label: String) = "$LABEL_PREFIX$label"
+    }
+}
+
 enum class VibeGrade(val rating: Int, val renderedLabel: String) {
     GOOD(1, "Vibe good 🙂"),
     TOLERABLE(2, "Tolerable 😐"),
