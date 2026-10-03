@@ -53,6 +53,7 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Type-the-exact-name Settings confirmations and separate Android permission/access flows for every Tier-2 content gate.
 - Schema v6 capture sessions and `session_id` joins on context rows.
 - User-started ELM327 Bluetooth `DRIVE_SESSION` capture with standard OBD-II PIDs, stored/pending DTCs, hashed adapter identity, ten-second session samples, and a persistent foreground notification.
+- Fail-soft Android Automotive OS property capture for cabin/outside temperature, speed, gear, fuel/charge, and odometer, with area/property provenance and explicit projection-host limitations.
 
 ### Validation
 

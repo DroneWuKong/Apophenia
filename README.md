@@ -81,6 +81,7 @@ The app explains what works without a prompt and lets you review optional access
 - Independent audio-state, display/interaction, power/thermal, time/solar, Wi-Fi Direct, and NFC snapshot gates
 - Deliberate notification, calendar, contacts, and message-metadata gates with encryption before SQLite persistence
 - User-started OBD-II `DRIVE_SESSION` capture through a paired ELM327-style Bluetooth adapter, with a persistent live indicator and hashed adapter identity
+- Native Android Automotive OS property snapshots with explicit gaps on projection-only hosts
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 
@@ -212,6 +213,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Wi-Fi, network, and auxiliary presence channels](docs/PHONE_CONTEXT.md)
 - [Encrypted Tier-2 content channels](docs/TIER2_CONTENTS.md)
 - [OBD-II drive sessions](docs/VEHICLE_OBD.md)
+- [Native Automotive properties](docs/VEHICLE_AUTOMOTIVE.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)

@@ -66,6 +66,8 @@ UI / widget / tile / external intent / Garmin
 | `DriveSessionManager` | Owns one in-memory ELM327 connection, hashed adapter identity, and durable session lifecycle |
 | `DriveSessionService` | Persistent foreground indicator and ten-second active-drive sampling loop |
 | `Elm327Client` | Transport-independent AT initialization, standard PID polling, DTC parsing, and honest unsupported-command tracking |
+| `AutomotiveContextProvider` | Gate-backed Android Automotive property mapping with platform/permission degradation |
+| `ReflectionAutomotivePropertySource` | Optional `android.car` boundary loaded only on Automotive OS so the phone APK remains portable |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -110,6 +112,10 @@ The app gate and Android permission are independent. When both are present, `Sen
 ### OBD-II drive sessions
 
 The operator selects an already paired Bluetooth device. `BluetoothElm327Transport` opens the Serial Port Profile socket, while `Elm327Client` contains no Android dependency and is exercised with deterministic transports. An active foreground service polls on a bounded cadence and stamps OBD plus concurrent phone/Bluetooth event/control context with one `DRIVE_SESSION` ID. Process loss closes the software claim as interrupted. See [VEHICLE_OBD.md](VEHICLE_OBD.md).
+
+### Native Automotive properties
+
+The portable APK cannot directly link the optional `android.car` library on ordinary phones, so a narrow reflection adapter resolves only public Automotive class, property, config, and value methods when the device declares Automotive OS. Each property is permission-isolated and fail-soft. Projection-only Android Auto/CarPlay hosts return a visible platform gap rather than phone-derived substitutes. See [VEHICLE_AUTOMOTIVE.md](VEHICLE_AUTOMOTIVE.md).
 
 ## Statistical boundary
 

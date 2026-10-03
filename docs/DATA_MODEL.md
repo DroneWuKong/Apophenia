@@ -43,6 +43,8 @@ Schema v6 adds nullable `session_id` to scalar context. When a drive session is 
 
 For an OBD drive session, one deliberate paired-adapter connection is the software boundary. Physical testing must determine how closely adapter connection lifetime matches one ignition cycle on a specific vehicle/adapter combination.
 
+Native Automotive OS rows use the same scalar context table and active drive-session ID when one exists. Every row retains the public vehicle-property name and area ID. Fuel level is stored in milliliters, EV battery level in watt-hours, speed in metres per second, and odometer in kilometres as exposed by Android Automotive; the app does not relabel raw capacity units as percentages.
+
 ## Sensitive context
 
 `sensitive_context` is deliberately separate from `context_samples`. A row contains timestamp, optional observation ID, control flag, source, content type, `capture_id`, AES-GCM ciphertext, IV, and a non-secret key alias. Plaintext is encrypted in memory before the database insert. The associated data binds source, content type, and capture ID, so moving ciphertext to a different capture or channel makes authentication fail.

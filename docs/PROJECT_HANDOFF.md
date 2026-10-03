@@ -39,6 +39,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - network state plus independent audio, display/interaction, power/thermal, time/solar, Wi-Fi Direct, and NFC event/control snapshots
 - deliberate notification/calendar/contacts/message-metadata capture encrypted with Android Keystore AES-GCM before SQLite persistence and excluded from the ordinary JSON export
 - paired ELM327 OBD-II drive sessions with hashed adapter identity, standard PID/DTC decoding, ten-second foreground sampling, and same-session phone/Bluetooth joins
+- optional Android Automotive OS property snapshots with per-property/area provenance and fail-soft permission/projection gaps
 - expandable timeline context capsules with explicit pre/instant/post phases
 
 ## Garmin Epix Pro (Gen 2)
@@ -123,7 +124,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 ## Validation status — 2026-10-03
 
 - `./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug`: passed locally on JDK 17.
-- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v6 migration, rolling pre/post separation, control/session grouping and matching, prompted neutral controls, hypothesis separation, data-only JSON export, AES-GCM/AAD integrity, Tier-2 gate bypass/table isolation, ELM327 response/PID/DTC parsing and drive-session lifecycle, association statistics, Garmin packet parsing/ingest/retry behavior, and the full simulated enrichment/database path.
+- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v6 migration, rolling pre/post separation, control/session grouping and matching, prompted neutral controls, hypothesis separation, data-only JSON export, AES-GCM/AAD integrity, Tier-2 isolation, ELM327 response/PID/DTC/session behavior, Automotive property provenance/gap behavior, association statistics, Garmin packet parsing/ingest/retry behavior, and the full simulated enrichment/database path.
 - `./gradlew.bat connectedDebugAndroidTest`: three tests passed on an API 36.1 Android emulator; they cover the logging surface, **THAT WAS WEIRD**, VIBE/egress capture, the timeline, and the expanded optional-context/Tier-2 settings surface.
 - Native Android location and notification permission prompts were exercised on the emulator. Weather returned a live Open-Meteo result after location approval.
 - Health Connect's permission controller was exercised end-to-end on the emulator, including the required privacy-rationale declaration, six read permissions, and optional background access. The app returned to a connected state.
@@ -138,7 +139,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 
 ## Next work
 
-The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Step 1 establishes gates, identifier hashing, and schema v4. Step 2 adds app/widget quick VIBE and egress capture. Step 3 adds Bluetooth. Step 4 adds Wi-Fi/network/phone metadata and the isolated encrypted Tier-2 path. Step 5 adds OBD-II plus `DRIVE_SESSION`. These are software and simulator results, not physical validation.
+The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Step 1 establishes gates, identifier hashing, and schema v4. Step 2 adds app/widget quick VIBE and egress capture. Step 3 adds Bluetooth. Step 4 adds phone metadata and encrypted Tier-2 contents. Step 5 adds OBD-II plus `DRIVE_SESSION`. Step 6 adds native Automotive properties. These are software and simulator results, not physical validation.
 
 ### Next physical-validation checklist — 3 October 2026
 

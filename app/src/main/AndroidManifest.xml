@@ -18,6 +18,13 @@
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
+    <uses-permission android:name="android.car.permission.CAR_SPEED" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.car.permission.CAR_ENERGY" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.car.permission.CAR_MILEAGE" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.car.permission.CAR_EXTERIOR_ENVIRONMENT" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.car.permission.READ_CAR_CLIMATE" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <!-- Nearby-device presence is intentionally usable as physical-context inference, so

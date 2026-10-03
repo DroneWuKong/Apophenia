@@ -6,6 +6,8 @@ Stored locally: manual observations, phone context, rolling black-box samples, r
 
 When the vehicle gate is enabled and the operator starts a session, Apophenia connects only to the paired Bluetooth adapter selected in the app. The raw Bluetooth address exists in memory for that connection but is never written to SQLite or preferences; the session stores a locally keyed hash. Standard vehicle telemetry and diagnostic trouble codes are local context. A foreground notification remains visible while session sampling is active.
 
+The separate native-Automotive gate reads only properties the Android Automotive host and vehicle permissions expose. Android Auto or Apple CarPlay projection does not automatically expose vehicle properties; on a projection-only host the app stores no invented substitute. Native rows contain property/area provenance and join the active drive session when present.
+
 Optional Health Connect reads are permission-gated and fail-soft. When authorized, Apophenia may read recent heart rate, resting heart rate, sleep, steps, SpO2, and exercise duration. The app does not write Health Connect records and logging still works when Health Connect is missing, unsupported, denied, or empty.
 
 The rolling buffer is bounded and pruned. It is not an unlimited surveillance log.

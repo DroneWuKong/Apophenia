@@ -1239,6 +1239,38 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 )
             }
         }
+        item {
+            val automotiveGate = HardwareGates.Gate.LIVE_CARPLAY_AUTOMOTIVE_CAPTURE
+            val automotivePlatform = activity.packageManager.hasSystemFeature("android.hardware.type.automotive")
+            SettingsCard(Icons.Default.DirectionsCarFilled, "Native Automotive properties", "Reads vehicle properties exposed by Android Automotive OS; projection hosts may expose none.") {
+                gateRevision
+                val enabled = HardwareGates.isAuthorized(activity, automotiveGate)
+                GateSwitchRow(
+                    title = "Automotive OS property channel",
+                    detail = "Cabin/outside temperature, speed, gear, fuel/charge, and odometer when the host and permissions expose them.",
+                    enabled = enabled,
+                    status = when {
+                        !enabled -> "Off"
+                        simulation || automotivePlatform -> "Armed"
+                        else -> "Armed · host absent"
+                    },
+                    onCheckedChange = { requested ->
+                        HardwareGates.setAuthorized(
+                            activity,
+                            automotiveGate,
+                            requested,
+                            if (requested) HardwareGates.ConsentProof.SingleConfirmation else null
+                        )
+                        gateRevision++
+                    }
+                )
+                Text(
+                    "Android Auto and Apple CarPlay projection do not grant a general vehicle-property API. On those hosts the gate stays visible and records a platform gap rather than invented values.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
+        }
 
         item { SectionLabel("Watch") }
         item {
