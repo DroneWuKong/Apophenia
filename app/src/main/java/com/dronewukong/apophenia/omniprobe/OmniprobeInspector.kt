@@ -82,7 +82,7 @@ class OmniprobeInspector(
             unmatchedValues = unmatched,
             mediaAssets = media,
             purgeEntries = db.purgeLedger().filter { it.observationId == observation.id },
-            exportState = "Legacy data-only JSON share is available, but tiered export manifests and the export audit ledger are not implemented yet (steps 19–22)."
+            exportState = "Data-only and full-evidence ZIPs require a verified manifest preview before sharesheet or SAF release. No export-audit ledger exists yet; that remains step 22."
         )
     }
 

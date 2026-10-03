@@ -68,7 +68,7 @@ The app explains what works without a prompt and lets you review optional access
 - One-tap graded VIBE capture plus a distinct red **FUCK THIS, I'M OUT** egress event in the app and widget
 - Quick logging for observations, headache, sinus/congestion, light, sound, body sensations, coincidences, hypotheses, and custom entries
 - A home-screen widget and Quick Settings tile
-- Local SQLite storage, JSON export, and delete controls
+- Local SQLite storage plus manifest-previewed data-only/full-evidence ZIP export through the Android sharesheet or save-as chooser
 - A user-enabled rolling black box with 30 minutes of pre-event context and a labeled post-event window
 - Random control captures that use the same pipeline as event captures, then match one-to-one by local time block and weekday/weekend
 - Optional neutral check-in prompts that let you record “nothing unusual” through the control pipeline
@@ -108,7 +108,7 @@ Apophenia is currently a **development preview**, not a Play Store release.
 
 GitHub may require a sign-in to download Actions artifacts. Debug signatures can differ between build machines; if Android rejects an update, export anything you need, uninstall the previous debug build, and install the new one.
 
-The [install and test guide](docs/INSTALL_AND_TEST.md) has a short remote-testing checklist and a privacy-safe bug-report template.
+The [install and test guide](docs/INSTALL_AND_TEST.md) has a short remote-testing checklist and a privacy-safe bug-report template. The [export contract](docs/EXPORT.md) documents content tiers, manifests, hashes, and current route boundaries.
 For recorder survival and real Garmin delivery, use the [48-hour physical acceptance checklist](docs/PHYSICAL_ACCEPTANCE.md).
 
 ## What is real today
@@ -116,7 +116,7 @@ For recorder survival and real Garmin delivery, use the [48-hour physical accept
 | Area | What has actually been verified |
 | --- | --- |
 | Android | JDK 17 build, unit tests, lint, and debug APK pass locally and in GitHub Actions |
-| UI | Three Jetpack Compose smoke tests pass on an API 36 emulator |
+| UI | Seven Jetpack Compose smoke tests pass on an API 36 emulator, including demo isolation, Omniprobe, and export-manifest preview |
 | Permissions | Location, notification, weather, and Health Connect flows were exercised in an emulator |
 | Garmin | All three Epix Pro targets compile with Connect IQ SDK 9.2.0 |
 | Garmin queue | Six native Monkey C tests pass in the 47 mm simulator |

@@ -27,7 +27,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - 30-minute rolling pre-event black box
 - 30-minute post-event collection
 - event-vs-control association engine
-- JSON export
+- manifest-previewed data-only and full-evidence ZIP export through Android sharesheet and SAF save-as
 - optional, permission-gated Health Connect reads
 - first-run context onboarding with visible location, notification, weather, and Health Connect status
 - database schema v9 with observation origin, external-event deduplication, explicit context phase/session identity, VIBE rating, egress, capture-session lifecycle/events, an isolated encrypted Tier-2 content table, AV media/purge inventory, and immutable hypothesis registration/evaluation history
@@ -37,7 +37,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - gate-backed Bluetooth LE presence rows with locally keyed address hashes plus capture-level count/strongest-RSSI metrics
 - gate-backed Wi-Fi rows with locally keyed BSSID hashes plus band/RSSI and capture-level count/strongest metrics
 - network state plus independent audio, display/interaction, power/thermal, time/solar, Wi-Fi Direct, and NFC event/control snapshots
-- deliberate notification/calendar/contacts/message-metadata capture encrypted with Android Keystore AES-GCM before SQLite persistence and excluded from the ordinary JSON export
+- deliberate notification/calendar/contacts/message-metadata capture encrypted with Android Keystore AES-GCM before SQLite persistence and excluded from data-only export
 - paired ELM327 OBD-II drive sessions with hashed adapter identity, standard PID/DTC decoding, ten-second foreground sampling, and same-session phone/Bluetooth joins
 - optional Android Automotive OS property snapshots with per-property/area provenance and fail-soft permission/projection gaps
 - MAVLink 1/2 flight sessions over UDP, TCP, or class-compliant USB/SiK with hashed sysid, CRC validation, exact STATUSTEXT, received mode/GPS/EKF/battery/link context, observed sequence gaps, and telemetry-age staleness
@@ -130,8 +130,8 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 ## Validation status — 2026-10-03
 
 - `./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug`: passed locally on JDK 17.
-- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v9 migration, rolling pre/post separation, control/session grouping and matching, egress/stayed cohorts, per-device presence/missing-channel handling, prompted neutral controls, hypothesis separation/pre-registration/locking/anti-backdating/evaluation outcomes, descriptive confounder surfacing, plain-language binary/continuous results, small-n/refutation copy, data-only JSON export, AES-GCM/AAD integrity, Tier-2 isolation, ELM327 response/PID/DTC/session behavior, Automotive property provenance/gap behavior, MAVLink 1/2 framing/CRC/session/filtering/STATUSTEXT/staleness behavior, CRSF/GHST CRC/link layouts, Field-Kit hashing/triggers, TAK own/full filtering, AV retention/keep/scrub/path-containment/anti-resurrection behavior, multiple-comparison disclosures, association statistics, Garmin packet parsing/ingest/retry behavior, and the full simulated enrichment/database path.
-- `./gradlew.bat connectedDebugAndroidTest`: three tests passed on an API 36.1 Android emulator; they cover the logging surface, **THAT WAS WEIRD**, VIBE/egress capture, the timeline, and the expanded optional-context/Tier-2 settings surface.
+- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v9 migration, rolling pre/post separation, control/session grouping and matching, egress/stayed cohorts, per-device presence/missing-channel handling, prompted neutral controls, hypothesis separation/pre-registration/locking/anti-backdating/evaluation outcomes, descriptive confounder surfacing, plain-language binary/continuous results, small-n/refutation copy, data/full export tier isolation, manifest/hash verification and corruption refusal, batch-sharesheet intent construction, byte-exact document writes, AES-GCM/AAD integrity, Tier-2 isolation, ELM327 response/PID/DTC/session behavior, Automotive property provenance/gap behavior, MAVLink 1/2 framing/CRC/session/filtering/STATUSTEXT/staleness behavior, CRSF/GHST CRC/link layouts, Field-Kit hashing/triggers, TAK own/full filtering, AV retention/keep/scrub/path-containment/anti-resurrection behavior, multiple-comparison disclosures, association statistics, Garmin packet parsing/ingest/retry behavior, and the full simulated enrichment/database path.
+- `./gradlew.bat connectedDebugAndroidTest`: seven tests passed on an API 36.1 Android emulator; they cover logging, VIBE/egress, settings, pre-registration, Omniprobe, demo isolation/badge state, and the data-only manifest preview.
 - Native Android location and notification permission prompts were exercised on the emulator. Weather returned a live Open-Meteo result after location approval.
 - Health Connect's permission controller was exercised end-to-end on the emulator, including the required privacy-rationale declaration, six read permissions, and optional background access. The app returned to a connected state.
 - APK produced at `app/build/outputs/apk/debug/app-debug.apk`.
@@ -145,7 +145,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 
 ## Next work
 
-The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Steps 1–18 now cover gates/hashing/VIBE, quick capture, Bluetooth, phone/Tier-2 context, OBD-II drive sessions, native Automotive properties, MAVLink flight sessions, CRSF/GHST, Field-Kit, TAK, ground context, bounded RTL-SDR survey windows, audio, camera/multicam, screen rings, derived AV metrics, the call-audio capability stub, durable AV retention/player controls, engine-credibility disclosures, hypothesis pre-registration, confounder surfacing, honest plain-language results, the per-event Omniprobe inventory, deliberate TOTAL_EVIDENCE/session presets with a persistent master strip, and an isolated six-story demo corpus. These are software and simulator results, not physical validation.
+The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Steps 1–19 now cover gates/hashing/VIBE, quick capture, Bluetooth, phone/Tier-2 context, OBD-II drive sessions, native Automotive properties, MAVLink flight sessions, CRSF/GHST, Field-Kit, TAK, ground context, bounded RTL-SDR survey windows, audio, camera/multicam, screen rings, derived AV metrics, the call-audio capability stub, durable AV retention/player controls, engine-credibility disclosures, hypothesis pre-registration, confounder surfacing, honest plain-language results, the per-event Omniprobe inventory, deliberate TOTAL_EVIDENCE/session presets with a persistent master strip, an isolated six-story demo corpus, and verified manifest-preview export tiers over sharesheet/SAF. These are software and simulator results, not physical validation or destination-delivery proof.
 
 ### Next physical-validation checklist — 3 October 2026
 
@@ -160,6 +160,7 @@ Run each item only after its implementation PR and software fixtures pass. Recor
 - Re-test Garmin/watch delivery, durable receipt behavior, physiology timestamps, disconnect/replay, and one representative physical event-to-phone capture.
 - On representative Android versions, compare each Omniprobe permission/platform/hardware gap against the actual OS setting and attached device; verify that empty event windows remain `NO_SAMPLE_IN_WINDOW` or `NO_ACTIVE_SESSION` rather than being promoted into hardware claims.
 - Verify every preset on-device: the hold duration, no permission-dialog side effect, no unintended service start, exact gate membership, persistent master strip, 120-second audio pre-buffer where specified, and `LIVE_EXPORT_LAN` exclusion.
+- Verify data-only/full-evidence previews and hashes on a representative phone, save to local and USB/OTG document providers, and confirm sharesheet recipients can read the granted ZIP without gaining unrelated app files.
 - Only after the preceding gates independently pass, run bounded drive/field/flight sessions and document those results separately from software and bench evidence.
 
 1. Disconnect USB, open Apophenia on the watch, and confirm the v0.3 replacement launches.

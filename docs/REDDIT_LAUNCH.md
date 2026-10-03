@@ -30,7 +30,7 @@ Alternative titles:
 > - post-event data is not used to “predict” the event;
 > - correlations are described cautiously, never as proof of causation, diagnosis, or anything paranormal.
 >
-> Current features include one-tap logging, custom observations, a widget, Quick Settings tile, JSON export, phone sensors/device state, optional weather, optional read-only Health Connect data, simulation mode, and an Epix Pro (Gen 2) watch logger with an offline queue.
+> Current features include one-tap logging, custom observations, a widget, Quick Settings tile, manifest-previewed data/full export, phone sensors/device state, optional weather, optional read-only Health Connect data, simulation mode, and an Epix Pro (Gen 2) watch logger with an offline queue.
 >
 > **Current validation:** Android unit tests, lint, APK build, and two API 36 emulator tests are passing in GitHub Actions. The Garmin app compiles for the 42/47/51 mm Epix Pro targets, and four native queue tests pass in Garmin's simulator. Physical phone/watch integration still needs broader testing, so this is a development preview—not a medical app or a finished consumer release.
 >

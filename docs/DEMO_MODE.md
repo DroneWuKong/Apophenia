@@ -8,7 +8,7 @@ Synthetic rows live in the separate `apophenia-demo.db` database. Turning demo m
 
 The master strip carries **DEMO DATA** on every tab while the mode is active. Every fixture observation also uses origin `SIMULATION`, a versioned external ID, a `demo_fixture=true` context marker, and `demo:` capture IDs.
 
-The data-only exporter refuses a demo database. While demo mode is active, the Settings export button still targets the live database and says **Export live JSON (demo excluded)**. The live delete action is disabled. This is structural isolation, not a warning that depends on operator memory.
+Every exporter refuses a demo database. While demo mode is active, the Settings export controls still target the canonical live database and identify that boundary. The live delete action is disabled. This is structural isolation, not a warning that depends on operator memory.
 
 ## Fixture corpus
 

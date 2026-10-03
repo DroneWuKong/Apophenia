@@ -39,6 +39,8 @@ import com.dronewukong.apophenia.bluetooth.BluetoothContextProvider
 import com.dronewukong.apophenia.data.*
 import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.export.ExportManager
+import com.dronewukong.apophenia.export.ExportTier
+import com.dronewukong.apophenia.export.PreparedExport
 import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.media.AvRetentionSettings
@@ -901,6 +903,9 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var callJurisdiction by remember { mutableStateOf(CallAudioCapability.jurisdiction(activity)) }
     var confirmCallAudio by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmFullExport by remember { mutableStateOf(false) }
+    var exportPreparing by remember { mutableStateOf(false) }
+    var pendingExport by remember { mutableStateOf<PreparedExport?>(null) }
     var pendingMediaScrub by remember { mutableStateOf<Long?>(null) }
     var mediaAssets by remember { mutableStateOf<List<MediaAsset>>(emptyList()) }
     var purgeLedger by remember { mutableStateOf<List<PurgeLedgerEntry>>(emptyList()) }
@@ -968,6 +973,26 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     fun refreshDemoSummary() {
         if (!demoMode.active) { demoSummary = null; return }
         scope.launch { demoSummary = withContext(Dispatchers.IO) { DemoFixtureInstaller.summary(ObservationStore.demoRepository(activity).db()) } }
+    }
+
+    fun prepareExport(tier: ExportTier) {
+        if (exportPreparing) return
+        exportPreparing = true
+        scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    ExportManager.prepareBundle(
+                        context = activity,
+                        db = ObservationStore.liveRepository(activity).db(),
+                        tier = tier,
+                        dir = File(activity.cacheDir, "exports")
+                    )
+                }
+            }
+            exportPreparing = false
+            result.onSuccess { pendingExport = it }
+                .onFailure { onMessage("Export preparation failed: ${it.message ?: "unknown error"}") }
+        }
     }
 
     fun testWeather() {
@@ -1520,7 +1545,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                     )
                 }
                 Text(
-                    "The ordinary JSON export has no code path to the sensitive_context table. Full-evidence export is added later with its own double confirmation.",
+                    "Data-only export has no code path to the sensitive_context table. Full evidence uses a separate double-confirmed, manifest-previewed plaintext route.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
@@ -2225,14 +2250,12 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = {
-                        scope.launch {
-                            val file = withContext(Dispatchers.IO) { ExportManager.exportJson(ObservationStore.liveRepository(activity).db(), File(activity.cacheDir, "exports")) }
-                            onMessage("Created ${file.name}")
-                            activity.shareExport(file)
-                        }
-                    }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.IosShare, null); Spacer(Modifier.width(8.dp)); Text(if (demoMode.active) "Export live JSON (demo excluded)" else "Export JSON")
+                    Text("Build locally, inspect every payload hash, then choose the sharesheet or Android save-as. Nothing is sent while the preview is open.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Button(onClick = { prepareExport(ExportTier.DATA_ONLY) }, enabled = !exportPreparing, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.IosShare, null); Spacer(Modifier.width(8.dp)); Text(if (exportPreparing) "Preparing…" else if (demoMode.active) "Prepare live data-only export" else "Prepare data-only export")
+                    }
+                    OutlinedButton(onClick = { confirmFullExport = true }, enabled = !exportPreparing, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Inventory2, null); Spacer(Modifier.width(8.dp)); Text("Prepare full evidence package")
                     }
                     OutlinedButton(onClick = { confirmDelete = true }, enabled = !demoMode.active, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
                         Icon(Icons.Default.Delete, null); Spacer(Modifier.width(8.dp)); Text(if (demoMode.active) "Live delete unavailable in demo" else "Delete all local data")
@@ -2244,6 +2267,66 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
 
     if (showOmniprobe) {
         OmniprobeOverlay(activity = activity, db = repo.db(), onDismiss = { showOmniprobe = false })
+    }
+
+    if (confirmFullExport) {
+        AlertDialog(
+            onDismissRequest = { confirmFullExport = false },
+            title = { Text("Build a full evidence package?") },
+            text = { Text("Confirmation 1 of 2. This prepares a local ZIP containing the data export plus every retained audio/video stream in portable plaintext formats and every Tier-2 content record in plaintext. No destination receives it until you review the manifest and confirm a route.") },
+            confirmButton = {
+                Button(onClick = { confirmFullExport = false; prepareExport(ExportTier.FULL_EVIDENCE) }) { Text("Build manifest preview") }
+            },
+            dismissButton = { TextButton(onClick = { confirmFullExport = false }) { Text("Cancel") } }
+        )
+    }
+
+    pendingExport?.let { prepared ->
+        val manifest = prepared.manifest
+        AlertDialog(
+            onDismissRequest = { prepared.bundle.delete(); pendingExport = null },
+            title = { Text("Manifest preview · ${manifest.tier.displayName}") },
+            text = {
+                Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text("${manifest.entries.size} payload files · ${formatBytes(manifest.totalBytes)} payload · ${formatBytes(prepared.bundle.length())} ZIP", fontWeight = FontWeight.SemiBold)
+                    Text("Raw AV: ${if (manifest.containsRawAv) "YES" else "no"} · Tier-2 contents: ${if (manifest.containsTier2Contents) "YES" else "no"}", color = if (manifest.containsRawAv || manifest.containsTier2Contents) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary)
+                    Text("Bundle SHA-256\n${prepared.bundleSha256}", fontSize = 11.sp)
+                    if (manifest.tier == ExportTier.FULL_EVIDENCE) {
+                        Text("Confirmation 2 of 2: choosing Share or Save below explicitly releases this plaintext evidence package from the app boundary.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                    } else {
+                        Text("Data-only excludes raw AV and Tier-2 contents. Hashed identifiers remain exactly as stored.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    HorizontalDivider()
+                    manifest.entries.forEach { entry ->
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(entry.path, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            Text("${formatBytes(entry.sizeBytes)} · AV=${entry.containsRawAv} · Tier2=${entry.containsTier2Contents}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(entry.sha256, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Text("manifest.json is included in the ZIP and declares every payload above. The bundle was re-opened and hash-verified before this preview.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        activity.saveExportWithSaf(prepared.bundle) { success, resultMessage ->
+                            if (success) {
+                                prepared.bundle.delete()
+                                pendingExport = null
+                            }
+                            onMessage(resultMessage)
+                        }
+                    }) { Text("Save as…") }
+                    Button(onClick = {
+                        activity.shareExports(listOf(prepared.bundle))
+                        pendingExport = null
+                        onMessage("Opened Android sharesheet for the verified ${manifest.tier.displayName.lowercase()} bundle")
+                    }) { Text("Share") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { prepared.bundle.delete(); pendingExport = null }) { Text("Cancel + delete") } }
+        )
     }
 
     pendingMediaScrub?.let { observationId ->
@@ -2516,6 +2599,13 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             dismissButton = { TextButton(onClick = { confirmCallAudio = false }) { Text("Cancel") } }
         )
     }
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1_073_741_824L -> "%.2f GiB".format(bytes / 1_073_741_824.0)
+    bytes >= 1_048_576L -> "%.2f MiB".format(bytes / 1_048_576.0)
+    bytes >= 1_024L -> "%.1f KiB".format(bytes / 1_024.0)
+    else -> "$bytes B"
 }
 
 @Composable

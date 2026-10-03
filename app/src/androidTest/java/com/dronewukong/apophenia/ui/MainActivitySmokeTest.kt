@@ -132,6 +132,20 @@ class MainActivitySmokeTest {
         compose.onNodeWithContentDescription("Demo data badge").assertIsDisplayed()
     }
 
+    @Test
+    fun dataOnlyExportShowsVerifiedManifestBeforeAnyRoute() {
+        dismissContextIntroIfPresent()
+        compose.onNodeWithText("Settings").performClick()
+        scrollSettingsTo("Prepare data-only export")
+        compose.onNodeWithText("Prepare data-only export").performClick()
+        compose.waitUntil(timeoutMillis = 15_000) {
+            compose.onAllNodesWithText("Manifest preview · Data-only").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Raw AV: no · Tier-2 contents: no").assertIsDisplayed()
+        compose.onNodeWithText("data/apophenia-data.json").assertIsDisplayed()
+        compose.onNodeWithText("Cancel + delete").performClick()
+    }
+
     private fun dismissContextIntroIfPresent() {
         if (compose.onAllNodesWithText("Not now").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithText("Not now").performClick()

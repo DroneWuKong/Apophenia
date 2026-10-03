@@ -86,7 +86,7 @@ The four current Tier-2 content types are:
 - a contacts phone/email snapshot;
 - six hours of SMS metadata, excluding the message body by this channel's contract.
 
-These rows are captured only when both the deliberate app gate and the corresponding Android access are enabled. The data-only JSON exporter has no query or output field for `sensitive_context`. A later full-evidence exporter must add an explicit, separately confirmed route rather than reusing the ordinary export path.
+These rows are captured only when both the deliberate app gate and the corresponding Android access are enabled. The data-only exporter has no query or output field for `sensitive_context`. The separately confirmed full-evidence path decrypts them into `tier2/contents.json` only while building the reviewed portable bundle; it does not reuse the data-only query path.
 
 ## Rolling sample
 `rolling_samples` is a bounded scratch buffer, separate from durable event context. When an event occurs, the relevant window is copied into `context_samples`; old scratch samples are pruned.

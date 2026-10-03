@@ -28,6 +28,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.dronewukong.apophenia.garmin.GarminBridge
+import com.dronewukong.apophenia.export.ExportRoutes
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.mavlink.UsbMavlinkDevice
@@ -49,6 +50,8 @@ class MainActivity : ComponentActivity() {
     private var healthResult: ((String) -> Unit)? = null
     private var requestedHealthPermissions: Set<String> = emptySet()
     private var usbPermissionReceiver: BroadcastReceiver? = null
+    private var pendingSafExport: File? = null
+    private var safExportResult: ((Boolean, String) -> Unit)? = null
 
     var permissionRevision by mutableIntStateOf(0)
         private set
@@ -162,6 +165,28 @@ class MainActivity : ComponentActivity() {
         )
         requestedHealthPermissions = emptySet()
         healthResult = null
+    }
+    private val createExportDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        val source = pendingSafExport
+        val callback = safExportResult
+        pendingSafExport = null
+        safExportResult = null
+        if (uri == null || source == null) {
+            callback?.invoke(false, "Save cancelled; the prepared export remains on this device")
+            return@registerForActivityResult
+        }
+        val result = runCatching {
+            val output = contentResolver.openOutputStream(uri, "w")
+                ?: error("Android did not provide a writable destination")
+            ExportRoutes.writeDocument(source, output)
+        }
+        callback?.invoke(
+            result.isSuccess,
+            result.fold(
+                onSuccess = { "Export saved to the selected document location" },
+                onFailure = { "Export save failed: ${it.message ?: "unknown error"}" }
+            )
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -490,13 +515,20 @@ class MainActivity : ComponentActivity() {
         runCatching { startActivity(market) }.getOrElse { startActivity(web) }
     }
 
-    fun shareExport(file: File) {
-        val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
-        startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-            type = "application/json"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }, "Share Apophenia export"))
+    fun shareExport(file: File) = shareExports(listOf(file))
+
+    fun shareExports(files: List<File>) {
+        val intent = ExportRoutes.shareIntent(files) { file ->
+            FileProvider.getUriForFile(this, "$packageName.files", file)
+        }
+        startActivity(Intent.createChooser(intent, "Share Apophenia export"))
+    }
+
+    fun saveExportWithSaf(file: File, onResult: (Boolean, String) -> Unit) {
+        check(pendingSafExport == null) { "An export save is already pending" }
+        pendingSafExport = file
+        safExportResult = onResult
+        createExportDocument.launch(file.name)
     }
 
     companion object {

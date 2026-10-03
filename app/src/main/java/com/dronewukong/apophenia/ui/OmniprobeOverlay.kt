@@ -163,7 +163,7 @@ internal fun OmniprobeOverlay(
                                 }
                             }
                             item {
-                                InventoryCard("Export log", "Current implementation boundary") {
+                                InventoryCard("Export status", "Current implementation boundary") {
                                     Text(current.exportState, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                                 }
                             }

@@ -130,7 +130,7 @@ The v0.3 split providers supersede that preview aggregate path for event/control
 
 ### Tier-2 contents
 
-The app gate and Android permission are independent. When both are present, `SensitiveContextProvider` builds a bounded snapshot, encrypts it with an Android Keystore AES-GCM key, and returns only ciphertext-bearing rows for `sensitive_context`. The standard JSON exporter never queries this table. See [TIER2_CONTENTS.md](TIER2_CONTENTS.md).
+The app gate and Android permission are independent. When both are present, `SensitiveContextProvider` builds a bounded snapshot, encrypts it with an Android Keystore AES-GCM key, and returns only ciphertext-bearing rows for `sensitive_context`. The default data-only exporter never queries this table; only the double-confirmed full-evidence materializer decrypts it into the reviewed bundle. See [TIER2_CONTENTS.md](TIER2_CONTENTS.md).
 
 ### OBD-II drive sessions
 
@@ -177,6 +177,10 @@ The overlay separately collects the current process-wide AV ring state. It label
 ## Demo repository boundary
 
 `ObservationStore` owns one canonical live repository and one lazy demo repository. The demo database uses the same schema and analysis code but a different SQLite filename. UI repository selection follows `DemoModeManager.state`; background repository lookups follow the same process state. Demo activation forces SIMULATION and deactivation restores the previous runtime. `ExportManager` rejects the demo database even if called directly. See [DEMO_MODE.md](DEMO_MODE.md).
+
+## Export boundary
+
+`ExportManager.prepareBundle` reads only the canonical live database and builds an app-cache ZIP. Data-only never calls the protected evidence materializer. Full evidence is a separate path that decrypts retained AV and Tier-2 rows into portable plaintext payloads after confirmation 1. Both paths compute a manifest from the exact payload bytes, write the ZIP, then reopen it and reject duplicate, unsafe, undeclared, size-mismatched, or hash-mismatched entries before the preview appears. Confirmation 2 is the explicit sharesheet or SAF route action. Android Keystore event keys remain non-exportable and are not copied into the bundle. See [EXPORT.md](EXPORT.md).
 
 ## Software-only boundary
 

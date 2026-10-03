@@ -2,7 +2,7 @@
 
 This checklist turns “it builds” into repeatable phone/watch evidence. It does not make Apophenia a medical device, and a completed emulator run is not a substitute for this checklist.
 
-Record the phone model, Android version, OEM battery setting, app version, Garmin model/firmware, Garmin Connect version, start/end time, and any deviation. Do not attach a real JSON export, coordinates, health records, or private observation text to a public issue.
+Record the phone model, Android version, OEM battery setting, app version, Garmin model/firmware, Garmin Connect version, start/end time, and any deviation. Do not attach a real export bundle, coordinates, health records, or private observation text to a public issue.
 
 ## Install and baseline
 

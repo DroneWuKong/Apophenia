@@ -38,7 +38,7 @@ Open **Settings**.
 - **Bluetooth presence / Wi-Fi presence:** enable each gate, approve the Android Nearby/location prompts, then take a test snapshot. Expected: counts and RSSI or a specific permission/radio limitation. Raw addresses, names, SSIDs, and BSSIDs are never stored.
 - **Network state:** enable the gate and test basic connectivity. The optional phone-state prompt adds modem signal/type where Android exposes it.
 - **Device circumstances:** enable only the audio/display/power/time/Wi-Fi Direct/NFC rows you want. Foreground-app identity additionally requires Android Usage Access; without it the channel records an explicit platform gap.
-- **Tier-2 contents:** enablement requires typing the exact enum gate name, then the corresponding Android access. Expected: the gate can remain visibly armed while denied access produces no content rows. Current JSON export must contain no Tier-2 contents.
+- **Tier-2 contents:** enablement requires typing the exact enum gate name, then the corresponding Android access. Expected: the gate can remain visibly armed while denied access produces no content rows. A data-only export must contain no Tier-2 contents.
 - **OBD-II drive session:** pair an ELM327-style adapter in Android first, enable the vehicle gate, choose the paired adapter, and confirm the persistent drive-capture notification. Do this parked and treat the first physical run as bench validation; simulator PID/DTC results are not a hardware claim.
 - **Native Automotive properties:** on Automotive OS, enable the separate property gate and log a parked event. On a phone, Android Auto, or CarPlay projection-only host, expected behavior is an armed-but-unavailable gap—not fabricated vehicle values.
 - **MAVLink flight session:** enable the gate, then deliberately start UDP, TCP, or an attached USB/SiK device. Expected: a persistent flight-capture notification appears immediately; a durable session begins only after a valid airframe heartbeat. SIMULATION verifies software flow only. Keep the aircraft disarmed for first physical transport/telemetry checks and record link/airframe testing separately from build evidence.
@@ -52,9 +52,9 @@ Open **Settings**.
 - **Screen ring:** authorize by exact name, arm, accept Android's MediaProjection dialog, and confirm the second persistent indicator. The consent is per arm. Verify app-switch/display-size behavior physically.
 - **Call audio:** choose the applicable jurisdiction state and run the per-call capability check. The expected current result is either Android platform-restricted or **Locked by statute, not by Apophenia**; no audio should be fabricated.
 - **Encrypted evidence media:** after an AV event finishes, open its event group in Settings. Play audio or review frames, mark the event keep forever, then return it to its original deadline. Scrub the event and confirm raw playback disappears while the purge ledger says derived metrics were kept. No plaintext playback file should appear in app storage.
-- **Omniprobe:** log an event, then open **Settings → Omniprobe**. Expected: all planned gates are listed; captured values show source, phase, and `capture_id`; absent channels show a reason; live AV-ring state is visibly separate from the selected event; raw media shows a retention countdown or keep-forever state; and the export panel says that tiered export/audit is not implemented yet. Do not treat a simulator gap classification as physical permission or hardware proof.
+- **Omniprobe:** log an event, then open **Settings → Omniprobe**. Expected: all planned gates are listed; captured values show source, phase, and `capture_id`; absent channels show a reason; live AV-ring state is visibly separate from the selected event; raw media shows a retention countdown or keep-forever state; and the export panel names the implemented manifest-preview tiers while stating that the audit ledger is not implemented yet. Do not treat a simulator gap classification as physical permission or hardware proof.
 - **TOTAL_EVIDENCE + presets:** the master strip must remain visible on every tab and separately report armed gate count and real AV ring state. In Settings, a short preset tap must do nothing except explain the 1.5-second hold. Hold FIELD/DRIVE/HOME/EVERYTHING to arm, then verify Android permissions did not open and hardware services did not start. TOTAL_EVIDENCE must exclude `LIVE_EXPORT_LAN`; its audio ring should still say off until you explicitly start it. When that service starts in FIELD/DRIVE/EVERYTHING/TOTAL_EVIDENCE, verify the indicator says 120 seconds pre-event. Disarming the mode must preserve individual gates.
-- **Demo mode:** enable it under Testing and wait for the fixture summary. Expected: the persistent strip says **DEMO DATA**, Timeline contains synthetic observations, Patterns exposes the fixture cohorts, and Omniprobe reads the demo event rows. Navigate between tabs and confirm the badge remains. Export must say **Export live JSON (demo excluded)** and must not contain fixture IDs. Reset demo fixtures, then disable the mode and confirm the original live timeline returns unchanged.
+- **Demo mode:** enable it under Testing and wait for the fixture summary. Expected: the persistent strip says **DEMO DATA**, Timeline contains synthetic observations, Patterns exposes the fixture cohorts, and Omniprobe reads the demo event rows. Navigate between tabs and confirm the badge remains. Export must target live data only and must not contain fixture IDs. Reset demo fixtures, then disable the mode and confirm the original live timeline returns unchanged.
 
 Basic observation logging must continue when every optional permission is denied.
 
@@ -82,10 +82,15 @@ For a real phone or Garmin watch, continue with [PHYSICAL_ACCEPTANCE.md](PHYSICA
 
 ### 6. Export and delete
 
-- Export JSON and choose a destination you control.
-- Inspect only if you are comfortable handling the personal data it contains.
+- Prepare **Data-only export**. Before choosing a route, verify the preview says raw AV **no** and Tier-2 **no**, lists `data/apophenia-data.json`, and shows file and final-ZIP SHA-256 values.
+- Cancel once and confirm the preview explicitly deletes the prepared cache bundle.
+- Prepare **Full evidence package** only with synthetic or disposable test content. Confirm the first warning, then verify the second preview says whether retained AV and Tier-2 rows are actually present. Purged media must not reappear.
+- Test **Save as…** to an Android document folder and, where available, an attached USB/OTG provider. Reopen the ZIP and compare its manifest. Test **Share** only to a destination you control.
+- The full package contains plaintext portable evidence. Do not attach it to a public issue. Device-bound Keystore keys are not exported.
 - Test **Delete all local data** only after saving anything you want to keep.
 - Expected: delete-all removes active encrypted AV files and their Keystore keys before clearing SQLite. This is destructive and is not a substitute for the later verified-backup/EJECT flow.
+
+See [EXPORT.md](EXPORT.md) for the exact tier, manifest, route, and current implementation boundaries.
 
 ## Garmin acceptance test
 

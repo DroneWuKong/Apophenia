@@ -75,6 +75,8 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - A structurally isolated `apophenia-demo.db` mode with a persistent DEMO DATA badge, 45 events across about 60 days, 120 control groups, rolling samples, one registration, a flight session, and a purged AV fixture.
 - Six deterministic credibility stories covering corrected BLE presence, a refuted poor-sleep registration, small-n weather, egress, cross-domain flight context, and retained-then-purged AV-derived evidence.
 - Hard live-export exclusion for demo databases; the Settings exporter continues to target the canonical live database while demo mode is active.
+- Data-only and full-evidence ZIP tiers with a mandatory per-file manifest preview, SHA-256 verification, raw-AV/Tier-2 flags, Android sharesheet release, and Storage Access Framework save-as.
+- Portable full-evidence materialization: retained audio becomes WAV, video becomes indexed JPEG frames, and Tier-2 records become an explicitly confirmed plaintext JSON payload. Device-bound Keystore keys are not exported.
 - First-class **Egress · bailed** and **Bad vibes · stayed** analysis cohorts, kept separate from ordinary label cohorts.
 - Binary hashed-device presence features for every observed BLE/Wi-Fi identity, with missing channel windows excluded rather than treated as absence.
 - Required multiple-comparisons scope on every result: total features tested, eligible features, Benjamini-Hochberg method, and explicit **indistinguishable from noise** labeling after correction.
@@ -87,7 +89,7 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 
 ### Validation
 
-- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, MAVLink framing/session/staleness/STATUSTEXT behavior, CRSF/GHST framing, Field-Kit parsing, TAK own/full filtering, ground/space-weather parsing, RF window/spectrum behavior, audio and video ring/freeze/feature/encryption behavior, AV expiry/keep/scrub/anti-resurrection/path containment, call-audio gap behavior, and simulation-pipeline coverage run in the software-only unit suite.
+- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, data/full export tier isolation, manifest/hash corruption refusal, demo export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, MAVLink framing/session/staleness/STATUSTEXT behavior, CRSF/GHST framing, Field-Kit parsing, TAK own/full filtering, ground/space-weather parsing, RF window/spectrum behavior, audio and video ring/freeze/feature/encryption behavior, AV expiry/keep/scrub/anti-resurrection/path containment, call-audio gap behavior, and simulation-pipeline coverage run in the software-only unit suite.
 
 ## [0.3.0-preview.2] - 2026-10-02
 
