@@ -173,7 +173,29 @@ object GarminBridge {
             return
         }
         recordDiagnostic("Received ${packets.size} Garmin event${if (packets.size == 1) "" else "s"} from ${device.friendlyName}")
-        packets.forEach { ingestor?.ingest(device.friendlyName, it) }
+        packets.forEach { packet ->
+            ingestor?.ingest(device.friendlyName, packet) { receipt ->
+                sendPersistenceReceipt(device, receipt)
+            }
+        }
+    }
+
+    private fun sendPersistenceReceipt(device: IQDevice, receipt: GarminPersistenceReceipt) {
+        val iq = connectIQ ?: return
+        val payload = GarminReceipt.payload(receipt.eventId)
+        try {
+            iq.sendMessage(device, IQApp(WATCH_APP_ID), payload) { _, _, status ->
+                if (status == ConnectIQ.IQMessageStatus.SUCCESS) {
+                    recordDiagnostic("Confirmed phone storage to ${device.friendlyName}")
+                } else {
+                    recordDiagnostic("Phone receipt delivery failed: ${status.name}; watch retry remains safe")
+                }
+            }
+        } catch (error: InvalidStateException) {
+            recordDiagnostic("Could not send phone receipt: Garmin SDK is not ready")
+        } catch (error: ServiceUnavailableException) {
+            recordDiagnostic("Could not send phone receipt: Garmin Connect unavailable")
+        }
     }
 
     private fun registerDeviceListener(iq: ConnectIQ, device: IQDevice) {

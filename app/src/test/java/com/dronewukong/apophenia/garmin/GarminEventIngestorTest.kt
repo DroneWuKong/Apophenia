@@ -12,6 +12,7 @@ class GarminEventIngestorTest {
     fun preservesWatchTimestampAndAttachesMetricsToInsertedObservation() {
         val store = FakeStore(inserted = true)
         val diagnostics = mutableListOf<String>()
+        val receipts = mutableListOf<GarminPersistenceReceipt>()
         val ingestor = GarminEventIngestor(store, "watch-app", diagnostics::add)
 
         val result = ingestor.ingest(
@@ -24,7 +25,8 @@ class GarminEventIngestorTest {
                 "kind" to "OBSERVATION",
                 "label" to "Light changed",
                 "metrics" to mapOf("garmin_heart_rate_bpm" to 72)
-            )
+            ),
+            onPersisted = receipts::add
         )
 
         assertTrue(result is GarminIngestResult.Accepted)
@@ -35,12 +37,14 @@ class GarminEventIngestorTest {
         assertEquals(42L, store.samples.single().observationId)
         assertEquals("bpm", store.samples.single().unit)
         assertTrue(diagnostics.last().contains("Stored Garmin event"))
+        assertEquals(listOf(GarminPersistenceReceipt("install:9", true)), receipts)
     }
 
     @Test
     fun duplicateRetryDoesNotAttachContextTwice() {
         val store = FakeStore(inserted = false)
         val diagnostics = mutableListOf<String>()
+        val receipts = mutableListOf<GarminPersistenceReceipt>()
         val ingestor = GarminEventIngestor(store, "watch-app", diagnostics::add)
 
         ingestor.ingest(
@@ -52,11 +56,13 @@ class GarminEventIngestorTest {
                 "ts_ms" to 1_700_000_000_123L,
                 "kind" to "OBSERVATION",
                 "metrics" to mapOf("garmin_stress" to 30)
-            )
+            ),
+            onPersisted = receipts::add
         )
 
         assertTrue(store.samples.isEmpty())
         assertTrue(diagnostics.any { it.contains("duplicate") })
+        assertEquals(listOf(GarminPersistenceReceipt("install:9", false)), receipts)
     }
 
     @Test

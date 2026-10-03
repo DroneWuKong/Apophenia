@@ -23,12 +23,19 @@ sealed interface GarminIngestResult {
     data class Rejected(val reason: String) : GarminIngestResult
 }
 
+data class GarminPersistenceReceipt(val eventId: String, val inserted: Boolean)
+
 class GarminEventIngestor(
     private val store: GarminEventStore,
     private val watchAppId: String,
     private val onDiagnostic: (String) -> Unit = {}
 ) {
-    fun ingest(deviceName: String, packet: Map<*, *>, receivedAtMs: Long = System.currentTimeMillis()): GarminIngestResult {
+    fun ingest(
+        deviceName: String,
+        packet: Map<*, *>,
+        receivedAtMs: Long = System.currentTimeMillis(),
+        onPersisted: (GarminPersistenceReceipt) -> Unit = {}
+    ): GarminIngestResult {
         return when (val parsed = GarminPacketParser.parseDetailed(packet, receivedAtMs)) {
             is GarminParseResult.Rejected -> {
                 onDiagnostic(parsed.reason)
@@ -65,6 +72,7 @@ class GarminEventIngestor(
                             onDiagnostic("Stored Garmin event from $deviceName")
                         }
                     }
+                    event.eventId?.let { onPersisted(GarminPersistenceReceipt(it, inserted)) }
                 }
                 GarminIngestResult.Accepted(parsed.warnings)
             }
