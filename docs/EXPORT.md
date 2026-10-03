@@ -18,7 +18,16 @@ The LAN route also does not retry in the background. A 2xx response says that th
 
 ### Data-only (default)
 
-The bundle contains `data/apophenia-data.json` with:
+The bundle contains both a canonical nested representation and flat analysis views:
+
+- `data/apophenia-data.json` — canonical JSON for scripts, notebooks, and lossless inspection;
+- `analysis/README.md` — human-readable scope, counts, exclusions, and statistical boundaries;
+- `analysis/data-dictionary.json` — machine-readable encoding, null, timestamp, table, and analysis contracts;
+- `analysis/observations.csv` and `analysis/context-samples.csv` — the primary event/control tables;
+- `analysis/hypotheses.csv` and `analysis/hypothesis-evaluations.csv` — preregistration and immutable evaluation tables;
+- `analysis/sessions.csv` and `analysis/session-events.csv` — drive/flight session timelines.
+
+The canonical JSON contains:
 
 - observations and their context;
 - the complete ordinary `context_samples` export, including controls, capture IDs, phases, session IDs, and permanent derived metrics;
@@ -27,16 +36,18 @@ The bundle contains `data/apophenia-data.json` with:
 - raw-media inventory and the purge ledger.
 - inbound share-attachment inventory (name, MIME, size, SHA-256), never the attachment bytes.
 
-It never reads `sensitive_context`, never decrypts raw AV, and does not include Tier-2 contents. Device identifiers remain the locally keyed hashes already stored in SQLite.
+CSV is UTF-8 with one header row, standard quoting for commas/quotes/line breaks, `true`/`false` booleans, Unix epoch milliseconds, and an empty cell for null/unavailable values. It is a flat analysis convenience; the JSON remains canonical. See [EXPORT_ANALYSIS.md](EXPORT_ANALYSIS.md) for joins and Python, R, and SQLite examples.
+
+The data-only builder never reads `sensitive_context`, never decrypts raw AV, and does not include Tier-2 contents, RF IQ, or attachment bytes. Device identifiers remain the locally keyed hashes already stored in SQLite.
 
 ### Full evidence package
 
 Full evidence requires two deliberate confirmations:
 
 1. confirm that a plaintext evidence package should be built locally;
-2. review its manifest, then choose **Share** or **Save as**.
+2. review its manifest, then choose **Share**, **Save as**, or the separately enabled local-LAN route.
 
-In addition to the data-only payload, it contains every retained AV asset, Tier-2 record, and inbound text/image attachment available at preparation time plus `inventories/omniprobe.json`, the per-event planned-channel/value/`capture_id`/gap accounting shown by Omniprobe. Audio is exported as mono PCM WAV. Video is exported as per-stream JPEG frames plus an index. Tier-2 records are decrypted into `tier2/contents.json`. Attachment bytes are hash-checked and indexed under `attachments/`; source content URIs are never exported because they are never stored.
+In addition to the complete JSON/CSV analysis pack from data-only, it contains every retained AV asset, Tier-2 record, and inbound text/image attachment available at preparation time plus `inventories/omniprobe.json`, the per-event planned-channel/value/`capture_id`/gap accounting shown by Omniprobe. Audio is exported as mono PCM WAV. Video is exported as per-stream JPEG frames plus an index. Tier-2 records are decrypted into `tier2/contents.json`. Attachment bytes are hash-checked and indexed under `attachments/`; source content URIs are never exported because they are never stored.
 
 Omniprobe gap reasons reflect gate, permission, platform, and hardware state visible at export time. They explain the locally knowable gap but do not retroactively prove what physical hardware was present at the historical event.
 

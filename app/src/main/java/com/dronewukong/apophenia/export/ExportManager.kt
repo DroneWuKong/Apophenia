@@ -44,6 +44,7 @@ object ExportManager {
                 bytes = dataJson(db, nowMs, tier).toString(2).toByteArray(Charsets.UTF_8)
             )
         )
+        payloads += AnalysisExportPayloads.build(db, nowMs)
         if (tier == ExportTier.FULL_EVIDENCE) {
             payloads += evidenceMaterializer.sensitivePayloads(db.allSensitiveContext(100_000))
             payloads += evidenceMaterializer.mediaPayloads(db.mediaAssets(includePurged = false, limit = 10_000))

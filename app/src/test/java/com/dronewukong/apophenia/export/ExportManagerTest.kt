@@ -31,6 +31,7 @@ class ExportManagerTest {
     private lateinit var context: Context
     private lateinit var db: ObservationDb
     private lateinit var output: File
+    private var observationId: Long = 0
 
     @Before
     fun setUp() {
@@ -38,7 +39,14 @@ class ExportManagerTest {
         context.deleteDatabase("export-framework-test.db")
         db = ObservationDb(context, "export-framework-test.db")
         output = File(context.cacheDir, "export-framework-test").apply { deleteRecursively(); mkdirs() }
-        val observationId = db.insertObservation(Observation(timestampMs = 1_000, kind = ObservationKind.WEIRD, label = "Test event"))
+        observationId = db.insertObservation(
+            Observation(
+                timestampMs = 1_000,
+                kind = ObservationKind.WEIRD,
+                label = "Test event, quoted",
+                note = "line one, \"quoted\"\nline two"
+            )
+        )
         db.insertContext(listOf(ContextSample(timestampMs = 1_000, observationId = observationId, source = "test", metric = "derived_metric", value = 4.2, unit = "score", captureId = "event:$observationId")))
         db.insertSensitiveContext(listOf(SensitiveContextRecord(timestampMs = 1_001, observationId = observationId, source = "test", contentType = "notification_contents", ciphertextBase64 = "encrypted-secret", ivBase64 = "iv", keyAlias = "test", captureId = "event:$observationId")))
         db.registerMediaAsset(
@@ -65,7 +73,20 @@ class ExportManagerTest {
         assertEquals(ExportTier.DATA_ONLY, prepared.manifest.tier)
         assertFalse(prepared.manifest.containsRawAv)
         assertFalse(prepared.manifest.containsTier2Contents)
-        assertEquals(listOf("data/apophenia-data.json"), prepared.manifest.entries.map { it.path })
+        assertEquals(
+            listOf(
+                "analysis/README.md",
+                "analysis/context-samples.csv",
+                "analysis/data-dictionary.json",
+                "analysis/hypotheses.csv",
+                "analysis/hypothesis-evaluations.csv",
+                "analysis/observations.csv",
+                "analysis/session-events.csv",
+                "analysis/sessions.csv",
+                "data/apophenia-data.json"
+            ),
+            prepared.manifest.entries.map { it.path }
+        )
         assertEquals(prepared.manifest, ExportManager.verifyBundle(prepared.bundle))
         val data = zipText(prepared.bundle, "data/apophenia-data.json")
         assertTrue(data.contains("derived_metric"))
@@ -73,6 +94,12 @@ class ExportManagerTest {
         assertFalse(data.contains("raw-wave"))
         assertFalse(data.contains("encrypted-secret"))
         assertEquals(1, JSONObject(data).getJSONArray("mediaInventory").length())
+        val observationsCsv = zipText(prepared.bundle, "analysis/observations.csv")
+        assertTrue(observationsCsv.contains("\"Test event, quoted\""))
+        assertTrue(observationsCsv.contains("\"line one, \"\"quoted\"\"\nline two\""))
+        assertTrue(zipText(prepared.bundle, "analysis/context-samples.csv").contains("event:$observationId"))
+        assertTrue(zipText(prepared.bundle, "analysis/README.md").contains("no raw audio/video"))
+        assertTrue(zipText(prepared.bundle, "analysis/data-dictionary.json").contains("capture_id"))
     }
 
     @Test
@@ -82,10 +109,12 @@ class ExportManagerTest {
         assertEquals(ExportTier.FULL_EVIDENCE, prepared.manifest.tier)
         assertTrue(prepared.manifest.containsRawAv)
         assertTrue(prepared.manifest.containsTier2Contents)
-        assertEquals(
-            listOf("av/event-1/audio-test.wav", "data/apophenia-data.json", "inventories/omniprobe.json", "tier2/contents.json"),
-            prepared.manifest.entries.map { it.path }
-        )
+        assertTrue(prepared.manifest.entries.any { it.path == "analysis/observations.csv" })
+        assertTrue(prepared.manifest.entries.any { it.path == "analysis/data-dictionary.json" })
+        assertTrue(prepared.manifest.entries.any { it.path == "av/event-1/audio-test.wav" })
+        assertTrue(prepared.manifest.entries.any { it.path == "data/apophenia-data.json" })
+        assertTrue(prepared.manifest.entries.any { it.path == "inventories/omniprobe.json" })
+        assertTrue(prepared.manifest.entries.any { it.path == "tier2/contents.json" })
         assertEquals("raw-wave", zipText(prepared.bundle, "av/event-1/audio-test.wav"))
         assertEquals("plaintext-tier2", zipText(prepared.bundle, "tier2/contents.json"))
         assertTrue(zipText(prepared.bundle, "inventories/omniprobe.json").contains("LIVE_AUDIO_CAPTURE"))

@@ -128,6 +128,12 @@ Raw MAC addresses, Wi-Fi BSSIDs, adapter/system identifiers, Field-Kit device ID
 
 Single-event dossiers and selected-event reports add no authority tables and do not rewrite stored evidence. They are verified projections of `observations`, `context_samples`, session events, immutable hypothesis evaluations, media inventory, Tier-2 rows where the tier permits them, and current Omniprobe gap accounting. Dossier RF bytes are included only when referenced by the event context and matching its stored SHA-256. Report JSON redacts Tier-2 values; optional retained stills are the only raw-AV report payload. Post-event rows remain visible for reconstruction but are excluded from derived predictor charts.
 
+## Analysis export projections
+
+Data-only and full-evidence bundles include a non-authoritative `analysis/` projection beside the canonical `data/apophenia-data.json`. The projection contains a plain-language README, a JSON data dictionary, and flat UTF-8 CSV tables for observations, context samples, hypotheses, hypothesis evaluations, sessions, and session events. CSV uses one header row, quotes commas/quotes/line breaks, writes booleans as `true`/`false`, leaves null values empty, and keeps timestamps in Unix milliseconds.
+
+These files do not add records or change schema authority. They deliberately preserve `capture_id`, `phase`, `is_control`, and session identity so an analyst can group dense samples, exclude `POST` predictors, and retain controls. The projection never queries `sensitive_context`, media ciphertext, RF IQ, or attachment bytes; full evidence carries those separately under its explicit higher-content contract. See [EXPORT_ANALYSIS.md](EXPORT_ANALYSIS.md) for the exact paths, joins, and analysis invariants.
+
 ## Evidence seals and export audit
 
 Schema v10 adds `evidence_seals` and `export_audit_log`. A seal is current confirmation state, keyed globally or to one observation; it is not capture data and does not remove export capability. Audit rows are append-only application events containing the prepared tier/scope/hash/flags and exactly what the route exposed: chooser handoff, byte-complete write, endpoint acknowledgement, or EJECT wipe completion. No row means exactly-once delivery or durable recipient retention.

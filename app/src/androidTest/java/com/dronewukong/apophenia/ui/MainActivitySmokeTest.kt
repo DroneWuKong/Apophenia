@@ -147,7 +147,8 @@ class MainActivitySmokeTest {
             compose.onAllNodesWithText("Manifest preview · Data-only").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Raw AV: no · Tier-2 contents: no").assertIsDisplayed()
-        compose.onNodeWithText("data/apophenia-data.json").assertIsDisplayed()
+        compose.onNodeWithText("analysis/README.md").assertIsDisplayed()
+        compose.onNodeWithText("data/apophenia-data.json").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Cancel + delete").performClick()
     }
 

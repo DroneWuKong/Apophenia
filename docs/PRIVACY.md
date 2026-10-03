@@ -1,6 +1,10 @@
 # Privacy and collection boundaries
 
-Apophenia is local-first.
+Apophenia is a local-first personal total-capture instrument. It is capable of being **maximum invasive** when the operator deliberately authorizes and arms its full capability set. That can include audio, every camera Android exposes, screen contents, protected message/notification/calendar/contact contents, location, physiology, vehicle and aircraft telemetry, nearby radios, and bounded RF-receiver evidence. The phrase describes the capability ceiling, not the default state.
+
+Basic logging needs none of those invasive channels. Named gates, deliberate confirmations, Android permissions, screen-capture consent, and live session starts remain separate controls. A gate records authorization; it is not proof that its hardware exists or that capture is active. Persistent indicators show active AV rings and drive, flight, or control-link sessions.
+
+All retained evidence is local unless the operator builds an export, reviews its manifest, and deliberately chooses a route. Apophenia has no account, advertising SDK, analytics SDK, automatic cloud sync, background uploader, or background export retry worker.
 
 Stored locally: manual observations, phone context, rolling black-box samples, random controls, Garmin event context delivered through the paired-phone companion channel, optional aggregate home-state counts, and explicitly enabled radio/presence metrics. Deliberately enabled notification, calendar, contacts, and message-metadata contents are encrypted before entering their separate SQLite table.
 

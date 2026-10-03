@@ -2597,7 +2597,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Build locally, inspect every payload hash, then choose the sharesheet or Android save-as. Nothing is sent while the preview is open.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text("Build locally, inspect every payload hash, then choose the sharesheet or Android save-as. Data-only includes canonical JSON plus flat CSV tables and a data dictionary. Nothing is sent while the preview is open.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     Button(onClick = { prepareExport(ExportTier.DATA_ONLY) }, enabled = !exportPreparing, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.IosShare, null); Spacer(Modifier.width(8.dp)); Text(if (exportPreparing) "Preparing…" else if (demoMode.active) "Prepare live data-only export" else "Prepare data-only export")
                     }
@@ -2927,7 +2927,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                     } else if (manifest.tier != ExportTier.DATA_ONLY) {
                         Text("Confirmation 2 of 2: choosing Share, Save, or Push LAN below explicitly releases this plaintext ${manifest.tier.displayName.lowercase()} from the app boundary.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                     } else {
-                        Text("Data-only excludes raw AV and Tier-2 contents. Hashed identifiers remain exactly as stored.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Data-only includes canonical JSON plus UTF-8 CSV tables and a data dictionary. It excludes raw AV and Tier-2 contents; hashed identifiers remain exactly as stored.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     HorizontalDivider()
                     manifest.entries.forEach { entry ->

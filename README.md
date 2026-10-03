@@ -4,17 +4,27 @@
 
 ### Notice now. Understand later.
 
-**I made a local-first Android + Garmin black box for the moments you want to investigate later.**
+**A local-first personal total-capture instrument for reconstructing what was happening around an event.**
 
 [![Android CI](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml/badge.svg)](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Android 8+](https://img.shields.io/badge/Android-8%2B-3DDC84.svg)](https://developer.android.com/about/versions/oreo)
 
-<img src="docs/images/apophenia-log.png" alt="Apophenia one-tap logging screen" width="420">
+<img src="docs/images/apophenia-home-annotated-v03.png" alt="Annotated Apophenia capture screen showing the live-status strip, timestamp-first event button, and distinct egress action" width="900">
 
 </div>
 
-## I built this because
+## What Apophenia is
+
+Apophenia is an Android and Garmin black box for the moments when you notice something now and want to investigate the circumstances later. You log the event first. The app freezes the authorized context around it, keeps observations separate from hypotheses, compares event windows with jittered controls, and tells you when an apparent pattern does not survive the comparison.
+
+It is deliberately capable of being **maximum invasive**. If you authorize and arm everything, it can collect phone state, nearby radios, location, physiology, notification/calendar/contact/message contents, microphone, every camera the device can expose, screen contents, vehicle telemetry, aircraft telemetry, control-link health, owned RF-receiver windows, and related session context. That is the capability ceiling, not the default operating mode.
+
+You choose each gate. Deliberate channels require deliberate confirmation. Android permissions, screen-record consent, and hardware-session starts remain separate. A persistent strip and foreground indicators show what is actually live. The app stores its evidence locally and has no account, analytics SDK, automatic cloud sync, or background uploader. Data crosses the app boundary only after you explicitly build an export, inspect its manifest, and choose a route.
+
+The design principle is simple: **you record the event; the software records the circumstances you authorized.**
+
+## Why I built it
 
 I kept having moments that were easy to notice and hard to reconstruct later: a headache, a light or sound changing, an odd coincidence, or simply *that was weird*.
 
@@ -36,12 +46,12 @@ The point is not to prove a story. It is to collect better evidence before telli
     <td width="33%" align="center"><strong>Test the pattern</strong></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/images/apophenia-settings.png" alt="Optional context, permission, recorder, and Garmin settings" width="260"></td>
+    <td align="center"><img src="docs/images/apophenia-settings-top-v03.png" alt="TOTAL_EVIDENCE and bounded session presets in Settings" width="260"></td>
     <td align="center"><img src="docs/images/apophenia-timeline.png" alt="Timeline with demo observations" width="260"></td>
     <td align="center"><img src="docs/images/apophenia-patterns.png" alt="Pattern screen honestly reporting insufficient demo data" width="260"></td>
   </tr>
   <tr>
-    <td>Location, weather, notifications, Health Connect, Garmin, and the rolling recorder are visible, optional choices.</td>
+    <td>Every channel is visible behind a named gate. TOTAL_EVIDENCE and presets arm gates, but never silently grant Android permissions or start hardware sessions.</td>
     <td>The timeline labels observations, coincidences, and hypotheses instead of mixing them together.</td>
     <td>The analysis says “insufficient data” when that is the honest answer and excludes post-event samples from prediction.</td>
   </tr>
@@ -53,14 +63,14 @@ The point is not to prove a story. It is to collect better evidence before telli
 <br>
 
 <p align="center">
-  <img src="docs/images/apophenia-onboarding.png" alt="First-run optional context explanation" width="360">
+  <img src="docs/images/apophenia-onboarding-v03.png" alt="First-run optional context explanation over the current VIBE capture screen" width="360">
 </p>
 
 The app explains what works without a prompt and lets you review optional access when you are ready. Basic logging does not depend on location, weather, Health Connect, Garmin, or physical sensors.
 
 </details>
 
-> The screenshots above were captured from the real debug app on an Android emulator. Timeline entries are demo data, not personal records. They are not evidence of physical-device validation.
+> The source screens were captured from the real debug app on an Android emulator. The wide figures add documentation arrows and labels; they are explanatory artwork, not pixel-diff test evidence. Timeline entries are demo data, not personal records, and emulator captures are not physical-device validation.
 
 ## What I made
 
@@ -68,7 +78,7 @@ The app explains what works without a prompt and lets you review optional access
 - One-tap graded VIBE capture plus a distinct red **FUCK THIS, I'M OUT** egress event in the app and widget
 - Quick logging for observations, headache, sinus/congestion, light, sound, body sensations, coincidences, hypotheses, and custom entries
 - A home-screen widget and Quick Settings tile
-- Local SQLite storage plus manifest-previewed data/full evidence, event dossiers, HTML/PDF reports, checkpointed raw `.db` snapshots, verified restorable backups, and a separately gated one-shot LAN route
+- Local SQLite storage plus manifest-previewed exports: canonical JSON, flat UTF-8 CSV tables, a machine-readable data dictionary, full evidence, event dossiers, HTML/PDF reports, checkpointed raw `.db` snapshots, verified restorable backups, and a separately gated one-shot LAN route
 - Global/per-event evidence seals, scrub-before-share dossiers, an honest route audit, and EJECT export-then-wipe limited to verifiable SAF/LAN completion
 - A user-enabled rolling black box with 30 minutes of pre-event context and a labeled post-event window
 - Random control captures that use the same pipeline as event captures, then match one-to-one by local time block and weekday/weekend
@@ -97,6 +107,8 @@ The app explains what works without a prompt and lets you review optional access
 
 There is no account, advertising SDK, analytics, or automatic upload. Microphone capture exists only behind its deliberate gate and explicit armed state, with a persistent Android indicator.
 
+The illustrated [user guide](docs/USER_GUIDE.md) explains the full capture model without euphemism. Generated copies are available as [Word](docs/Apophenia_User_Guide.docx), [PDF](docs/Apophenia_User_Guide.pdf), and [self-contained HTML](docs/Apophenia_User_Guide.html). The [analysis export guide](docs/EXPORT_ANALYSIS.md) maps each export to the human and machine tools that can read it.
+
 ## Try it
 
 Apophenia is currently a **development preview**, not a Play Store release.
@@ -112,12 +124,26 @@ GitHub may require a sign-in to download Actions artifacts. Debug signatures can
 The [install and test guide](docs/INSTALL_AND_TEST.md) has a short remote-testing checklist and a privacy-safe bug-report template. The [export contract](docs/EXPORT.md) documents content tiers, manifests, hashes, and current route boundaries; [event reports](docs/REPORTS.md) documents dossiers and HTML/PDF output.
 For recorder survival and real Garmin delivery, use the [48-hour physical acceptance checklist](docs/PHYSICAL_ACCEPTANCE.md).
 
+## Exports for people and machines
+
+Every export is built in app-private cache, hash-verified, and shown as a manifest preview before Share, Save as, or the separately gated local-LAN action becomes available.
+
+| Need | Human-readable | Machine-readable |
+| --- | --- | --- |
+| Ordinary analysis | `analysis/README.md` and spreadsheet-friendly CSV tables | canonical nested JSON, flat CSV, JSON data dictionary |
+| SQL or BI work | schema documentation | checkpointed SQLite `.db` with `schema_version` |
+| One event | plain-language dossier summary and SVG chart | event JSON, context CSV, complete inventory |
+| Selected events | self-contained HTML and PDF report | report JSON, context CSV, SVG derived-metric chart |
+| Complete portable evidence | manifest plus ordinary analysis pack | JSON/CSV plus explicitly included AV, Tier-2 contents, attachments, inventories, and hashes |
+
+The default data-only tier excludes raw audio/video, Tier-2 contents, and attachment bytes. Full evidence is intentionally plaintext-portable and requires two confirmations. See [EXPORT_ANALYSIS.md](docs/EXPORT_ANALYSIS.md) for Python, R, spreadsheet, and SQLite notes.
+
 ## What is real today
 
 | Area | What has actually been verified |
 | --- | --- |
 | Android | JDK 17 build, unit tests, lint, and debug APK pass locally and in GitHub Actions |
-| UI | Ten Jetpack Compose smoke tests pass on an API 36 emulator, including demo isolation, Omniprobe, sealed-release enforcement, export-manifest/raw-SQLite previews, and Android PDF report generation |
+| UI | Eleven Jetpack Compose smoke tests pass on an API 36 emulator, including demo isolation, Omniprobe, sealed-release enforcement, export-manifest/raw-SQLite previews, Android PDF report generation, and inbound share capture |
 | Permissions | Location, notification, weather, and Health Connect flows were exercised in an emulator |
 | Garmin | All three Epix Pro targets compile with Connect IQ SDK 9.2.0 |
 | Garmin queue | Six native Monkey C tests pass in the 47 mm simulator |
@@ -199,7 +225,9 @@ No Garmin hardware, GPS fix, weather service, or Health Connect data is required
 
 ## Privacy
 
-Everything is local-first. Optional access is explicit and fail-soft, and export only happens when you choose a share destination. Do not attach real exports, coordinates, health records, or observation notes to a public issue.
+Apophenia can be the most invasive app on your phone **if you deliberately authorize it to be**. That is an honest description of the product, not a hidden behavior. It exposes the channels, the gate tier, the live state, and the reason for every gap. Conservative defaults mean basic logging works without granting the invasive channels.
+
+Everything is local-first. Optional access is explicit and fail-soft. There is no automatic upload, and preparing or previewing an export does not send it. Data leaves only when you choose a sharesheet target, a Storage Access Framework destination, or the separately gated local-LAN route. Do not attach real exports, coordinates, health records, or observation notes to a public issue.
 
 Read the full [privacy and collection boundaries](docs/PRIVACY.md).
 
@@ -211,6 +239,11 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 
 ## Project docs
 
+- [Illustrated user guide](docs/USER_GUIDE.md)
+- [Human and machine analysis exports](docs/EXPORT_ANALYSIS.md)
+- [Printable user guide DOCX](docs/Apophenia_User_Guide.docx)
+- [Printable user guide PDF](docs/Apophenia_User_Guide.pdf)
+- [Standalone user guide HTML](docs/Apophenia_User_Guide.html)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Data model and statistical boundaries](docs/DATA_MODEL.md)
 - [Capture gates and consent tiers](docs/CAPTURE_GATES.md)
