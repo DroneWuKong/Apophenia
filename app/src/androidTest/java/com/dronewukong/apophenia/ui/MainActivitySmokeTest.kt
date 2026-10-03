@@ -93,7 +93,8 @@ class MainActivitySmokeTest {
             "OBD-II drive session",
             "Native Automotive properties",
             "Encrypted evidence media",
-            "Octopod observer"
+            "Octopod observer",
+            "Explicit LAN export"
         ).forEach(::scrollSettingsTo)
     }
 
@@ -143,6 +144,19 @@ class MainActivitySmokeTest {
         }
         compose.onNodeWithText("Raw AV: no · Tier-2 contents: no").assertIsDisplayed()
         compose.onNodeWithText("data/apophenia-data.json").assertIsDisplayed()
+        compose.onNodeWithText("Cancel + delete").performClick()
+    }
+
+    @Test
+    fun rawSqliteSnapshotShowsCheckpointedPreviewBeforeAnyRoute() {
+        dismissContextIntroIfPresent()
+        compose.onNodeWithText("Settings").performClick()
+        scrollSettingsTo("Prepare raw SQLite snapshot")
+        compose.onNodeWithText("Prepare raw SQLite snapshot").performClick()
+        compose.waitUntil(timeoutMillis = 15_000) {
+            compose.onAllNodesWithText("Raw SQLite preview").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("schema_version 9", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Cancel + delete").performClick()
     }
 

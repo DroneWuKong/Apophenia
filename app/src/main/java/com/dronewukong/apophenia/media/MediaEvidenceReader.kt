@@ -13,10 +13,11 @@ import java.security.KeyStore
 import java.security.MessageDigest
 import java.util.zip.ZipInputStream
 import javax.crypto.SecretKey
+import org.json.JSONArray
 import org.json.JSONObject
 
 data class AudioEvidence(val pcm: ByteArray, val sampleRateHz: Int, val preBytes: Int, val postBytes: Int)
-data class VideoEvidenceFrame(val name: String, val phase: String, val jpeg: ByteArray)
+data class VideoEvidenceFrame(val name: String, val phase: String, val timestampMs: Long, val jpeg: ByteArray)
 
 /** Decrypts only into memory; no plaintext media is written to disk. */
 class MediaEvidenceReader(private val context: Context) {
@@ -36,19 +37,28 @@ class MediaEvidenceReader(private val context: Context) {
         val plaintext = decrypt(asset, manifest)
         return try {
             val frames = mutableListOf<VideoEvidenceFrame>()
+            var index = JSONArray()
             ZipInputStream(ByteArrayInputStream(plaintext)).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     if (!entry.isDirectory && entry.name.matches(Regex("(pre|post)_\\d{4}\\.jpg"))) {
                         val bytes = zip.readBytes()
                         check(bytes.size <= 5_000_000) { "Evidence frame exceeds the 5 MB safety bound" }
-                        frames += VideoEvidenceFrame(entry.name, entry.name.substringBefore('_'), bytes)
+                        frames += VideoEvidenceFrame(entry.name, entry.name.substringBefore('_'), asset.createdAtMs, bytes)
+                    } else if (!entry.isDirectory && entry.name == "frames.json") {
+                        index = JSONArray(zip.readBytes().toString(Charsets.UTF_8))
                     }
                     zip.closeEntry()
                     check(frames.size <= 300) { "Evidence archive exceeds the 300-frame safety bound" }
                 }
             }
-            frames
+            val timestamps = buildMap {
+                repeat(index.length()) { row ->
+                    val item = index.getJSONObject(row)
+                    put(item.getString("file"), item.optLong("timestamp_ms", asset.createdAtMs))
+                }
+            }
+            frames.map { it.copy(timestampMs = timestamps[it.name] ?: asset.createdAtMs) }
         } finally { plaintext.fill(0) }
     }
 

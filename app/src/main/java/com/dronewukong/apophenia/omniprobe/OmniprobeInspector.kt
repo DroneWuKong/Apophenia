@@ -82,7 +82,7 @@ class OmniprobeInspector(
             unmatchedValues = unmatched,
             mediaAssets = media,
             purgeEntries = db.purgeLedger().filter { it.observationId == observation.id },
-            exportState = "Data-only and full-evidence ZIPs require a verified manifest preview before sharesheet or SAF release. No export-audit ledger exists yet; that remains step 22."
+            exportState = "Data-only, full-evidence, and restorable-backup ZIPs require verified manifest previews before sharesheet, SAF, or gated LAN release. Raw SQLite snapshots are checkpointed and hash-previewed. Verified restore exists; the durable export-audit ledger remains step 22."
         )
     }
 

@@ -29,10 +29,13 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.export.ExportRoutes
+import com.dronewukong.apophenia.export.LanExportSettings
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.mavlink.UsbMavlinkDevice
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private var locationResult: ((Boolean, String) -> Unit)? = null
@@ -52,6 +55,8 @@ class MainActivity : ComponentActivity() {
     private var usbPermissionReceiver: BroadcastReceiver? = null
     private var pendingSafExport: File? = null
     private var safExportResult: ((Boolean, String) -> Unit)? = null
+    private var lanTreeResult: ((Boolean, String) -> Unit)? = null
+    private var backupImportResult: ((Result<File>) -> Unit)? = null
 
     var permissionRevision by mutableIntStateOf(0)
         private set
@@ -166,7 +171,7 @@ class MainActivity : ComponentActivity() {
         requestedHealthPermissions = emptySet()
         healthResult = null
     }
-    private val createExportDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+    private val createExportDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val source = pendingSafExport
         val callback = safExportResult
         pendingSafExport = null
@@ -187,6 +192,48 @@ class MainActivity : ComponentActivity() {
                 onFailure = { "Export save failed: ${it.message ?: "unknown error"}" }
             )
         )
+    }
+    private val chooseLanTree = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val callback = lanTreeResult
+        lanTreeResult = null
+        if (uri == null) {
+            callback?.invoke(false, "Network-folder selection cancelled")
+            return@registerForActivityResult
+        }
+        val result = runCatching {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            LanExportSettings(this).saveDocumentTree(uri.toString())
+        }
+        callback?.invoke(
+            result.isSuccess,
+            result.fold(
+                onSuccess = { "LAN destination set to the selected Android document tree" },
+                onFailure = { "Could not retain network-folder access: ${it.message ?: "unknown error"}" }
+            )
+        )
+    }
+    private val openBackupDocument = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val callback = backupImportResult
+        backupImportResult = null
+        if (uri == null) {
+            callback?.invoke(Result.failure(IllegalStateException("Restore selection cancelled")))
+            return@registerForActivityResult
+        }
+        lifecycleScope.launch {
+            val destination = File(cacheDir, "restore-import-${System.currentTimeMillis()}.zip")
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val input = contentResolver.openInputStream(uri) ?: error("Android did not provide the selected backup")
+                    input.use { source -> destination.outputStream().use { source.copyTo(it) } }
+                    destination
+                }
+            }
+            if (result.isFailure) destination.delete()
+            callback?.invoke(result)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -529,6 +576,18 @@ class MainActivity : ComponentActivity() {
         pendingSafExport = file
         safExportResult = onResult
         createExportDocument.launch(file.name)
+    }
+
+    fun chooseLanDocumentTree(onResult: (Boolean, String) -> Unit) {
+        check(lanTreeResult == null) { "A document-tree selection is already pending" }
+        lanTreeResult = onResult
+        chooseLanTree.launch(null)
+    }
+
+    fun selectBackupForRestore(onResult: (Result<File>) -> Unit) {
+        check(backupImportResult == null) { "A restore selection is already pending" }
+        backupImportResult = onResult
+        openBackupDocument.launch(arrayOf("application/zip", "application/octet-stream"))
     }
 
     companion object {

@@ -12,7 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object ExportManager {
-    private const val DATA_SCHEMA_VERSION = 9
+    private val DATA_SCHEMA_VERSION = ObservationDb.SCHEMA_VERSION
     private const val MANIFEST_SCHEMA = "apophenia.export.manifest.v1"
 
     /** Legacy plain-JSON route retained for compatibility. New UI routes use [prepareBundle]. */
@@ -33,6 +33,7 @@ object ExportManager {
         evidenceMaterializer: ExportEvidenceMaterializer = AndroidExportEvidenceMaterializer(context)
     ): PreparedExport {
         requireLiveDatabase(db)
+        require(tier != ExportTier.FULL_BACKUP) { "Full backups are built by BackupManager" }
         dir.mkdirs()
         val payloads = mutableListOf(
             ExportPayload(
@@ -45,6 +46,16 @@ object ExportManager {
             payloads += evidenceMaterializer.mediaPayloads(db.mediaAssets(includePurged = false, limit = 10_000))
             payloads += ExportInventoryMaterializer(context, db).payload()
         }
+        return preparePayloadBundle(tier, dir, nowMs, payloads)
+    }
+
+    internal fun preparePayloadBundle(
+        tier: ExportTier,
+        dir: File,
+        nowMs: Long,
+        payloads: MutableList<ExportPayload>
+    ): PreparedExport {
+        dir.mkdirs()
         validatePayloads(payloads)
         val entries = payloads.sortedBy { it.path }.map { payload ->
             ExportManifestEntry(

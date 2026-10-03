@@ -39,6 +39,8 @@ Evidence-mode state is local configuration rather than event evidence: active pr
 
 Demo mode reuses schema v9 in a separate `apophenia-demo.db`. Fixture observations use `origin=SIMULATION` plus versioned `external_event_id`; context and controls use `demo:` capture IDs and `demo_fixture=true` metadata. The separate database, rather than a nullable flag scattered through live queries, prevents synthetic rows from entering live cohorts, sessions, Omniprobe views, or exports.
 
+Schema v9 is also the raw-backup contract. A raw export checkpoints the WAL into one `.db` file and verifies SQLite integrity plus the required table set. A full backup pairs that database with portable protected evidence so device-bound AV/Tier-2 keys can be recreated on restore. See [SCHEMA.md](SCHEMA.md) for the table contract; a successful restore is software persistence evidence, not evidence that any physical channel captured correctly.
+
 Schema v5 adds scalar phone-context metrics for Wi-Fi presence, connectivity/network state, audio routing and volume, display/interaction state, power/thermal state, local time/solar phase, Wi-Fi Direct, and NFC adapter state. Identifying Wi-Fi values use only locally keyed BSSID hashes. Active playback package identity is marked `platform_restricted` because Android's public playback API exposes active configurations but not their owning UID/package.
 
 Schema v6 adds nullable `session_id` to scalar context. When a drive session is active, OBD values and concurrently captured phone/Bluetooth context carry the same ID. Session-stream rows use a unique `capture_id` per polling instant; event/control rows retain their event/control capture identity. Dense stream rows therefore remain distinguishable from independent human observations.

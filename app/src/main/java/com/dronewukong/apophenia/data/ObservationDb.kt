@@ -8,8 +8,8 @@ import com.dronewukong.apophenia.correlation.TimedCaptureValue
 
 data class ObservationInsertResult(val id: Long, val inserted: Boolean)
 
-class ObservationDb(context: Context, databaseName: String = "apophenia.db") : SQLiteOpenHelper(context, databaseName, null, 9) {
-    val isDemoDatabase: Boolean = databaseName == "apophenia-demo.db"
+class ObservationDb(context: Context, val databaseFileName: String = "apophenia.db") : SQLiteOpenHelper(context, databaseFileName, null, SCHEMA_VERSION) {
+    val isDemoDatabase: Boolean = databaseFileName == "apophenia-demo.db"
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -435,6 +435,23 @@ class ObservationDb(context: Context, databaseName: String = "apophenia.db") : S
         } finally {
             writableDatabase.endTransaction()
         }
+    }
+
+    fun replaceSensitiveContext(records: List<SensitiveContextRecord>) {
+        val database = writableDatabase
+        database.beginTransaction()
+        try {
+            database.delete("sensitive_context", null, null)
+            records.forEach { record ->
+                database.insertOrThrow("sensitive_context", null, ContentValues().apply {
+                    put("timestamp_ms", record.timestampMs); put("observation_id", record.observationId)
+                    put("is_control", if (record.isControl) 1 else 0); put("source", record.source)
+                    put("content_type", record.contentType); put("ciphertext_base64", record.ciphertextBase64)
+                    put("iv_base64", record.ivBase64); put("key_alias", record.keyAlias); put("capture_id", record.captureId)
+                })
+            }
+            database.setTransactionSuccessful()
+        } finally { database.endTransaction() }
     }
 
     fun insertSession(session: CaptureSession) {
@@ -955,5 +972,9 @@ class ObservationDb(context: Context, databaseName: String = "apophenia.db") : S
             sessionId=if(c.columnCount<=11||c.isNull(11))null else c.getString(11)
         )}
         return out
+    }
+
+    companion object {
+        const val SCHEMA_VERSION = 9
     }
 }

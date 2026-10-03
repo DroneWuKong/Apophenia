@@ -77,6 +77,9 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Hard live-export exclusion for demo databases; the Settings exporter continues to target the canonical live database while demo mode is active.
 - Data-only and full-evidence ZIP tiers with a mandatory per-file manifest preview, SHA-256 verification, raw-AV/Tier-2 flags, Android sharesheet release, and Storage Access Framework save-as.
 - Portable full-evidence materialization: retained audio becomes WAV, video becomes indexed JPEG frames, and Tier-2 records become an explicitly confirmed plaintext JSON payload. Device-bound Keystore keys are not exported.
+- Schema-v9 raw SQLite snapshots after a required FULL WAL checkpoint, with integrity/table checks and SHA-256 preview.
+- Full restorable backups containing the checkpointed store, nested portable protected evidence, RF IQ files, and independent manifests; restore verifies completeness before mutation, rekeys protected evidence, and rolls back failed applies.
+- Separately gated, manifest-previewed LAN push to a persisted Android document tree or literal private/link-local HTTP(S) endpoint. SMB/NFS uses the operator-selected DocumentsProvider; optional credentials are Keystore-encrypted, public/DNS destinations and redirects are refused, and no background retry or exactly-once claim is made.
 - First-class **Egress · bailed** and **Bad vibes · stayed** analysis cohorts, kept separate from ordinary label cohorts.
 - Binary hashed-device presence features for every observed BLE/Wi-Fi identity, with missing channel windows excluded rather than treated as absence.
 - Required multiple-comparisons scope on every result: total features tested, eligible features, Benjamini-Hochberg method, and explicit **indistinguishable from noise** labeling after correction.

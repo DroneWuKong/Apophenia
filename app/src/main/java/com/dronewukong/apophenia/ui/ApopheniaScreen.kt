@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,11 +37,17 @@ import com.dronewukong.apophenia.correlation.CaptureMatcher
 import com.dronewukong.apophenia.correlation.ConfounderSurfacer
 import com.dronewukong.apophenia.correlation.HypothesisEvaluator
 import com.dronewukong.apophenia.bluetooth.BluetoothContextProvider
+import com.dronewukong.apophenia.backup.BackupInspection
+import com.dronewukong.apophenia.backup.BackupManager
+import com.dronewukong.apophenia.backup.RawDatabaseSnapshot
 import com.dronewukong.apophenia.data.*
 import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.export.ExportManager
 import com.dronewukong.apophenia.export.ExportTier
 import com.dronewukong.apophenia.export.PreparedExport
+import com.dronewukong.apophenia.export.LanDestinationType
+import com.dronewukong.apophenia.export.LanExportManager
+import com.dronewukong.apophenia.export.LanExportSettings
 import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.media.AvRetentionSettings
@@ -107,6 +114,8 @@ private data class PendingVibeNote(
     val egress: Boolean,
     val timestampMs: Long
 )
+
+private data class PendingRestore(val bundle: File, val inspection: BackupInspection)
 
 private val appColors = darkColorScheme(
     background = Color(0xFF090B10),
@@ -904,8 +913,19 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var confirmCallAudio by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmFullExport by remember { mutableStateOf(false) }
+    var confirmFullBackup by remember { mutableStateOf(false) }
     var exportPreparing by remember { mutableStateOf(false) }
     var pendingExport by remember { mutableStateOf<PreparedExport?>(null) }
+    var pendingRawDatabase by remember { mutableStateOf<RawDatabaseSnapshot?>(null) }
+    var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
+    var restoreApplying by remember { mutableStateOf(false) }
+    val lanSettings = remember { LanExportSettings(activity) }
+    var lanEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_EXPORT_LAN)) }
+    var lanConfiguration by remember { mutableStateOf(lanSettings.configuration()) }
+    var lanEndpoint by remember { mutableStateOf(lanConfiguration.endpoint) }
+    var lanUsername by remember { mutableStateOf(lanConfiguration.username) }
+    var lanPassword by remember { mutableStateOf("") }
+    var lanPushBusy by remember { mutableStateOf(false) }
     var pendingMediaScrub by remember { mutableStateOf<Long?>(null) }
     var mediaAssets by remember { mutableStateOf<List<MediaAsset>>(emptyList()) }
     var purgeLedger by remember { mutableStateOf<List<PurgeLedgerEntry>>(emptyList()) }
@@ -937,6 +957,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         multicamEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_MULTICAM_CAPTURE)
         screenVideoEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_SCREENRECORD_CAPTURE)
         callAudioEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_CALL_AUDIO_CAPTURE)
+        lanEnabled = HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_EXPORT_LAN)
         gateRevision++
     }
 
@@ -992,6 +1013,77 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             exportPreparing = false
             result.onSuccess { pendingExport = it }
                 .onFailure { onMessage("Export preparation failed: ${it.message ?: "unknown error"}") }
+        }
+    }
+
+    fun prepareBackup() {
+        if (exportPreparing) return
+        exportPreparing = true
+        scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    BackupManager(activity).prepare(
+                        ObservationStore.liveRepository(activity).db(),
+                        File(activity.cacheDir, "exports")
+                    )
+                }
+            }
+            exportPreparing = false
+            result.onSuccess { pendingExport = it }
+                .onFailure { onMessage("Backup preparation failed: ${it.message ?: "unknown error"}") }
+        }
+    }
+
+    fun prepareRawDatabase() {
+        if (exportPreparing) return
+        exportPreparing = true
+        scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    BackupManager(activity).prepareRawDatabase(
+                        ObservationStore.liveRepository(activity).db(),
+                        File(activity.cacheDir, "exports")
+                    )
+                }
+            }
+            exportPreparing = false
+            result.onSuccess { pendingRawDatabase = it }
+                .onFailure { onMessage("SQLite snapshot failed: ${it.message ?: "unknown error"}") }
+        }
+    }
+
+    fun captureSessionActive(): Boolean = audioRingState.active || audioRingState.pendingEvents > 0 ||
+        videoRingState.active || videoRingState.pendingEvents > 0 || driveState.active ||
+        flightState.armed || controlLinkState.active
+
+    fun selectRestore() {
+        if (captureSessionActive()) {
+            onMessage("Disarm AV, drive, flight, and control-link sessions before selecting a restore")
+            return
+        }
+        activity.selectBackupForRestore { selected ->
+            selected.onFailure { onMessage(it.message ?: "Restore selection failed") }
+            selected.onSuccess { file ->
+                scope.launch {
+                    val inspection = runCatching { withContext(Dispatchers.IO) { BackupManager(activity).inspect(file) } }
+                    inspection.onSuccess { pendingRestore = PendingRestore(file, it) }
+                        .onFailure { file.delete(); onMessage("Restore refused: ${it.message ?: "invalid or corrupt backup"}") }
+                }
+            }
+        }
+    }
+
+    fun pushLan(prepared: PreparedExport) {
+        if (lanPushBusy) return
+        lanPushBusy = true
+        scope.launch {
+            val result = runCatching { withContext(Dispatchers.IO) { LanExportManager(activity).push(prepared.bundle) } }
+            lanPushBusy = false
+            result.onSuccess {
+                prepared.bundle.delete()
+                pendingExport = null
+                onMessage("LAN push completed · ${it.bytesWritten} bytes · explicit transfer only")
+            }.onFailure { onMessage("LAN push failed; prepared bundle kept locally: ${it.message ?: "unknown error"}") }
         }
     }
 
@@ -2257,10 +2349,72 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                     OutlinedButton(onClick = { confirmFullExport = true }, enabled = !exportPreparing, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.Inventory2, null); Spacer(Modifier.width(8.dp)); Text("Prepare full evidence package")
                     }
+                    OutlinedButton(onClick = ::prepareRawDatabase, enabled = !exportPreparing, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Storage, null); Spacer(Modifier.width(8.dp)); Text("Prepare raw SQLite snapshot")
+                    }
+                    OutlinedButton(onClick = {
+                        if (captureSessionActive()) onMessage("Disarm AV, drive, flight, and control-link sessions before building a full backup")
+                        else confirmFullBackup = true
+                    }, enabled = !exportPreparing, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Backup, null); Spacer(Modifier.width(8.dp)); Text("Prepare full restorable backup")
+                    }
+                    OutlinedButton(onClick = ::selectRestore, enabled = !exportPreparing && !restoreApplying && !demoMode.active, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Restore, null); Spacer(Modifier.width(8.dp)); Text(if (demoMode.active) "Restore unavailable in demo" else "Verify and restore backup")
+                    }
                     OutlinedButton(onClick = { confirmDelete = true }, enabled = !demoMode.active, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
                         Icon(Icons.Default.Delete, null); Spacer(Modifier.width(8.dp)); Text(if (demoMode.active) "Live delete unavailable in demo" else "Delete all local data")
                     }
                 }
+            }
+        }
+        item {
+            SettingsCard(Icons.Default.Lan, "Explicit LAN export", "Standard gate · one deliberate push to a configured local document provider or literal private HTTP(S) address. No background upload and no delivery guarantee.") {
+                GateSwitchRow(
+                    "LIVE_EXPORT_LAN",
+                    if (lanEnabled) "Enabled · ${lanConfiguration.summary}" else "Off · configured destination remains local",
+                    lanEnabled,
+                    onCheckedChange = { enabled ->
+                        lanEnabled = if (enabled) {
+                            HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_EXPORT_LAN, true, HardwareGates.ConsentProof.SingleConfirmation) == HardwareGates.AuthorizationResult.ENABLED
+                        } else {
+                            HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_EXPORT_LAN, false)
+                            false
+                        }
+                    }
+                )
+                OutlinedButton(onClick = {
+                    activity.chooseLanDocumentTree { success, resultMessage ->
+                        if (success) {
+                            lanConfiguration = lanSettings.configuration()
+                            lanEndpoint = ""
+                            lanUsername = ""
+                            lanPassword = ""
+                        }
+                        onMessage(resultMessage)
+                    }
+                }, modifier = Modifier.fillMaxWidth()) { Text("Choose LAN / SMB / NFS document folder") }
+                OutlinedTextField(
+                    value = lanEndpoint,
+                    onValueChange = { lanEndpoint = it },
+                    label = { Text("Private HTTP(S) endpoint") },
+                    supportingText = { Text("Literal loopback, RFC1918, link-local, or IPv6 ULA address only; no DNS names") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = lanUsername, onValueChange = { lanUsername = it }, label = { Text("Username") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = lanPassword, onValueChange = { lanPassword = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.weight(1f))
+                }
+                OutlinedButton(onClick = {
+                    runCatching { lanSettings.saveHttp(lanEndpoint, lanUsername, lanPassword) }
+                        .onSuccess {
+                            lanConfiguration = lanSettings.configuration()
+                            lanPassword = ""
+                            onMessage("Private HTTP(S) LAN destination saved; credentials are Keystore-encrypted")
+                        }
+                        .onFailure { onMessage("LAN configuration rejected: ${it.message ?: "invalid endpoint"}") }
+                }, modifier = Modifier.fillMaxWidth()) { Text("Save private HTTP(S) destination") }
+                Text("SMB/NFS transport is supplied by the Android DocumentsProvider you select. Plain HTTP and Basic credentials are visible to that local network; prefer HTTPS where your endpoint supports it. Redirects are refused, and a success response confirms only that endpoint response, not exactly-once delivery.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
             }
         }
     }
@@ -2281,6 +2435,16 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         )
     }
 
+    if (confirmFullBackup) {
+        AlertDialog(
+            onDismissRequest = { confirmFullBackup = false },
+            title = { Text("Build a full restorable backup?") },
+            text = { Text("Confirmation 1 of 2. The ZIP contains a checkpointed raw SQLite database, portable plaintext copies of retained AV and Tier-2 contents, RF IQ files, and SHA-256 manifests. The backup is integrity-checked, not encrypted as a whole. No destination receives it until you review the manifest.") },
+            confirmButton = { Button(onClick = { confirmFullBackup = false; prepareBackup() }) { Text("Build verified backup") } },
+            dismissButton = { TextButton(onClick = { confirmFullBackup = false }) { Text("Cancel") } }
+        )
+    }
+
     pendingExport?.let { prepared ->
         val manifest = prepared.manifest
         AlertDialog(
@@ -2291,8 +2455,8 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                     Text("${manifest.entries.size} payload files · ${formatBytes(manifest.totalBytes)} payload · ${formatBytes(prepared.bundle.length())} ZIP", fontWeight = FontWeight.SemiBold)
                     Text("Raw AV: ${if (manifest.containsRawAv) "YES" else "no"} · Tier-2 contents: ${if (manifest.containsTier2Contents) "YES" else "no"}", color = if (manifest.containsRawAv || manifest.containsTier2Contents) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary)
                     Text("Bundle SHA-256\n${prepared.bundleSha256}", fontSize = 11.sp)
-                    if (manifest.tier == ExportTier.FULL_EVIDENCE) {
-                        Text("Confirmation 2 of 2: choosing Share or Save below explicitly releases this plaintext evidence package from the app boundary.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                    if (manifest.tier != ExportTier.DATA_ONLY) {
+                        Text("Confirmation 2 of 2: choosing Share, Save, or Push LAN below explicitly releases this plaintext ${manifest.tier.displayName.lowercase()} from the app boundary.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                     } else {
                         Text("Data-only excludes raw AV and Tier-2 contents. Hashed identifiers remain exactly as stored.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -2308,7 +2472,13 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 }
             },
             confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(horizontalAlignment = Alignment.End) {
+                    if (lanEnabled && lanConfiguration.type != LanDestinationType.NONE) {
+                        TextButton(onClick = { pushLan(prepared) }, enabled = !lanPushBusy) {
+                            Text(if (lanPushBusy) "Pushing…" else "Push LAN")
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = {
                         activity.saveExportWithSaf(prepared.bundle) { success, resultMessage ->
                             if (success) {
@@ -2323,9 +2493,84 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                         pendingExport = null
                         onMessage("Opened Android sharesheet for the verified ${manifest.tier.displayName.lowercase()} bundle")
                     }) { Text("Share") }
+                    }
                 }
             },
             dismissButton = { TextButton(onClick = { prepared.bundle.delete(); pendingExport = null }) { Text("Cancel + delete") } }
+        )
+    }
+
+    pendingRawDatabase?.let { snapshot ->
+        AlertDialog(
+            onDismissRequest = { snapshot.file.delete(); pendingRawDatabase = null },
+            title = { Text("Raw SQLite preview") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${snapshot.file.name} · ${formatBytes(snapshot.file.length())}", fontWeight = FontWeight.SemiBold)
+                    Text("schema_version ${snapshot.schemaVersion} · ${snapshot.observationCount} observations · ${snapshot.contextSampleCount} context samples")
+                    Text("SHA-256\n${snapshot.sha256}", fontSize = 11.sp)
+                    Text("The WAL was checkpointed with FULL and the copied database passed SQLite integrity_check. This raw database can contain sensitive stored ciphertext and identifiers as stored; it does not include portable AV files.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        activity.saveExportWithSaf(snapshot.file) { success, resultMessage ->
+                            if (success) { snapshot.file.delete(); pendingRawDatabase = null }
+                            onMessage(resultMessage)
+                        }
+                    }) { Text("Save as…") }
+                    Button(onClick = {
+                        activity.shareExport(snapshot.file)
+                        pendingRawDatabase = null
+                        onMessage("Opened Android sharesheet for the verified SQLite snapshot")
+                    }) { Text("Share") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { snapshot.file.delete(); pendingRawDatabase = null }) { Text("Cancel + delete") } }
+        )
+    }
+
+    pendingRestore?.let { selected ->
+        val inspection = selected.inspection
+        AlertDialog(
+            onDismissRequest = { if (!restoreApplying) { selected.bundle.delete(); pendingRestore = null } },
+            title = { Text("Restore verified backup?") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("The bundle and every nested payload passed declared SHA-256 hashes, SQLite integrity_check, schema checks, and protected-evidence completeness checks before this confirmation.")
+                    Text("schema ${inspection.schemaVersion} · ${inspection.observationCount} observations · ${inspection.contextSampleCount} context samples")
+                    Text("${inspection.activeMediaCount} active AV streams · ${inspection.sensitiveRecordCount} Tier-2 rows · ${inspection.rfIqFileCount} RF IQ files")
+                    Text("This replaces the live database and retained AV/RF files. Portable AV and Tier-2 data are re-encrypted under fresh device-local keys. If any apply step fails, the previous local store is rolled back.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = !restoreApplying,
+                    onClick = {
+                        if (captureSessionActive()) {
+                            onMessage("Restore stopped: a capture session became active")
+                            return@Button
+                        }
+                        restoreApplying = true
+                        scope.launch {
+                            val result = runCatching {
+                                withContext(Dispatchers.IO) {
+                                    BackupManager(activity).restore(ObservationStore.liveRepository(activity).db(), selected.bundle)
+                                }
+                            }
+                            restoreApplying = false
+                            result.onSuccess {
+                                selected.bundle.delete()
+                                pendingRestore = null
+                                onMessage("Restore complete · ${it.observationCount} observations · ${it.restoredMediaCount} AV streams")
+                                activity.recreate()
+                            }.onFailure { onMessage("Restore failed and prior store was recovered: ${it.message ?: "unknown error"}") }
+                        }
+                    }
+                ) { Text(if (restoreApplying) "Restoring…" else "Replace live store") }
+            },
+            dismissButton = { TextButton(enabled = !restoreApplying, onClick = { selected.bundle.delete(); pendingRestore = null }) { Text("Cancel + delete import") } }
         )
     }
 

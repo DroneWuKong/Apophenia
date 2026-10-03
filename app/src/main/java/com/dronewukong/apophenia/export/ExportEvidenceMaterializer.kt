@@ -100,7 +100,7 @@ class AndroidExportEvidenceMaterializer(context: Context) : ExportEvidenceMateri
                     frames.forEachIndexed { number, frame ->
                         val name = "${number.toString().padStart(4, '0')}-${safeToken(frame.name)}"
                         add(ExportPayload("$base/$name", frame.jpeg, containsRawAv = true))
-                        index.put(JSONObject().put("file", name).put("phase", frame.phase))
+                        index.put(JSONObject().put("file", name).put("sourceFile", frame.name).put("phase", frame.phase).put("timestampMs", frame.timestampMs))
                     }
                     add(
                         ExportPayload(

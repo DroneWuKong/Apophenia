@@ -20,10 +20,22 @@ import javax.crypto.SecretKey
 import org.json.JSONArray
 import org.json.JSONObject
 
-class VideoArtifactStore(private val context: Context) {
+class VideoArtifactStore(
+    private val context: Context,
+    private val retention: MediaRetentionManager = MediaRetentionManager(context)
+) {
     data class Artifact(val fileId: String, val ciphertextSha256: String, val retained: Boolean)
 
-    fun persist(eventId: Long, eventAtMs: Long, streamId: String, lensTag: String, pre: List<VideoFrame>, post: List<VideoFrame>, retentionDays: Int = AvRetentionSettings.days(context)): Artifact {
+    fun persist(
+        eventId: Long,
+        eventAtMs: Long,
+        streamId: String,
+        lensTag: String,
+        pre: List<VideoFrame>,
+        post: List<VideoFrame>,
+        retentionDays: Int = AvRetentionSettings.days(context),
+        absoluteRetentionUntilMs: Long? = null
+    ): Artifact {
         val directory = File(context.filesDir, "av/video").apply { mkdirs() }
         val safeStream = token(streamId)
         val fileId = "video-$eventId-$eventAtMs-$safeStream"
@@ -38,7 +50,7 @@ class VideoArtifactStore(private val context: Context) {
         check(temporary.renameTo(target)) { "Could not commit encrypted video stream" }
         val sha = MessageDigest.getInstance("SHA-256").digest(encrypted.ciphertext).joinToString("") { "%02x".format(it) }
         val manifestFile = File(directory, "$fileId.json")
-        val retentionUntilMs = eventAtMs + retentionDays * 86_400_000L
+        val retentionUntilMs = absoluteRetentionUntilMs ?: (eventAtMs + retentionDays * 86_400_000L)
         manifestFile.writeText(
             JSONObject().put("schema", "apophenia.video.mjpeg.v1")
                 .put("event_id", eventId).put("event_at_ms", eventAtMs)
@@ -49,7 +61,7 @@ class VideoArtifactStore(private val context: Context) {
                 .put("key_alias", keyAlias).put("ciphertext_sha256", sha)
                 .put("retention_until_ms", retentionUntilMs).toString(2)
         )
-        val retained = MediaRetentionManager(context).register(
+        val retained = retention.register(
             MediaAsset(
                 id = fileId, observationId = eventId, mediaType = MediaType.VIDEO, streamId = safeStream,
                 createdAtMs = eventAtMs, retentionUntilMs = retentionUntilMs,

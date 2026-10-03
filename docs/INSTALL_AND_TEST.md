@@ -87,8 +87,11 @@ For a real phone or Garmin watch, continue with [PHYSICAL_ACCEPTANCE.md](PHYSICA
 - Prepare **Full evidence package** only with synthetic or disposable test content. Confirm the first warning, then verify the second preview says whether retained AV and Tier-2 rows are actually present. Purged media must not reappear.
 - Test **Save as…** to an Android document folder and, where available, an attached USB/OTG provider. Reopen the ZIP and compare its manifest. Test **Share** only to a destination you control.
 - The full package contains plaintext portable evidence. Do not attach it to a public issue. Device-bound Keystore keys are not exported.
+- Prepare **Raw SQLite snapshot**. Confirm schema version 9, row counts, byte size, and SHA-256 in the preview; save the `.db`, open it with a local SQLite tool, and require `PRAGMA integrity_check` to return `ok`. The checkpointed snapshot does not require a companion WAL file and does not contain raw AV/RF files.
+- Prepare **Full restorable backup** using disposable content. Verify the outer ZIP manifest, nested full-evidence manifest, `database/schema.json`, and raw SQLite integrity. Add a new disposable event, disarm every capture service, restore the backup, and confirm the later event disappears while backed-up rows and protected assets return. Corrupt one copied payload and confirm restore refuses it without changing the current live store.
+- Enable `LIVE_EXPORT_LAN` with its switch. Configure either a document tree from a controlled SMB/NFS-capable Android DocumentsProvider or a literal private/link-local HTTP(S) fixture. From the manifest preview, press **Push LAN** once and compare received bytes/hash. Confirm a hostname, public address, redirect, gate-off state, or revoked document permission is refused. This is bench software/transport evidence, not proof of destination durability or exactly-once delivery.
 - Test **Delete all local data** only after saving anything you want to keep.
-- Expected: delete-all removes active encrypted AV files and their Keystore keys before clearing SQLite. This is destructive and is not a substitute for the later verified-backup/EJECT flow.
+- Expected: delete-all removes active encrypted AV files and their Keystore keys before clearing SQLite. This is destructive and is not a substitute for the separate EJECT flow.
 
 See [EXPORT.md](EXPORT.md) for the exact tier, manifest, route, and current implementation boundaries.
 

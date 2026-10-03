@@ -33,7 +33,10 @@ object AudioArtifactCrypto {
     }
 }
 
-class AudioArtifactStore(private val context: Context) {
+class AudioArtifactStore(
+    private val context: Context,
+    private val retention: MediaRetentionManager = MediaRetentionManager(context)
+) {
     data class Artifact(val fileId: String, val keyAlias: String, val ciphertextSha256: String, val retained: Boolean)
 
     fun persist(
@@ -42,7 +45,8 @@ class AudioArtifactStore(private val context: Context) {
         sampleRateHz: Int,
         prePcm: ByteArray,
         postPcm: ByteArray,
-        retentionDays: Int = AvRetentionSettings.days(context)
+        retentionDays: Int = AvRetentionSettings.days(context),
+        absoluteRetentionUntilMs: Long? = null
     ): Artifact {
         val directory = File(context.filesDir, "av/audio").apply { mkdirs() }
         val fileId = "audio-$eventId-$eventAtMs"
@@ -60,7 +64,7 @@ class AudioArtifactStore(private val context: Context) {
         check(temporary.renameTo(ciphertextFile)) { "Could not commit encrypted audio artifact" }
         val sha = MessageDigest.getInstance("SHA-256").digest(encrypted.ciphertext).joinToString("") { "%02x".format(it) }
         val manifestFile = File(directory, "$fileId.json")
-        val retentionUntilMs = eventAtMs + retentionDays * 86_400_000L
+        val retentionUntilMs = absoluteRetentionUntilMs ?: (eventAtMs + retentionDays * 86_400_000L)
         manifestFile.writeText(
             JSONObject()
                 .put("schema", "apophenia.audio.pcm.v1")
@@ -80,7 +84,7 @@ class AudioArtifactStore(private val context: Context) {
                 .toString(2)
         )
         combined.fill(0)
-        val retained = MediaRetentionManager(context).register(
+        val retained = retention.register(
             MediaAsset(
                 id = fileId, observationId = eventId, mediaType = MediaType.AUDIO, streamId = "microphone",
                 createdAtMs = eventAtMs, retentionUntilMs = retentionUntilMs,

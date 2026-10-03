@@ -68,7 +68,7 @@ The app explains what works without a prompt and lets you review optional access
 - One-tap graded VIBE capture plus a distinct red **FUCK THIS, I'M OUT** egress event in the app and widget
 - Quick logging for observations, headache, sinus/congestion, light, sound, body sensations, coincidences, hypotheses, and custom entries
 - A home-screen widget and Quick Settings tile
-- Local SQLite storage plus manifest-previewed data-only/full-evidence ZIP export through the Android sharesheet or save-as chooser
+- Local SQLite storage plus manifest-previewed data-only/full-evidence ZIP export, checkpointed raw `.db` snapshots, verified restorable backups, and a separately gated one-shot LAN route
 - A user-enabled rolling black box with 30 minutes of pre-event context and a labeled post-event window
 - Random control captures that use the same pipeline as event captures, then match one-to-one by local time block and weekday/weekend
 - Optional neutral check-in prompts that let you record “nothing unusual” through the control pipeline
@@ -116,7 +116,7 @@ For recorder survival and real Garmin delivery, use the [48-hour physical accept
 | Area | What has actually been verified |
 | --- | --- |
 | Android | JDK 17 build, unit tests, lint, and debug APK pass locally and in GitHub Actions |
-| UI | Seven Jetpack Compose smoke tests pass on an API 36 emulator, including demo isolation, Omniprobe, and export-manifest preview |
+| UI | Eight Jetpack Compose smoke tests pass on an API 36 emulator, including demo isolation, Omniprobe, export-manifest preview, and raw-SQLite preview |
 | Permissions | Location, notification, weather, and Health Connect flows were exercised in an emulator |
 | Garmin | All three Epix Pro targets compile with Connect IQ SDK 9.2.0 |
 | Garmin queue | Six native Monkey C tests pass in the 47 mm simulator |
@@ -234,6 +234,8 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Omniprobe event inventory](docs/OMNIPROBE.md)
 - [TOTAL_EVIDENCE and session presets](docs/TOTAL_EVIDENCE.md)
 - [Isolated demo mode and fixtures](docs/DEMO_MODE.md)
+- [Export, raw backup/restore, and explicit LAN routes](docs/EXPORT.md)
+- [SQLite schema contract](docs/SCHEMA.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)
