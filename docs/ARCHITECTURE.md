@@ -71,6 +71,10 @@ UI / widget / tile / external intent / Garmin
 | `MavlinkParser` / `MavlinkDecoder` | Streaming MAVLink 1/2 framing, CRC validation, and supported telemetry/event mapping |
 | `MavlinkSessionManager` | First-heartbeat airframe binding, hashed sysid session lifecycle, stream persistence, sequence gaps, and event/control snapshots |
 | `FlightSessionService` | Persistent foreground indicator and owner for UDP, TCP, USB/SiK, or simulated transport lifetime |
+| `CrsfLinkParser` / `GhstLinkParser` | CRC-8/DVB-S2 serial framing and link-stat mapping from the existing proven protocol paths |
+| `ControlLinkManager` / `ControlLinkService` | Latest-value snapshots, flight-session joins, and persistent USB capture ownership |
+| `FieldKitContextProvider` | Bounded event/control UDP window and hashed detector snapshot mapping |
+| `TakContextProvider` | Bounded CoT multicast window, keyed own-UID filtering, and separately gated full-visible traffic |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -123,6 +127,10 @@ The portable APK cannot directly link the optional `android.car` library on ordi
 ### MAVLink flight sessions
 
 An explicitly started foreground service owns one UDP listener, TCP client, USB bulk/CDC input, or deterministic simulation stream. The streaming parser accepts fragmented MAVLink 1/2 frames only after message-specific CRC validation. A durable session begins on the first valid nonzero-system heartbeat, whose raw sysid is hashed before persistence; frames from other systems are excluded. Scalar stream rows, exact `STATUSTEXT`, mode/failsafe transitions, component sequence gaps, and event/control telemetry-age snapshots share that flight-session timeline. See [MAVLINK.md](MAVLINK.md).
+
+### Control link, Field-Kit, and TAK
+
+CRSF/GHST is an operator-started foreground USB stream. Its latest link values and telemetry age can join an active flight session. Field-Kit and TAK are event/control-contingent UDP windows: their sockets exist only for a short bounded receive period. Field-Kit JSON maps owned detector thresholds/triggers after device-ID hashing. TAK CoT defaults to a keyed own-UID comparison; its Tier-3 full gate expands the filter only to traffic visible on the configured connection. See [UAS_LINKS_FIELD_KIT_TAK.md](UAS_LINKS_FIELD_KIT_TAK.md).
 
 ## Statistical boundary
 

@@ -14,7 +14,8 @@ import javax.crypto.spec.SecretKeySpec
 enum class DeviceIdentifierKind {
     MAC_ADDRESS,
     WIFI_BSSID,
-    ADAPTER_SYSID
+    ADAPTER_SYSID,
+    TAK_UID
 }
 
 data class IdentifierHashKey(
@@ -47,7 +48,8 @@ class DeviceIdentifierHasher(
     private fun normalize(kind: DeviceIdentifierKind, rawIdentifier: String): String = when (kind) {
         DeviceIdentifierKind.MAC_ADDRESS,
         DeviceIdentifierKind.WIFI_BSSID -> rawIdentifier.filter(Char::isLetterOrDigit).uppercase()
-        DeviceIdentifierKind.ADAPTER_SYSID -> rawIdentifier.trim().lowercase()
+        DeviceIdentifierKind.ADAPTER_SYSID,
+        DeviceIdentifierKind.TAK_UID -> rawIdentifier.trim().lowercase()
     }
 
     companion object {

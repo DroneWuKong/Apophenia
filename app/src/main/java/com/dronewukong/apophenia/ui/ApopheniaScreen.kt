@@ -48,6 +48,13 @@ import com.dronewukong.apophenia.mavlink.FlightSessionService
 import com.dronewukong.apophenia.mavlink.MavlinkEndpoint
 import com.dronewukong.apophenia.mavlink.MavlinkSessionManager
 import com.dronewukong.apophenia.mavlink.UsbMavlinkDevice
+import com.dronewukong.apophenia.control.ControlLinkManager
+import com.dronewukong.apophenia.control.ControlLinkProtocol
+import com.dronewukong.apophenia.control.ControlLinkService
+import com.dronewukong.apophenia.fieldkit.FieldKitContextProvider
+import com.dronewukong.apophenia.fieldkit.FieldKitSettings
+import com.dronewukong.apophenia.tak.TakContextProvider
+import com.dronewukong.apophenia.tak.TakSettings
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -662,6 +669,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     val garminBridge by GarminBridge.state.collectAsState()
     val driveState by DriveSessionManager.state.collectAsState()
     val flightState by MavlinkSessionManager.state.collectAsState()
+    val controlLinkState by ControlLinkManager.state.collectAsState()
     var rollingSummary by remember { mutableStateOf("No samples yet") }
     var healthStatus by remember { mutableStateOf("Checking…") }
     var locationAllowed by remember { mutableStateOf(activity.hasLocationPermission()) }
@@ -706,6 +714,19 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var mavlinkPort by remember { mutableStateOf("14550") }
     var usbMavlinkDevices by remember { mutableStateOf<List<UsbMavlinkDevice>>(emptyList()) }
     var showUsbMavlinkPicker by remember { mutableStateOf(false) }
+    var controlLinkEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_CRSF_GHST_CAPTURE)) }
+    var selectedControlProtocol by remember { mutableStateOf(ControlLinkProtocol.CRSF) }
+    var controlLinkBaud by remember { mutableStateOf(ControlLinkProtocol.CRSF.defaultBaud.toString()) }
+    var usbControlDevices by remember { mutableStateOf<List<UsbMavlinkDevice>>(emptyList()) }
+    var showUsbControlPicker by remember { mutableStateOf(false) }
+    var fieldKitEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_FIELD_KIT_CAPTURE)) }
+    var fieldKitPort by remember { mutableStateOf(FieldKitSettings.port(activity).toString()) }
+    var takEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_TAK_CAPTURE)) }
+    var takFullEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_TAK_CAPTURE_FULL)) }
+    var takOwnUid by remember { mutableStateOf("") }
+    var takGroup by remember { mutableStateOf(TakSettings.group(activity)) }
+    var takPort by remember { mutableStateOf(TakSettings.port(activity).toString()) }
+    var confirmTakFull by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -870,6 +891,18 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         usbMavlinkDevices = activity.usbMavlinkDevices()
         if (usbMavlinkDevices.isEmpty()) onMessage("No attached USB serial/SiK device found")
         else showUsbMavlinkPicker = true
+    }
+
+    fun openUsbControlPicker() {
+        if (!notificationsAllowed) {
+            activity.requestNotificationPermission { granted, message ->
+                notificationsAllowed = granted; onMessage(message); if (granted) openUsbControlPicker()
+            }
+            return
+        }
+        usbControlDevices = activity.usbMavlinkDevices()
+        if (usbControlDevices.isEmpty()) onMessage("No attached USB control-link device found")
+        else showUsbControlPicker = true
     }
 
     LaunchedEffect(permissionRevision) { refreshPermissionState() }
@@ -1397,6 +1430,134 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
         }
 
+        item { SectionLabel("Control link, Field-Kit + TAK") }
+        item {
+            SettingsCard(Icons.Default.SettingsInputAntenna, "CRSF / GHST link telemetry", "CRC-validated USB serial link statistics from the operator's own CRSF/ELRS or GHST/IRONghost path.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = controlLinkEnabled, onCheckedChange = { enabled ->
+                        controlLinkEnabled = if (!enabled) {
+                            if (controlLinkState.active) ControlLinkService.stop(activity)
+                            HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_CRSF_GHST_CAPTURE, false); false
+                        } else HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_CRSF_GHST_CAPTURE, true, HardwareGates.ConsentProof.SingleConfirmation) == HardwareGates.AuthorizationResult.ENABLED
+                    })
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (controlLinkState.active) "${controlLinkState.protocol?.displayName} capture active" else if (controlLinkEnabled) "Armed · no serial input" else "Off", fontWeight = FontWeight.SemiBold)
+                        Text(controlLinkState.lastError ?: if (controlLinkState.active) "${controlLinkState.frameCount} link frames · ${controlLinkState.endpointLabel}" else "No raw USB identity is persisted", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                }
+                if (controlLinkState.active) {
+                    Button(onClick = { ControlLinkService.stop(activity) }, modifier = Modifier.fillMaxWidth()) { Text("End control-link capture") }
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ControlLinkProtocol.entries.forEach { protocol ->
+                            FilterChip(
+                                selected = selectedControlProtocol == protocol,
+                                onClick = { selectedControlProtocol = protocol; controlLinkBaud = protocol.defaultBaud.toString() },
+                                label = { Text(protocol.name) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    if (simulation) {
+                        OutlinedButton(
+                            onClick = { ControlLinkService.start(activity, selectedControlProtocol, -1, selectedControlProtocol.defaultBaud, simulation = true) },
+                            enabled = controlLinkEnabled,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Start simulated ${selectedControlProtocol.name}") }
+                    } else {
+                        OutlinedTextField(
+                            value = controlLinkBaud,
+                            onValueChange = { controlLinkBaud = it.filter(Char::isDigit).take(7) },
+                            label = { Text("Serial baud") },
+                            supportingText = { Text("CRSF mirror commonly 115200; GHST hardware may expose 115200 or 400000") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedButton(onClick = ::openUsbControlPicker, enabled = controlLinkEnabled, modifier = Modifier.fillMaxWidth()) { Text("Choose USB control-link device") }
+                    }
+                }
+                Text("CRSF supplies directional RSSI/LQ/SNR. The proven GHST link-stat frame supplies receiver-reported uplink statistics; unavailable downlink fields are recorded as unavailable rather than mirrored or invented.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
+        item {
+            SettingsCard(Icons.Default.Sensors, "Owned Field-Kit detector", "Listens only during event/control windows for bounded JSON datagrams from your ESP32 detector hardware.") {
+                GateSwitchRow(
+                    title = "Field-Kit window capture",
+                    detail = "Band RSSI, configured thresholds, threshold crossings, and trigger events; device ID is hashed.",
+                    enabled = fieldKitEnabled,
+                    onCheckedChange = { enabled ->
+                        fieldKitEnabled = if (enabled) HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_FIELD_KIT_CAPTURE, true, HardwareGates.ConsentProof.SingleConfirmation) == HardwareGates.AuthorizationResult.ENABLED
+                        else { HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_FIELD_KIT_CAPTURE, false); false }
+                    }
+                )
+                OutlinedTextField(value = fieldKitPort, onValueChange = { fieldKitPort = it.filter(Char::isDigit).take(5) }, label = { Text("Field-Kit UDP port") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        val port = fieldKitPort.toIntOrNull()
+                        if (port == null || port !in 1..65535) onMessage("Enter a valid Field-Kit port")
+                        else { FieldKitSettings.setPort(activity, port); onMessage("Field-Kit window saved on UDP $port") }
+                    }, modifier = Modifier.weight(1f)) { Text("Save") }
+                    OutlinedButton(onClick = {
+                        scope.launch {
+                            val rows = withContext(Dispatchers.IO) { FieldKitContextProvider(activity).collect(null, false) }
+                            onMessage(if (rows.isEmpty()) "No Field-Kit datagram in the bounded window" else "Field-Kit snapshot · ${rows.size} metrics")
+                        }
+                    }, enabled = fieldKitEnabled, modifier = Modifier.weight(1f)) { Text("Test window") }
+                }
+            }
+        }
+        item {
+            SettingsCard(Icons.Default.Map, "TAK visible-track context", "Reads CoT traffic visible on your configured ATAK/TAK multicast connection at event/control windows.") {
+                GateSwitchRow(
+                    title = "Own asset track",
+                    detail = "Default: only the configured own UID. UID is stored only as a local keyed hash; callsign text is not persisted.",
+                    enabled = takEnabled,
+                    onCheckedChange = { enabled ->
+                        takEnabled = if (enabled) HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_TAK_CAPTURE, true, HardwareGates.ConsentProof.SingleConfirmation) == HardwareGates.AuthorizationResult.ENABLED
+                        else { HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_TAK_CAPTURE, false); false }
+                    }
+                )
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Full visible CoT traffic", fontWeight = FontWeight.SemiBold)
+                        Text("Tier 3 · traffic visible on your own connection; every UID remains hashed", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                    Switch(checked = takFullEnabled, enabled = takEnabled, onCheckedChange = { enabled ->
+                        if (!enabled) { HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_TAK_CAPTURE_FULL, false); takFullEnabled = false }
+                        else confirmTakFull = true
+                    })
+                }
+                OutlinedTextField(
+                    value = takOwnUid,
+                    onValueChange = { takOwnUid = it },
+                    label = { Text("Own CoT UID${if (TakSettings.ownUidConfigured(activity)) " · hash configured" else ""}") },
+                    supportingText = { Text("Enter only to set/replace; the raw UID is hashed before preferences") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = takGroup, onValueChange = { takGroup = it.trim() }, label = { Text("Multicast group") }, singleLine = true, modifier = Modifier.weight(1.4f))
+                    OutlinedTextField(value = takPort, onValueChange = { takPort = it.filter(Char::isDigit).take(5) }, label = { Text("Port") }, singleLine = true, modifier = Modifier.weight(0.7f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        val port = takPort.toIntOrNull()
+                        runCatching { TakSettings.save(activity, takOwnUid, takGroup, port ?: -1) }
+                            .onSuccess { takOwnUid = ""; onMessage("TAK filter and multicast settings saved") }
+                            .onFailure { onMessage("Enter a nonblank group and valid TAK port") }
+                    }, modifier = Modifier.weight(1f)) { Text("Save") }
+                    OutlinedButton(onClick = {
+                        scope.launch {
+                            val rows = withContext(Dispatchers.IO) { TakContextProvider(activity).collect(null, false) }
+                            val tracks = rows.map { it.metadata.substringAfter("uid_hash=", "").substringBefore(';') }.filter(String::isNotBlank).distinct().size
+                            onMessage(if (rows.isEmpty()) "No eligible CoT track in the bounded window" else "TAK snapshot · $tracks track(s) · ${rows.size} metrics")
+                        }
+                    }, enabled = takEnabled, modifier = Modifier.weight(1f)) { Text("Test window") }
+                }
+            }
+        }
+
         item { SectionLabel("Watch") }
         item {
             SettingsCard(Icons.Default.Watch, "Garmin Epix Pro (Gen 2)", garminBridge.deviceText) {
@@ -1593,6 +1754,50 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             },
             confirmButton = {},
             dismissButton = { TextButton(onClick = { showUsbMavlinkPicker = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (showUsbControlPicker) {
+        AlertDialog(
+            onDismissRequest = { showUsbControlPicker = false },
+            title = { Text("Choose ${selectedControlProtocol.displayName} USB device") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    usbControlDevices.forEach { device ->
+                        TextButton(onClick = {
+                            showUsbControlPicker = false
+                            val baud = controlLinkBaud.toIntOrNull()
+                            if (baud == null || baud !in 1_200..2_000_000) { onMessage("Enter a valid serial baud"); return@TextButton }
+                            activity.requestUsbMavlinkPermission(device.deviceId) { granted, message ->
+                                onMessage(message)
+                                if (granted) ControlLinkService.start(activity, selectedControlProtocol, device.deviceId, baud)
+                            }
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(device.displayName, fontWeight = FontWeight.SemiBold)
+                                Text("${selectedControlProtocol.displayName} · $controlLinkBaud baud", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showUsbControlPicker = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (confirmTakFull) {
+        AlertDialog(
+            onDismissRequest = { confirmTakFull = false },
+            title = { Text("Enable full visible TAK traffic?") },
+            text = { Text("At event and control windows, Apophenia will ingest every CoT track visible on your configured connection, label it visible-on-your-connection, hash each UID, and omit callsign text. This does not grant network access or bypass TAK controls.") },
+            confirmButton = {
+                Button(onClick = {
+                    takFullEnabled = HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_TAK_CAPTURE_FULL, true, HardwareGates.ConsentProof.CapabilityConditionalConfirmation) == HardwareGates.AuthorizationResult.ENABLED
+                    confirmTakFull = false
+                }) { Text("Enable full traffic") }
+            },
+            dismissButton = { TextButton(onClick = { confirmTakFull = false }) { Text("Cancel") } }
         )
     }
 }

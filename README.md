@@ -83,6 +83,7 @@ The app explains what works without a prompt and lets you review optional access
 - User-started OBD-II `DRIVE_SESSION` capture through a paired ELM327-style Bluetooth adapter, with a persistent live indicator and hashed adapter identity
 - Native Android Automotive OS property snapshots with explicit gaps on projection-only hosts
 - User-started MAVLink `FLIGHT_SESSION` capture over UDP, TCP, or class-compliant USB/SiK, with hashed airframe identity, persistent capture indication, exact `STATUSTEXT`, and explicit telemetry age/sequence gaps
+- User-started CRC-validated CRSF/GHST link statistics, bounded owned Field-Kit detector snapshots, and TAK own-track context with a separate full-visible-traffic gate
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 
@@ -216,6 +217,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [OBD-II drive sessions](docs/VEHICLE_OBD.md)
 - [Native Automotive properties](docs/VEHICLE_AUTOMOTIVE.md)
 - [MAVLink flight sessions](docs/MAVLINK.md)
+- [Control-link, Field-Kit, and TAK context](docs/UAS_LINKS_FIELD_KIT_TAK.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)

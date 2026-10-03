@@ -42,6 +42,9 @@ Open **Settings**.
 - **OBD-II drive session:** pair an ELM327-style adapter in Android first, enable the vehicle gate, choose the paired adapter, and confirm the persistent drive-capture notification. Do this parked and treat the first physical run as bench validation; simulator PID/DTC results are not a hardware claim.
 - **Native Automotive properties:** on Automotive OS, enable the separate property gate and log a parked event. On a phone, Android Auto, or CarPlay projection-only host, expected behavior is an armed-but-unavailable gap—not fabricated vehicle values.
 - **MAVLink flight session:** enable the gate, then deliberately start UDP, TCP, or an attached USB/SiK device. Expected: a persistent flight-capture notification appears immediately; a durable session begins only after a valid airframe heartbeat. SIMULATION verifies software flow only. Keep the aircraft disarmed for first physical transport/telemetry checks and record link/airframe testing separately from build evidence.
+- **CRSF/GHST:** enable the control-link gate, select protocol/baud and the attached radio/transmitter USB device. Expected: a persistent indicator and CRC-valid link frames only. Compare values with the source display before trusting units.
+- **Field-Kit:** enable the gate, configure the owned ESP32's UDP port, then use **Test window** while it broadcasts. Expected: a bounded snapshot or a specific no-datagram result; the listener is not continuous.
+- **TAK:** enter the own CoT UID once (stored only as a hash), configure the multicast group/port, and test. Default results must be own-track only. The separate full-visible-traffic switch requires another confirmation and must label other tracks as visible on your connection.
 
 Basic observation logging must continue when every optional permission is denied.
 

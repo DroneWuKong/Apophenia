@@ -49,6 +49,12 @@ Native Automotive OS rows use the same scalar context table and active drive-ses
 
 For MAVLink, one transport plus the first valid airframe `HEARTBEAT` defines the software flight-session boundary. The raw system ID is locally hashed before the session row is written. Schema v7 adds `session_events` for exact `STATUSTEXT`, mode/arm transitions, and failsafe-state transitions. Events retain receive time, type, optional severity, text, and message provenance. This boundary does not itself prove one physical flight.
 
+CRSF/GHST rows use source `control_link`. Dense serial rows have per-frame capture IDs; event/control snapshots reuse the latest link values with telemetry age. When a flight session is active, both join its session ID. `control_*_packet_loss_pct` is derived from LQ rather than represented as an independent packet counter. An unavailable GHST downlink is an explicit boolean gap row.
+
+Field-Kit rows use source `field_kit` and contain a locally keyed device hash, sanitized band/type labels, RSSI, configured threshold, crossing flags, and trigger/crossing counts. Raw ESP32 IDs are never durable fields.
+
+TAK rows use `tak_own` or `tak_visible`. The configured own UID and every received UID are locally keyed hashes; callsign text is omitted. Full-gate rows carry `scope=visible_on_your_connection`, while default rows require the own-asset UID hash. CoT location, error, track, and receive-age values remain scalar context and join an active flight session when present.
+
 ## Sensitive context
 
 `sensitive_context` is deliberately separate from `context_samples`. A row contains timestamp, optional observation ID, control flag, source, content type, `capture_id`, AES-GCM ciphertext, IV, and a non-secret key alias. Plaintext is encrypted in memory before the database insert. The associated data binds source, content type, and capture ID, so moving ciphertext to a different capture or channel makes authentication fail.
@@ -82,4 +88,4 @@ Analysis aggregates dense values once per event or control capture. Post-event s
 
 ## Identifier hashes
 
-Raw MAC addresses, Wi-Fi BSSIDs, and adapter/system identifiers must not enter durable rows. Providers pass a raw identifier directly to the Keystore-backed HMAC utility and persist only the returned `idhash:v<generation>:...` token. A channel namespace is included in the HMAC input. Formatting-equivalent MAC/BSSID values normalize to the same token, and rotating the local key advances the generation and intentionally invalidates future comparisons with older hashes.
+Raw MAC addresses, Wi-Fi BSSIDs, adapter/system identifiers, Field-Kit device IDs, and TAK UIDs must not enter durable evidence rows. Providers pass a raw identifier directly to the Keystore-backed HMAC utility and persist only the returned `idhash:v<generation>:...` token. A channel namespace is included in the HMAC input. Formatting-equivalent MAC/BSSID values normalize to the same token, and rotating the local key advances the generation and intentionally invalidates future comparisons with older hashes.

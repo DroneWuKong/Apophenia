@@ -10,6 +10,8 @@ The separate native-Automotive gate reads only properties the Android Automotive
 
 The MAVLink gate opens no transport until the operator starts USB, UDP, or TCP capture. The foreground flight-session indicator remains visible while capture is armed. The first valid airframe system ID is locally hashed before persistence; exact `STATUSTEXT` and received position/telemetry values are local evidence and can be sensitive. UDP/TCP traffic stays within the operator-selected transport path, and no telemetry is uploaded by Apophenia. Simulator coverage is not hardware, link, field, or flight validation.
 
+The CRSF/GHST gate opens only the USB device the operator selects and shows a foreground capture notification. Raw Android USB identity is not durable context. The Field-Kit gate opens a UDP listener only for the bounded event/control window and hashes the reported ESP32 identity. The TAK gate similarly joins the configured multicast group only for that bounded window. Own-track mode keeps only the configured keyed UID; the full gate may retain all locations visible on that connection, but labels that scope, hashes UIDs, and omits callsign text. These streams can contain precise position and link evidence.
+
 Optional Health Connect reads are permission-gated and fail-soft. When authorized, Apophenia may read recent heart rate, resting heart rate, sleep, steps, SpO2, and exercise duration. The app does not write Health Connect records and logging still works when Health Connect is missing, unsupported, denied, or empty.
 
 The rolling buffer is bounded and pruned. It is not an unlimited surveillance log.
@@ -21,6 +23,7 @@ Network use:
 - Optional on-device radio and presence snapshots. Wi-Fi stores a locally keyed BSSID hash, band/frequency, and RSSI while discarding SSIDs and raw BSSIDs. Bluetooth stores a locally keyed address hash, coarse advertised class/name category, and RSSI while discarding raw addresses and names. Network state stores connectivity, carrier/network type, roaming, and signal where Android exposes them; no cell ID is persisted.
 - Health Connect through Android's local Health Connect provider when explicitly authorized.
 - Operator-started MAVLink UDP/TCP traffic to or from the explicitly selected endpoint; no background connection is opened merely because the gate is enabled.
+- Operator-started CRSF/GHST USB serial input and bounded Field-Kit/TAK UDP receive windows; no remote upload is added by these channels.
 
 Android cloud backup excludes the observation database. Android device-to-device transfer may copy the local database to a replacement device through the operating system's protected transfer mechanism. A user-selected JSON export is outside the app's local boundary once it is handed to another app or destination.
 
