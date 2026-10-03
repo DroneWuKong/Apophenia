@@ -1,6 +1,9 @@
 package com.dronewukong.apophenia.ui
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.media.AudioTrack
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -16,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -31,6 +35,10 @@ import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.export.ExportManager
 import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.hardware.HardwareGates
+import com.dronewukong.apophenia.media.AvRetentionSettings
+import com.dronewukong.apophenia.media.MediaEvidenceReader
+import com.dronewukong.apophenia.media.MediaRetentionManager
+import com.dronewukong.apophenia.media.VideoEvidenceFrame
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import com.dronewukong.apophenia.home.HomeContextProvider
 import com.dronewukong.apophenia.home.HomeContextSettings
@@ -763,6 +771,14 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var callJurisdiction by remember { mutableStateOf(CallAudioCapability.jurisdiction(activity)) }
     var confirmCallAudio by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var pendingMediaScrub by remember { mutableStateOf<Long?>(null) }
+    var mediaAssets by remember { mutableStateOf<List<MediaAsset>>(emptyList()) }
+    var purgeLedger by remember { mutableStateOf<List<PurgeLedgerEntry>>(emptyList()) }
+    var retentionDaysText by remember { mutableStateOf(AvRetentionSettings.days(activity).toString()) }
+    var audioTrack by remember { mutableStateOf<AudioTrack?>(null) }
+    var videoFrames by remember { mutableStateOf<List<VideoEvidenceFrame>>(emptyList()) }
+    var videoFrameIndex by remember { mutableIntStateOf(0) }
+    var videoTitle by remember { mutableStateOf("") }
     val permissionRevision = activity.permissionRevision
 
     fun refreshRolling() {
@@ -785,6 +801,14 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         networkSignalAllowed = activity.hasNetworkSignalPermission()
         usageAllowed = activity.hasUsageAccess()
         scope.launch { healthStatus = withContext(Dispatchers.IO) { HealthConnectAccess.permissionSummary(activity) } }
+    }
+
+    fun refreshMedia() {
+        scope.launch {
+            val snapshot = withContext(Dispatchers.IO) { repo.db().mediaAssets(limit = 100) to repo.db().purgeLedger(20) }
+            mediaAssets = snapshot.first
+            purgeLedger = snapshot.second
+        }
     }
 
     fun testWeather() {
@@ -986,7 +1010,10 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     }
 
     LaunchedEffect(permissionRevision) { refreshPermissionState() }
-    LaunchedEffect(Unit) { refreshRolling() }
+    LaunchedEffect(Unit) { refreshRolling(); refreshMedia() }
+    DisposableEffect(Unit) {
+        onDispose { runCatching { audioTrack?.stop() }; audioTrack?.release(); audioTrack = null }
+    }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 30.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { ScreenHeader("Settings", "Everything stays local unless you enable an optional source.") }
@@ -1737,6 +1764,105 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 OutlinedButton(onClick = { onMessage(CallAudioCapability.explanation(activity)) }, enabled = callAudioEnabled, modifier = Modifier.fillMaxWidth()) { Text("Per-call capability check") }
             }
         }
+        item {
+            SettingsCard(Icons.Default.VideoLibrary, "Encrypted evidence media", "Retention, keep-forever, scrub, and in-app playback. Decryption stays in memory; derived metrics survive every raw-media purge.") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = retentionDaysText,
+                        onValueChange = { retentionDaysText = it.filter(Char::isDigit).take(4) },
+                        label = { Text("Default days") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(onClick = {
+                        val days = retentionDaysText.toIntOrNull()?.coerceIn(1, 3_650)
+                        if (days == null) onMessage("Retention must be 1–3650 days") else {
+                            retentionDaysText = days.toString()
+                            AvRetentionSettings.setDays(activity, days)
+                            onMessage("New AV captures retain raw media for $days days")
+                        }
+                    }) { Text("Save") }
+                }
+                Text("Changing the default applies to new freezes. Existing deadlines stay fixed unless that event is marked keep forever.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+
+                if (videoFrames.isNotEmpty()) {
+                    val frame = videoFrames[videoFrameIndex.coerceIn(0, videoFrames.lastIndex)]
+                    val bitmap = remember(frame) { BitmapFactory.decodeByteArray(frame.jpeg, 0, frame.jpeg.size) }
+                    bitmap?.let {
+                        Image(it.asImageBitmap(), contentDescription = "Decrypted evidence frame", modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp))
+                    }
+                    Text("$videoTitle · ${frame.phase.uppercase()} · ${videoFrameIndex + 1}/${videoFrames.size}", fontSize = 12.sp)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { videoFrameIndex = (videoFrameIndex - 1).coerceAtLeast(0) }, enabled = videoFrameIndex > 0, modifier = Modifier.weight(1f)) { Text("Previous") }
+                        OutlinedButton(onClick = { videoFrameIndex = (videoFrameIndex + 1).coerceAtMost(videoFrames.lastIndex) }, enabled = videoFrameIndex < videoFrames.lastIndex, modifier = Modifier.weight(1f)) { Text("Next") }
+                        TextButton(onClick = { videoFrames = emptyList(); videoFrameIndex = 0; videoTitle = "" }) { Text("Close") }
+                    }
+                }
+                if (audioTrack != null) {
+                    OutlinedButton(onClick = {
+                        runCatching { audioTrack?.stop() }
+                        audioTrack?.release()
+                        audioTrack = null
+                        onMessage("Evidence audio stopped and released from memory")
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Stop evidence audio") }
+                }
+
+                if (mediaAssets.isEmpty()) {
+                    Text("No retained AV evidence yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    mediaAssets.groupBy { it.observationId }.entries.take(8).forEach { (observationId, assets) ->
+                        HorizontalDivider()
+                        val allKept = assets.all { it.keepForever }
+                        Text("Event #$observationId · ${assets.size} stream${if (assets.size == 1) "" else "s"}", fontWeight = FontWeight.SemiBold)
+                        assets.forEach { asset ->
+                            val remainingMs = (asset.retentionUntilMs - System.currentTimeMillis()).coerceAtLeast(0L)
+                            val remaining = if (asset.keepForever) "keep forever" else "${(remainingMs + 86_399_999L) / 86_400_000L}d left"
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("${asset.mediaType.name.lowercase()} · ${asset.streamId} · ${asset.sizeBytes / 1_024} KiB · $remaining", modifier = Modifier.weight(1f), fontSize = 12.sp)
+                                TextButton(onClick = {
+                                    scope.launch {
+                                        runCatching {
+                                            if (asset.mediaType == MediaType.AUDIO) {
+                                                runCatching { audioTrack?.stop() }; audioTrack?.release()
+                                                audioTrack = withContext(Dispatchers.IO) {
+                                                    val reader = MediaEvidenceReader(activity)
+                                                    val evidence = reader.loadAudio(asset)
+                                                    try { reader.playAudio(evidence) } finally { evidence.pcm.fill(0) }
+                                                }
+                                                onMessage("Playing event #$observationId audio from encrypted storage")
+                                            } else {
+                                                videoFrames = withContext(Dispatchers.IO) { MediaEvidenceReader(activity).loadVideo(asset) }
+                                                videoFrameIndex = 0
+                                                videoTitle = "Event #$observationId · ${asset.streamId}"
+                                                onMessage("Loaded ${videoFrames.size} decrypted frames in memory")
+                                            }
+                                        }.onFailure { onMessage(it.message ?: "Could not open encrypted media") }
+                                    }
+                                }) { Text(if (asset.mediaType == MediaType.AUDIO) "Play" else "View") }
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                scope.launch {
+                                    val changed = withContext(Dispatchers.IO) { MediaRetentionManager(activity).setEventKeepForever(observationId, !allKept) }
+                                    refreshMedia()
+                                    onMessage(if (changed > 0) if (allKept) "Event returns to its original deadline" else "Event kept forever" else "No active media changed")
+                                }
+                            }, modifier = Modifier.weight(1f)) { Text(if (allKept) "Use deadline" else "Keep forever") }
+                            OutlinedButton(onClick = { pendingMediaScrub = observationId }, modifier = Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Scrub event") }
+                        }
+                    }
+                }
+                if (purgeLedger.isNotEmpty()) {
+                    HorizontalDivider()
+                    Text("Purge ledger", fontWeight = FontWeight.SemiBold)
+                    purgeLedger.take(5).forEach { entry ->
+                        Text("Event #${entry.observationId} · ${entry.mediaType.name.lowercase()} · ${entry.reason} · ${entry.bytesDeleted / 1_024} KiB deleted · derived metrics kept", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                OutlinedButton(onClick = { refreshMedia() }, modifier = Modifier.fillMaxWidth()) { Text("Refresh media inventory") }
+            }
+        }
 
         item { SectionLabel("Ground context + owned RF receiver") }
         item {
@@ -1903,12 +2029,33 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         }
     }
 
+    pendingMediaScrub?.let { observationId ->
+        AlertDialog(
+            onDismissRequest = { pendingMediaScrub = null },
+            title = { Text("Scrub event #$observationId raw media?") },
+            text = { Text("Encrypted audio and video, their manifests, and event keys will be deleted. Derived loudness, spectral, motion, brightness, flicker, and scene-change metrics remain for analysis; the purge is recorded in the local ledger.") },
+            confirmButton = {
+                Button(onClick = {
+                    scope.launch {
+                        runCatching { audioTrack?.stop() }; audioTrack?.release(); audioTrack = null
+                        videoFrames = emptyList()
+                        val purged = withContext(Dispatchers.IO) { MediaRetentionManager(activity).scrubEvent(observationId) }
+                        pendingMediaScrub = null
+                        refreshMedia()
+                        onMessage("Scrubbed $purged raw media stream${if (purged == 1) "" else "s"}; derived metrics kept")
+                    }
+                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Scrub raw media") }
+            },
+            dismissButton = { TextButton(onClick = { pendingMediaScrub = null }) { Text("Cancel") } }
+        )
+    }
+
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete all local data?") },
-            text = { Text("This permanently removes observations, hypotheses, controls, rolling samples, ordinary context, and encrypted Tier-2 contents from this device.") },
-            confirmButton = { Button(onClick = { scope.launch { withContext(Dispatchers.IO) { repo.db().deleteAllData() }; confirmDelete = false; onMessage("All local data deleted") } }) { Text("Delete") } },
+            text = { Text("This permanently removes observations, hypotheses, controls, rolling samples, ordinary context, encrypted Tier-2 contents, encrypted AV media, and AV keys from this device.") },
+            confirmButton = { Button(onClick = { scope.launch { withContext(Dispatchers.IO) { MediaRetentionManager(activity).scrubAll(); repo.db().deleteAllData() }; confirmDelete = false; mediaAssets = emptyList(); purgeLedger = emptyList(); onMessage("All local data and retained AV media deleted") } }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
         )
     }

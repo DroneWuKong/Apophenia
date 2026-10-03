@@ -28,6 +28,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.dronewukong.apophenia.R
 import com.dronewukong.apophenia.hardware.HardwareGates
+import com.dronewukong.apophenia.media.MediaRetentionManager
 import com.dronewukong.apophenia.ui.MainActivity
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
@@ -88,7 +89,7 @@ class CameraCaptureService : Service() {
         getSystemService(NotificationManager::class.java)?.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Camera ring capture", NotificationManager.IMPORTANCE_LOW)
         )
-        runCatching { VideoArtifactStore(this).pruneExpired() }
+        runCatching { MediaRetentionManager(this).purgeExpired() }
         startForeground(NOTIFICATION_ID, notification("Camera ring is starting"))
     }
 

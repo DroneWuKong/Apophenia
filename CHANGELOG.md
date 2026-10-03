@@ -66,10 +66,12 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Deliberate main/front/multicam camera and MediaProjection screen rings with per-stream 15-second pre/10-second post MJPEG evidence, Keystore encryption, persistent indicators, and explicit concurrent-camera degradation.
 - Permanent video brightness, motion, flicker, spatial PWM-banding, scene-change, and PWM-observability rows with POST exclusion.
 - Tier-3 per-call audio capability surface with user-configured jurisdiction, statutory-lock copy, and an honest Android public-API restriction stub.
+- Schema v8 media inventory, configurable raw-AV retention, app-start/capture-service expiry, per-event keep-forever and scrub, and a durable purge ledger that records derived-metric preservation.
+- An in-app encrypted evidence library for PCM playback and per-stream MJPEG frame review; plaintext exists only in memory and is never written as a playback file.
 
 ### Validation
 
-- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, MAVLink framing/session/staleness/STATUSTEXT behavior, CRSF/GHST framing, Field-Kit parsing, TAK own/full filtering, ground/space-weather parsing, RF window/spectrum behavior, audio and video ring/freeze/feature/encryption behavior, call-audio gap behavior, and simulation-pipeline coverage run in the software-only unit suite.
+- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, MAVLink framing/session/staleness/STATUSTEXT behavior, CRSF/GHST framing, Field-Kit parsing, TAK own/full filtering, ground/space-weather parsing, RF window/spectrum behavior, audio and video ring/freeze/feature/encryption behavior, AV expiry/keep/scrub/anti-resurrection/path containment, call-audio gap behavior, and simulation-pipeline coverage run in the software-only unit suite.
 
 ## [0.3.0-preview.2] - 2026-10-02
 

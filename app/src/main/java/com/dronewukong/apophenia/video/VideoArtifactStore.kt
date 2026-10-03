@@ -5,6 +5,10 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.dronewukong.apophenia.audio.AudioArtifactCrypto
+import com.dronewukong.apophenia.data.MediaAsset
+import com.dronewukong.apophenia.data.MediaType
+import com.dronewukong.apophenia.media.AvRetentionSettings
+import com.dronewukong.apophenia.media.MediaRetentionManager
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.KeyStore
@@ -17,11 +21,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class VideoArtifactStore(private val context: Context) {
-    data class Artifact(val fileId: String, val ciphertextSha256: String)
+    data class Artifact(val fileId: String, val ciphertextSha256: String, val retained: Boolean)
 
-    fun persist(eventId: Long, eventAtMs: Long, streamId: String, lensTag: String, pre: List<VideoFrame>, post: List<VideoFrame>, retentionDays: Int = 14): Artifact {
+    fun persist(eventId: Long, eventAtMs: Long, streamId: String, lensTag: String, pre: List<VideoFrame>, post: List<VideoFrame>, retentionDays: Int = AvRetentionSettings.days(context)): Artifact {
         val directory = File(context.filesDir, "av/video").apply { mkdirs() }
-        pruneExpired(directory, System.currentTimeMillis())
         val safeStream = token(streamId)
         val fileId = "video-$eventId-$eventAtMs-$safeStream"
         val keyAlias = "apophenia_video_event_${eventId}_${eventAtMs}_$safeStream"
@@ -34,7 +37,9 @@ class VideoArtifactStore(private val context: Context) {
         if (target.exists()) check(target.delete())
         check(temporary.renameTo(target)) { "Could not commit encrypted video stream" }
         val sha = MessageDigest.getInstance("SHA-256").digest(encrypted.ciphertext).joinToString("") { "%02x".format(it) }
-        File(directory, "$fileId.json").writeText(
+        val manifestFile = File(directory, "$fileId.json")
+        val retentionUntilMs = eventAtMs + retentionDays * 86_400_000L
+        manifestFile.writeText(
             JSONObject().put("schema", "apophenia.video.mjpeg.v1")
                 .put("event_id", eventId).put("event_at_ms", eventAtMs)
                 .put("stream", safeStream).put("lens", token(lensTag))
@@ -42,27 +47,18 @@ class VideoArtifactStore(private val context: Context) {
                 .put("post_excluded_from_predictors", true)
                 .put("cipher", "AES-256-GCM").put("iv_base64", Base64.encodeToString(encrypted.iv, Base64.NO_WRAP))
                 .put("key_alias", keyAlias).put("ciphertext_sha256", sha)
-                .put("retention_until_ms", eventAtMs + retentionDays * 86_400_000L).toString(2)
+                .put("retention_until_ms", retentionUntilMs).toString(2)
         )
-        return Artifact(fileId, sha)
-    }
-
-    fun pruneExpired(nowMs: Long = System.currentTimeMillis()) {
-        val directory = File(context.filesDir, "av/video")
-        if (directory.isDirectory) pruneExpired(directory, nowMs)
-    }
-
-    private fun pruneExpired(directory: File, nowMs: Long) {
-        directory.listFiles { file -> file.extension == "json" }?.forEach { manifest ->
-            runCatching {
-                val json = JSONObject(manifest.readText())
-                if (json.getLong("retention_until_ms") > nowMs) return@runCatching
-                File(directory, "${manifest.nameWithoutExtension}.mjpeg.aesgcm").delete()
-                val alias = json.optString("key_alias")
-                if (alias.isNotBlank()) KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
-                manifest.delete()
-            }
-        }
+        val retained = MediaRetentionManager(context).register(
+            MediaAsset(
+                id = fileId, observationId = eventId, mediaType = MediaType.VIDEO, streamId = safeStream,
+                createdAtMs = eventAtMs, retentionUntilMs = retentionUntilMs,
+                ciphertextRelativePath = target.relativeTo(context.filesDir).invariantSeparatorsPath,
+                manifestRelativePath = manifestFile.relativeTo(context.filesDir).invariantSeparatorsPath,
+                keyAlias = keyAlias, ciphertextSha256 = sha, sizeBytes = target.length()
+            )
+        )
+        return Artifact(fileId, sha, retained)
     }
 
     private fun archive(pre: List<VideoFrame>, post: List<VideoFrame>): ByteArray {

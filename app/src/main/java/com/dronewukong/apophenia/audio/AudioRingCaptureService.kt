@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.dronewukong.apophenia.R
 import com.dronewukong.apophenia.hardware.HardwareGates
+import com.dronewukong.apophenia.media.MediaRetentionManager
 import com.dronewukong.apophenia.ui.MainActivity
 import kotlin.concurrent.thread
 import kotlin.math.PI
@@ -32,7 +33,7 @@ class AudioRingCaptureService : Service() {
         getSystemService(NotificationManager::class.java)?.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Audio ring capture", NotificationManager.IMPORTANCE_LOW)
         )
-        runCatching { AudioArtifactStore(this).pruneExpired() }
+        runCatching { MediaRetentionManager(this).purgeExpired() }
         startForeground(NOTIFICATION_ID, notification("Microphone ring is starting"))
     }
 

@@ -5,6 +5,35 @@ enum class ObservationOrigin { ANDROID, WIDGET, TILE, EXTERNAL, GARMIN, SIMULATI
 enum class ContextPhase { INSTANT, PRE, POST, CONTROL }
 enum class CaptureSessionType { DRIVE_SESSION, FLIGHT_SESSION }
 enum class CaptureSessionStatus { ACTIVE, COMPLETED, INTERRUPTED }
+enum class MediaType { AUDIO, VIDEO }
+enum class MediaStatus { ACTIVE, PURGED, MISSING }
+
+data class MediaAsset(
+    val id: String,
+    val observationId: Long,
+    val mediaType: MediaType,
+    val streamId: String,
+    val createdAtMs: Long,
+    val retentionUntilMs: Long,
+    val keepForever: Boolean = false,
+    val status: MediaStatus = MediaStatus.ACTIVE,
+    val ciphertextRelativePath: String,
+    val manifestRelativePath: String,
+    val keyAlias: String,
+    val ciphertextSha256: String,
+    val sizeBytes: Long
+)
+
+data class PurgeLedgerEntry(
+    val id: Long = 0,
+    val mediaId: String,
+    val observationId: Long,
+    val mediaType: MediaType,
+    val purgedAtMs: Long,
+    val reason: String,
+    val bytesDeleted: Long,
+    val derivedMetricsRetained: Boolean = true
+)
 
 enum class VibeGrade(val rating: Int, val renderedLabel: String) {
     GOOD(1, "Vibe good 🙂"),

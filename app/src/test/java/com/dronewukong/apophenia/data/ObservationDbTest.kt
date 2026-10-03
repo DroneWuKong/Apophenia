@@ -186,7 +186,7 @@ class ObservationDbTest {
         legacy.close()
 
         db = ObservationDb(context)
-        assertEquals(7, db.readableDatabase.version)
+        assertEquals(8, db.readableDatabase.version)
         assertEquals("Legacy", db.observations().single().label)
         assertEquals(ObservationOrigin.ANDROID, db.observations().single().origin)
     }
@@ -244,7 +244,7 @@ class ObservationDbTest {
         val exported = ExportManager.exportJson(db, outputDirectory)
         val json = JSONObject(exported.readText())
 
-        assertEquals(7, json.getInt("schema"))
+        assertEquals(8, json.getInt("schema"))
         val observation = json.getJSONArray("observations").getJSONObject(0)
         assertEquals(4, observation.getInt("vibeRating"))
         assertFalse(observation.getBoolean("egress"))

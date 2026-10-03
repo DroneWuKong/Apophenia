@@ -181,7 +181,7 @@ object AudioRingCaptureManager {
                 val samples = AudioFeatureExtractor.contextSamples(eventId, capture.eventAtMs, captureId, ContextPhase.PRE, capture.pre, SAMPLE_RATE_HZ) +
                     AudioFeatureExtractor.contextSamples(eventId, capture.eventAtMs, captureId, ContextPhase.POST, postBytes, SAMPLE_RATE_HZ)
                 val inventory = samples.map { row ->
-                    row.copy(metadata = "${row.metadata};audio_file_id=${artifact.fileId};cipher=AES-256-GCM;ciphertext_sha256=${artifact.ciphertextSha256};raw_retention_days=14")
+                    row.copy(metadata = "${row.metadata};audio_file_id=${artifact.fileId};cipher=AES-256-GCM;ciphertext_sha256=${artifact.ciphertextSha256};raw_media_status=${if (artifact.retained) "active" else "purged"}")
                 }
                 ObservationStore.repository(context).insertContext(inventory)
             }.onFailure { stateFlow.value = stateFlow.value.copy(lastError = it.message ?: "Audio event finalization failed") }

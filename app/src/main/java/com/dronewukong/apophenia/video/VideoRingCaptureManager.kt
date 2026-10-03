@@ -147,7 +147,7 @@ object VideoRingCaptureManager {
                         val captureId = "event:$eventId:video:$stream"
                         (VideoFeatureExtractor.contextSamples(eventId, captureId, ContextPhase.PRE, windows.first) +
                             VideoFeatureExtractor.contextSamples(eventId, captureId, ContextPhase.POST, windows.second)).map { row ->
-                            row.copy(metadata = "${row.metadata};video_file_id=${artifact.fileId};cipher=AES-256-GCM;ciphertext_sha256=${artifact.ciphertextSha256};raw_retention_days=14")
+                            row.copy(metadata = "${row.metadata};video_file_id=${artifact.fileId};cipher=AES-256-GCM;ciphertext_sha256=${artifact.ciphertextSha256};raw_media_status=${if (artifact.retained) "active" else "purged"}")
                         }
                     }
                     ObservationStore.repository(context).insertContext(rows)

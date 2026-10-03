@@ -8,6 +8,8 @@ import com.dronewukong.apophenia.work.ControlScheduler
 import com.dronewukong.apophenia.work.PromptedCheckInScheduler
 import com.dronewukong.apophenia.vehicle.DriveSessionManager
 import com.dronewukong.apophenia.mavlink.MavlinkSessionManager
+import com.dronewukong.apophenia.media.MediaRetentionManager
+import kotlin.concurrent.thread
 
 class ApopheniaApp : Application() {
     override fun onCreate() {
@@ -19,5 +21,8 @@ class ApopheniaApp : Application() {
         DriveSessionManager.reconcileProcessStart(this)
         MavlinkSessionManager.reconcileProcessStart(this)
         GarminBridge.initialize(this)
+        thread(name = "apophenia-av-retention", isDaemon = true) {
+            runCatching { MediaRetentionManager(this).purgeExpired() }
+        }
     }
 }

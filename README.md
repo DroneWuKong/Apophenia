@@ -87,6 +87,7 @@ The app explains what works without a prompt and lets you review optional access
 - Ground barometer/magnetic/solar context with public NOAA Kp/F10.7 observations, plus Tier-3 bounded RTL-SDR IQ windows through an owned receiver's local `rtl_tcp` driver
 - A deliberately armed microphone ring with a persistent indicator, encrypted 60-second pre-event/30-second post-event evidence, and permanent descriptive spectral/loudness metrics
 - Deliberately armed main/front/concurrent-camera and screen rings with separate encrypted streams, persistent indicators, and permanent motion/brightness/flicker/banding metrics
+- Schema-backed AV retention with configurable deadlines, per-event keep-forever/scrub, an auditable purge ledger, and an in-app player that decrypts only in memory
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 
@@ -221,6 +222,9 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Native Automotive properties](docs/VEHICLE_AUTOMOTIVE.md)
 - [MAVLink flight sessions](docs/MAVLINK.md)
 - [Control-link, Field-Kit, and TAK context](docs/UAS_LINKS_FIELD_KIT_TAK.md)
+- [Audio ring capture](docs/AUDIO_RING.md)
+- [Video, screen, and call-audio capability](docs/VIDEO_SCREEN_CALL.md)
+- [AV retention and encrypted evidence player](docs/AV_RETENTION.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)

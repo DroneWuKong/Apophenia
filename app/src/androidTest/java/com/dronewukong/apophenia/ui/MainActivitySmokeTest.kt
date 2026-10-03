@@ -82,6 +82,7 @@ class MainActivitySmokeTest {
             "Tier-2 contents",
             "OBD-II drive session",
             "Native Automotive properties",
+            "Encrypted evidence media",
             "Octopod observer"
         ).forEach(::scrollSettingsTo)
     }

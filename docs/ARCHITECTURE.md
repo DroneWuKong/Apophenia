@@ -79,11 +79,13 @@ UI / widget / tile / external intent / Garmin
 | `RfSurveyContextProvider` | Tier-3 bounded `rtl_tcp` IQ window, app-private artifact inventory, and receiver-relative spectral summary |
 | `AudioRingCaptureService` | Deliberately armed microphone foreground capture and persistent live indicator |
 | `AudioRingCaptureManager` | Timestamp-first circular freeze, overlapping post windows, encrypted checkpoint/finalization, and derived-row insertion |
-| `AudioArtifactStore` | Per-event Android Keystore AES-GCM raw-audio artifact and opportunistic 14-day pruning |
+| `AudioArtifactStore` | Per-event Android Keystore AES-GCM raw-audio artifact and schema-backed media registration |
 | `CameraCaptureService` | Camera2 low-rate JPEG ring with Android-reported concurrent-set planning and explicit degradation |
 | `ScreenCaptureService` | Per-arm MediaProjection screen ring with persistent foreground indication |
 | `VideoRingCaptureManager` | Per-stream tap-time freeze, ten-second post windows, encrypted artifacts, and derived-row insertion |
 | `CallAudioCapability` | Tier-3 jurisdiction/platform gap model; no capture substitution |
+| `MediaRetentionManager` | Contained artifact/key deletion, fixed-deadline expiry, keep-forever, event scrub, anti-resurrection, and purge-ledger writes |
+| `MediaEvidenceReader` | Ciphertext/hash verification plus memory-only PCM or MJPEG decryption for the in-app player |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -140,6 +142,10 @@ An explicitly started foreground service owns one UDP listener, TCP client, USB 
 ### Control link, Field-Kit, and TAK
 
 CRSF/GHST is an operator-started foreground USB stream. Its latest link values and telemetry age can join an active flight session. Field-Kit and TAK are event/control-contingent UDP windows: their sockets exist only for a short bounded receive period. Field-Kit JSON maps owned detector thresholds/triggers after device-ID hashing. TAK CoT defaults to a keyed own-UID comparison; its Tier-3 full gate expands the filter only to traffic visible on the configured connection. See [UAS_LINKS_FIELD_KIT_TAK.md](UAS_LINKS_FIELD_KIT_TAK.md).
+
+### AV retention and playback
+
+Raw audio and video remain encrypted, app-private artifacts. Schema v8 registers every ciphertext, manifest, key alias, hash, size, event, stream, and fixed retention deadline. A process-wide coordinator serializes finalization with scrub/expiry so a late post-event write cannot resurrect a deliberately purged artifact. Startup and each AV capture service run the same retention engine. Keep-forever changes only the purge decision; returning to the deadline does not extend it. Scrub deletes ciphertext, manifest, and Keystore entry while retaining derived context, then appends a purge-ledger row. The player verifies the stored ciphertext hash and decrypts into memory only. See [AV_RETENTION.md](AV_RETENTION.md).
 
 ## Statistical boundary
 

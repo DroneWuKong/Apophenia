@@ -4,6 +4,10 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import com.dronewukong.apophenia.data.MediaAsset
+import com.dronewukong.apophenia.data.MediaType
+import com.dronewukong.apophenia.media.AvRetentionSettings
+import com.dronewukong.apophenia.media.MediaRetentionManager
 import java.io.File
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -30,7 +34,7 @@ object AudioArtifactCrypto {
 }
 
 class AudioArtifactStore(private val context: Context) {
-    data class Artifact(val fileId: String, val keyAlias: String, val ciphertextSha256: String)
+    data class Artifact(val fileId: String, val keyAlias: String, val ciphertextSha256: String, val retained: Boolean)
 
     fun persist(
         eventId: Long,
@@ -38,10 +42,9 @@ class AudioArtifactStore(private val context: Context) {
         sampleRateHz: Int,
         prePcm: ByteArray,
         postPcm: ByteArray,
-        retentionDays: Int = 14
+        retentionDays: Int = AvRetentionSettings.days(context)
     ): Artifact {
         val directory = File(context.filesDir, "av/audio").apply { mkdirs() }
-        pruneExpired(directory, System.currentTimeMillis())
         val fileId = "audio-$eventId-$eventAtMs"
         val keyAlias = "apophenia_audio_event_${eventId}_$eventAtMs"
         val key = eventKey(keyAlias)
@@ -56,7 +59,9 @@ class AudioArtifactStore(private val context: Context) {
         if (ciphertextFile.exists()) check(ciphertextFile.delete()) { "Could not replace encrypted audio artifact" }
         check(temporary.renameTo(ciphertextFile)) { "Could not commit encrypted audio artifact" }
         val sha = MessageDigest.getInstance("SHA-256").digest(encrypted.ciphertext).joinToString("") { "%02x".format(it) }
-        File(directory, "$fileId.json").writeText(
+        val manifestFile = File(directory, "$fileId.json")
+        val retentionUntilMs = eventAtMs + retentionDays * 86_400_000L
+        manifestFile.writeText(
             JSONObject()
                 .put("schema", "apophenia.audio.pcm.v1")
                 .put("event_id", eventId)
@@ -71,29 +76,20 @@ class AudioArtifactStore(private val context: Context) {
                 .put("iv_base64", Base64.encodeToString(encrypted.iv, Base64.NO_WRAP))
                 .put("key_alias", keyAlias)
                 .put("ciphertext_sha256", sha)
-                .put("retention_until_ms", eventAtMs + retentionDays * 86_400_000L)
+                .put("retention_until_ms", retentionUntilMs)
                 .toString(2)
         )
         combined.fill(0)
-        return Artifact(fileId, keyAlias, sha)
-    }
-
-    fun pruneExpired(nowMs: Long = System.currentTimeMillis()) {
-        val directory = File(context.filesDir, "av/audio")
-        if (directory.isDirectory) pruneExpired(directory, nowMs)
-    }
-
-    private fun pruneExpired(directory: File, nowMs: Long) {
-        directory.listFiles { file -> file.extension == "json" }?.forEach { manifest ->
-            runCatching {
-                val json = JSONObject(manifest.readText())
-                if (json.getLong("retention_until_ms") > nowMs) return@runCatching
-                File(directory, "${manifest.nameWithoutExtension}.pcm.aesgcm").delete()
-                val alias = json.optString("key_alias")
-                if (alias.isNotBlank()) KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
-                manifest.delete()
-            }
-        }
+        val retained = MediaRetentionManager(context).register(
+            MediaAsset(
+                id = fileId, observationId = eventId, mediaType = MediaType.AUDIO, streamId = "microphone",
+                createdAtMs = eventAtMs, retentionUntilMs = retentionUntilMs,
+                ciphertextRelativePath = ciphertextFile.relativeTo(context.filesDir).invariantSeparatorsPath,
+                manifestRelativePath = manifestFile.relativeTo(context.filesDir).invariantSeparatorsPath,
+                keyAlias = keyAlias, ciphertextSha256 = sha, sizeBytes = ciphertextFile.length()
+            )
+        )
+        return Artifact(fileId, keyAlias, sha, retained)
     }
 
     private fun eventKey(alias: String): SecretKey {

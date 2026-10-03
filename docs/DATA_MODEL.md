@@ -63,6 +63,12 @@ Audio-derived rows use source `audio_derived` and `capture_id=event:<id>:audio`.
 
 Video-derived rows use source `video_derived` and a per-stream `capture_id=event:<id>:video:<stream>`. Each frame contributes brightness, motion energy, flicker delta, spatial banding, scene-change, and PWM-frequency-observability values. Lens/screen tags are coarse tokens; raw Camera2 IDs are not persisted. Separate app-private manifests inventory each encrypted MJPEG stream, lens tag, pre/post frame counts, IV/key alias, ciphertext hash, and retention deadline. `POST` remains ineligible for predictors.
 
+## Media assets and purge ledger
+
+Schema v8 adds `media_assets`. One row inventories one encrypted audio or video stream: opaque artifact ID, owning observation, media type, coarse stream token, creation time, fixed retention deadline, keep-forever flag, active/purged status, app-private relative ciphertext and manifest paths, non-secret Keystore alias, SHA-256, and ciphertext size. It contains no plaintext AV. A checkpoint and final artifact use the same ID; update preserves keep-forever. A purged ID cannot become active again, preventing a late post-event finalizer from resurrecting scrubbed media.
+
+`purge_ledger` records media ID, observation ID, type, purge time, reason, deleted byte count, and `derived_metrics_retained=true`. Retention expiry and user scrub remove ciphertext, manifest, and the per-event key. Audio/video derived `context_samples` are intentionally untouched and remain available to the analysis engine. Delete-all scrubs active artifacts before clearing the local tables.
+
 ## Sensitive context
 
 `sensitive_context` is deliberately separate from `context_samples`. A row contains timestamp, optional observation ID, control flag, source, content type, `capture_id`, AES-GCM ciphertext, IV, and a non-secret key alias. Plaintext is encrypted in memory before the database insert. The associated data binds source, content type, and capture ID, so moving ciphertext to a different capture or channel makes authentication fail.

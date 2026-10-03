@@ -51,6 +51,7 @@ Open **Settings**.
 - **Camera rings:** authorize the desired main/front/multicam gates by exact name, grant camera access, arm, and confirm the persistent indicator. Compare the active stream/degradation display with the phone's actual lenses. Log an event and wait ten seconds; emulator frames do not prove physical multicam.
 - **Screen ring:** authorize by exact name, arm, accept Android's MediaProjection dialog, and confirm the second persistent indicator. The consent is per arm. Verify app-switch/display-size behavior physically.
 - **Call audio:** choose the applicable jurisdiction state and run the per-call capability check. The expected current result is either Android platform-restricted or **Locked by statute, not by Apophenia**; no audio should be fabricated.
+- **Encrypted evidence media:** after an AV event finishes, open its event group in Settings. Play audio or review frames, mark the event keep forever, then return it to its original deadline. Scrub the event and confirm raw playback disappears while the purge ledger says derived metrics were kept. No plaintext playback file should appear in app storage.
 
 Basic observation logging must continue when every optional permission is denied.
 
@@ -78,6 +79,7 @@ For a real phone or Garmin watch, continue with [PHYSICAL_ACCEPTANCE.md](PHYSICA
 - Export JSON and choose a destination you control.
 - Inspect only if you are comfortable handling the personal data it contains.
 - Test **Delete all local data** only after saving anything you want to keep.
+- Expected: delete-all removes active encrypted AV files and their Keystore keys before clearing SQLite. This is destructive and is not a substitute for the later verified-backup/EJECT flow.
 
 ## Garmin acceptance test
 

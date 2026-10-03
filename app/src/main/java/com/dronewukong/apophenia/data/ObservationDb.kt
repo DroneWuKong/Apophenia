@@ -8,7 +8,7 @@ import com.dronewukong.apophenia.correlation.TimedCaptureValue
 
 data class ObservationInsertResult(val id: Long, val inserted: Boolean)
 
-class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 7) {
+class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 8) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -37,6 +37,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         createSensitiveContextTable(db)
         createCaptureSessionTable(db)
         createSessionEventTable(db)
+        createMediaTables(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -67,6 +68,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_context_session ON context_samples(session_id,timestamp_ms)")
         }
         if (oldVersion < 7) createSessionEventTable(db)
+        if (oldVersion < 8) createMediaTables(db)
     }
 
     private fun createObservationIndexes(db: SQLiteDatabase) {
@@ -183,6 +185,43 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         """.trimIndent())
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_session_event_time ON session_events(session_id,timestamp_ms)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_session_event_type ON session_events(event_type,timestamp_ms)")
+    }
+
+    private fun createMediaTables(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS media_assets(
+              id TEXT PRIMARY KEY,
+              observation_id INTEGER NOT NULL,
+              media_type TEXT NOT NULL,
+              stream_id TEXT NOT NULL,
+              created_at_ms INTEGER NOT NULL,
+              retention_until_ms INTEGER NOT NULL,
+              keep_forever INTEGER NOT NULL DEFAULT 0 CHECK(keep_forever IN (0,1)),
+              status TEXT NOT NULL DEFAULT 'ACTIVE',
+              ciphertext_relative_path TEXT NOT NULL,
+              manifest_relative_path TEXT NOT NULL,
+              key_alias TEXT NOT NULL,
+              ciphertext_sha256 TEXT NOT NULL,
+              size_bytes INTEGER NOT NULL,
+              FOREIGN KEY(observation_id) REFERENCES observations(id) ON DELETE CASCADE
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_media_observation ON media_assets(observation_id,status)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_media_retention ON media_assets(status,keep_forever,retention_until_ms)")
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS purge_ledger(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              media_id TEXT NOT NULL,
+              observation_id INTEGER NOT NULL,
+              media_type TEXT NOT NULL,
+              purged_at_ms INTEGER NOT NULL,
+              reason TEXT NOT NULL,
+              bytes_deleted INTEGER NOT NULL,
+              derived_metrics_retained INTEGER NOT NULL DEFAULT 1 CHECK(derived_metrics_retained IN (0,1))
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_purge_time ON purge_ledger(purged_at_ms)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_purge_observation ON purge_ledger(observation_id,purged_at_ms)")
     }
 
     fun insertObservation(o: Observation): Long = insertObservationOrGet(o).id
@@ -575,11 +614,106 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         arrayOf(limit.toString())
     )
 
+    fun registerMediaAsset(asset: MediaAsset): Boolean {
+        val database = writableDatabase
+        database.beginTransaction()
+        try {
+            val existing = mediaAsset(asset.id)
+            if (existing?.status == MediaStatus.PURGED) return false
+            val values = ContentValues().apply {
+                put("observation_id", asset.observationId)
+                put("media_type", asset.mediaType.name)
+                put("stream_id", asset.streamId)
+                put("created_at_ms", asset.createdAtMs)
+                put("retention_until_ms", asset.retentionUntilMs)
+                put("keep_forever", if (existing?.keepForever == true || asset.keepForever) 1 else 0)
+                put("status", MediaStatus.ACTIVE.name)
+                put("ciphertext_relative_path", asset.ciphertextRelativePath)
+                put("manifest_relative_path", asset.manifestRelativePath)
+                put("key_alias", asset.keyAlias)
+                put("ciphertext_sha256", asset.ciphertextSha256)
+                put("size_bytes", asset.sizeBytes)
+            }
+            if (existing == null) {
+                values.put("id", asset.id)
+                database.insertOrThrow("media_assets", null, values)
+            } else {
+                database.update("media_assets", values, "id=?", arrayOf(asset.id))
+            }
+            database.setTransactionSuccessful()
+            return true
+        } finally { database.endTransaction() }
+    }
+
+    fun mediaAsset(id: String): MediaAsset? = queryMedia("id=?", arrayOf(id), 1).firstOrNull()
+
+    fun mediaAssets(observationId: Long? = null, includePurged: Boolean = false, limit: Int = 1_000): List<MediaAsset> {
+        val clauses = mutableListOf<String>()
+        val args = mutableListOf<String>()
+        observationId?.let { clauses += "observation_id=?"; args += it.toString() }
+        if (!includePurged) clauses += "status='ACTIVE'"
+        return queryMedia(clauses.takeIf { it.isNotEmpty() }?.joinToString(" AND "), args.toTypedArray(), limit)
+    }
+
+    private fun queryMedia(where: String?, args: Array<String>, limit: Int): List<MediaAsset> {
+        val clause = where?.let { " WHERE $it" }.orEmpty()
+        val out = mutableListOf<MediaAsset>()
+        readableDatabase.rawQuery(
+            "SELECT id,observation_id,media_type,stream_id,created_at_ms,retention_until_ms,keep_forever,status,ciphertext_relative_path,manifest_relative_path,key_alias,ciphertext_sha256,size_bytes FROM media_assets$clause ORDER BY created_at_ms DESC LIMIT ?",
+            args + limit.toString()
+        ).use { c -> while (c.moveToNext()) out += MediaAsset(
+            id = c.getString(0), observationId = c.getLong(1), mediaType = MediaType.valueOf(c.getString(2)),
+            streamId = c.getString(3), createdAtMs = c.getLong(4), retentionUntilMs = c.getLong(5),
+            keepForever = c.getInt(6) == 1, status = MediaStatus.valueOf(c.getString(7)),
+            ciphertextRelativePath = c.getString(8), manifestRelativePath = c.getString(9),
+            keyAlias = c.getString(10), ciphertextSha256 = c.getString(11), sizeBytes = c.getLong(12)
+        ) }
+        return out
+    }
+
+    fun setMediaKeepForever(id: String, keepForever: Boolean): Boolean = writableDatabase.update(
+        "media_assets", ContentValues().apply { put("keep_forever", if (keepForever) 1 else 0) },
+        "id=? AND status='ACTIVE'", arrayOf(id)
+    ) > 0
+
+    fun markMediaPurged(id: String, purgedAtMs: Long, reason: String, bytesDeleted: Long): Boolean {
+        val asset = mediaAsset(id) ?: return false
+        if (asset.status != MediaStatus.ACTIVE) return false
+        val database = writableDatabase
+        database.beginTransaction()
+        try {
+            val updated = database.update(
+                "media_assets", ContentValues().apply { put("status", MediaStatus.PURGED.name); put("size_bytes", 0L) },
+                "id=? AND status='ACTIVE'", arrayOf(id)
+            )
+            if (updated == 0) return false
+            database.insertOrThrow("purge_ledger", null, ContentValues().apply {
+                put("media_id", id); put("observation_id", asset.observationId); put("media_type", asset.mediaType.name)
+                put("purged_at_ms", purgedAtMs); put("reason", reason); put("bytes_deleted", bytesDeleted)
+                put("derived_metrics_retained", 1)
+            })
+            database.setTransactionSuccessful()
+            return true
+        } finally { database.endTransaction() }
+    }
+
+    fun purgeLedger(limit: Int = 1_000): List<PurgeLedgerEntry> {
+        val out = mutableListOf<PurgeLedgerEntry>()
+        readableDatabase.rawQuery(
+            "SELECT id,media_id,observation_id,media_type,purged_at_ms,reason,bytes_deleted,derived_metrics_retained FROM purge_ledger ORDER BY purged_at_ms DESC LIMIT ?",
+            arrayOf(limit.toString())
+        ).use { c -> while (c.moveToNext()) out += PurgeLedgerEntry(
+            id = c.getLong(0), mediaId = c.getString(1), observationId = c.getLong(2), mediaType = MediaType.valueOf(c.getString(3)),
+            purgedAtMs = c.getLong(4), reason = c.getString(5), bytesDeleted = c.getLong(6), derivedMetricsRetained = c.getInt(7) == 1
+        ) }
+        return out
+    }
+
     fun deleteObservation(id:Long):Boolean = writableDatabase.delete("observations","id=?",arrayOf(id.toString()))>0
 
     fun deleteAllData(){
         writableDatabase.beginTransaction()
-        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("session_events",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.setTransactionSuccessful() }
+        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("session_events",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("media_assets",null,null); writableDatabase.delete("purge_ledger",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.setTransactionSuccessful() }
         finally { writableDatabase.endTransaction() }
     }
 
