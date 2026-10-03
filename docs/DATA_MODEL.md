@@ -61,6 +61,8 @@ RF survey rows use source `rf_survey` and one event/control `capture_id`. Scalar
 
 Audio-derived rows use source `audio_derived` and `capture_id=event:<id>:audio`. The loudness curve can contain dense one-second rows, but the shared capture ID keeps them one evidence window. Silence ratio, onset count, and descriptive hum/voice/high-frequency/broadband band energy are recorded separately for `PRE` and `POST`. Raw PCM never enters SQLite: an app-private manifest inventories the AES-GCM ciphertext, per-event Keystore alias, IV, sample format, pre/post byte counts, ciphertext SHA-256, and retention deadline. `POST` remains ineligible for predictor calculations.
 
+Video-derived rows use source `video_derived` and a per-stream `capture_id=event:<id>:video:<stream>`. Each frame contributes brightness, motion energy, flicker delta, spatial banding, scene-change, and PWM-frequency-observability values. Lens/screen tags are coarse tokens; raw Camera2 IDs are not persisted. Separate app-private manifests inventory each encrypted MJPEG stream, lens tag, pre/post frame counts, IV/key alias, ciphertext hash, and retention deadline. `POST` remains ineligible for predictors.
+
 ## Sensitive context
 
 `sensitive_context` is deliberately separate from `context_samples`. A row contains timestamp, optional observation ID, control flag, source, content type, `capture_id`, AES-GCM ciphertext, IV, and a non-secret key alias. Plaintext is encrypted in memory before the database insert. The associated data binds source, content type, and capture ID, so moving ciphertext to a different capture or channel makes authentication fail.

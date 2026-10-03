@@ -61,6 +61,11 @@ import com.dronewukong.apophenia.rf.RfSurveyContextProvider
 import com.dronewukong.apophenia.rf.RfSurveySettings
 import com.dronewukong.apophenia.audio.AudioRingCaptureManager
 import com.dronewukong.apophenia.audio.AudioRingCaptureService
+import com.dronewukong.apophenia.video.CallAudioCapability
+import com.dronewukong.apophenia.video.CallConsentJurisdiction
+import com.dronewukong.apophenia.video.CameraCaptureService
+import com.dronewukong.apophenia.video.ScreenCaptureService
+import com.dronewukong.apophenia.video.VideoRingCaptureManager
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -677,6 +682,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     val flightState by MavlinkSessionManager.state.collectAsState()
     val controlLinkState by ControlLinkManager.state.collectAsState()
     val audioRingState by AudioRingCaptureManager.state.collectAsState()
+    val videoRingState by VideoRingCaptureManager.state.collectAsState()
     var rollingSummary by remember { mutableStateOf("No samples yet") }
     var healthStatus by remember { mutableStateOf("Checking…") }
     var locationAllowed by remember { mutableStateOf(activity.hasLocationPermission()) }
@@ -747,6 +753,15 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var audioGateEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_AUDIO_CAPTURE)) }
     var confirmAudioGate by remember { mutableStateOf(false) }
     var audioGateInput by remember { mutableStateOf("") }
+    var mainVideoEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_VIDEO_CAPTURE)) }
+    var frontVideoEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_VIDEO_SELFCAPTURE)) }
+    var multicamEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_MULTICAM_CAPTURE)) }
+    var screenVideoEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_SCREENRECORD_CAPTURE)) }
+    var pendingVideoGate by remember { mutableStateOf<HardwareGates.Gate?>(null) }
+    var videoGateInput by remember { mutableStateOf("") }
+    var callAudioEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_CALL_AUDIO_CAPTURE)) }
+    var callJurisdiction by remember { mutableStateOf(CallAudioCapability.jurisdiction(activity)) }
+    var confirmCallAudio by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -940,6 +955,34 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             onMessage(message)
             if (granted) startAfterNotification()
         } else startAfterNotification()
+    }
+
+    fun armCameraRings() {
+        fun afterNotification() {
+            if (simulation) CameraCaptureService.start(activity)
+            else activity.requestCameraPermission { granted, message ->
+                onMessage(message)
+                if (granted) CameraCaptureService.start(activity)
+            }
+        }
+        if (!notificationsAllowed) activity.requestNotificationPermission { granted, message ->
+            notificationsAllowed = granted; onMessage(message); if (granted) afterNotification()
+        } else afterNotification()
+    }
+
+    fun armScreenRing() {
+        fun afterNotification() {
+            if (simulation) ScreenCaptureService.startSimulation(activity)
+            else activity.requestScreenCapture { resultCode, data ->
+                if (resultCode == android.app.Activity.RESULT_OK && data != null) {
+                    ScreenCaptureService.start(activity, resultCode, data)
+                    onMessage("Screen ring armed with Android MediaProjection consent")
+                } else onMessage("Screen-capture consent was not granted")
+            }
+        }
+        if (!notificationsAllowed) activity.requestNotificationPermission { granted, message ->
+            notificationsAllowed = granted; onMessage(message); if (granted) afterNotification()
+        } else afterNotification()
     }
 
     LaunchedEffect(permissionRevision) { refreshPermissionState() }
@@ -1625,6 +1668,75 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 Text("Every observation freezes the sound already in memory. Raw PCM is written only after per-event AES-256-GCM encryption; derived loudness, hum/voice/high-frequency bands, onsets, and silence ratios survive raw retention. POST rows are excluded from predictors.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
             }
         }
+        item {
+            SettingsCard(Icons.Default.Videocam, "Camera + screen evidence rings", "Tier 2 · 15 seconds pre-event and 10 seconds post-event per available stream, each encrypted separately.") {
+                fun setVideoGate(gate: HardwareGates.Gate, enabled: Boolean) {
+                    if (enabled) {
+                        videoGateInput = ""
+                        pendingVideoGate = gate
+                    } else {
+                        HardwareGates.setAuthorized(activity, gate, false)
+                        when (gate) {
+                            HardwareGates.Gate.LIVE_VIDEO_CAPTURE -> mainVideoEnabled = false
+                            HardwareGates.Gate.LIVE_VIDEO_SELFCAPTURE -> frontVideoEnabled = false
+                            HardwareGates.Gate.LIVE_MULTICAM_CAPTURE -> multicamEnabled = false
+                            HardwareGates.Gate.LIVE_SCREENRECORD_CAPTURE -> screenVideoEnabled = false
+                            else -> Unit
+                        }
+                    }
+                }
+                GateSwitchRow("Main camera", "Rear/logical-main stream when the platform exposes it.", mainVideoEnabled, onCheckedChange = { setVideoGate(HardwareGates.Gate.LIVE_VIDEO_CAPTURE, it) })
+                GateSwitchRow("Front camera", "Self-capture stream, separately tagged and stored.", frontVideoEnabled, onCheckedChange = { setVideoGate(HardwareGates.Gate.LIVE_VIDEO_SELFCAPTURE, it) })
+                GateSwitchRow("All-camera multicam", "Requests the largest concurrent camera set Android reports; every unavailable lens stays an explicit degradation.", multicamEnabled, onCheckedChange = { setVideoGate(HardwareGates.Gate.LIVE_MULTICAM_CAPTURE, it) })
+                GateSwitchRow("Screen record", "Requires Android's MediaProjection consent each time it is armed.", screenVideoEnabled, onCheckedChange = { setVideoGate(HardwareGates.Gate.LIVE_SCREENRECORD_CAPTURE, it) })
+                Text(
+                    if (videoRingState.active) "LIVE · ${videoRingState.activeStreams.size} stream(s) · ${videoRingState.framesCaptured} frames · ${videoRingState.pendingEvents} event freeze(s)"
+                    else "Rings disarmed",
+                    fontWeight = FontWeight.SemiBold
+                )
+                videoRingState.degradation?.let { Text("Degraded: $it", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) }
+                videoRingState.lastError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if ("camera" in videoRingState.activeSources) {
+                        Button(onClick = { CameraCaptureService.stop(activity) }, modifier = Modifier.weight(1f)) { Text("Disarm cameras") }
+                    } else {
+                        Button(onClick = ::armCameraRings, enabled = mainVideoEnabled || frontVideoEnabled || multicamEnabled, modifier = Modifier.weight(1f)) { Text("Arm cameras") }
+                    }
+                    if ("screen" in videoRingState.activeSources) {
+                        Button(onClick = { ScreenCaptureService.stop(activity) }, modifier = Modifier.weight(1f)) { Text("Disarm screen") }
+                    } else {
+                        Button(onClick = ::armScreenRing, enabled = screenVideoEnabled, modifier = Modifier.weight(1f)) { Text("Arm screen") }
+                    }
+                }
+                Text("MJPEG frame streams are separate per lens/screen. Derived rows include motion energy, brightness, frame-to-frame flicker, spatial PWM-banding score, and scene-change flags. Two-fps capture cannot estimate PWM frequency and says so explicitly.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
+        item {
+            SettingsCard(Icons.Default.PhoneInTalk, "Call audio capability", "Tier 3 · visible per-call channel with platform and configured-jurisdiction gaps; no substitute audio is mislabeled.") {
+                Text("Configured consent jurisdiction", fontWeight = FontWeight.SemiBold)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    CallConsentJurisdiction.entries.forEach { jurisdiction ->
+                        FilterChip(
+                            selected = callJurisdiction == jurisdiction,
+                            onClick = { callJurisdiction = jurisdiction; CallAudioCapability.setJurisdiction(activity, jurisdiction) },
+                            label = { Text(jurisdiction.name.replace('_', ' ')) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(if (callAudioEnabled) "Call-audio gate authorized" else "Call-audio gate off", fontWeight = FontWeight.SemiBold)
+                        Text(CallAudioCapability.explanation(activity), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                    Switch(checked = callAudioEnabled, onCheckedChange = { enabled ->
+                        if (!enabled) { HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_CALL_AUDIO_CAPTURE, false); callAudioEnabled = false }
+                        else confirmCallAudio = true
+                    })
+                }
+                OutlinedButton(onClick = { onMessage(CallAudioCapability.explanation(activity)) }, enabled = callAudioEnabled, modifier = Modifier.fillMaxWidth()) { Text("Per-call capability check") }
+            }
+        }
 
         item { SectionLabel("Ground context + owned RF receiver") }
         item {
@@ -1993,6 +2105,51 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 }) { Text("Authorize + arm") }
             },
             dismissButton = { TextButton(onClick = { confirmAudioGate = false }) { Text("Cancel") } }
+        )
+    }
+
+    pendingVideoGate?.let { gate ->
+        AlertDialog(
+            onDismissRequest = { pendingVideoGate = null },
+            title = { Text("Authorize ${gate.name}?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("This deliberate gate permits an armed foreground ring for that camera/screen channel. Enabling the gate does not bypass Android camera, concurrency, or MediaProjection controls.")
+                    Text("Type ${gate.name} exactly.", fontWeight = FontWeight.SemiBold)
+                    OutlinedTextField(value = videoGateInput, onValueChange = { videoGateInput = it }, singleLine = true, label = { Text("Gate name") })
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val enabled = HardwareGates.setAuthorized(activity, gate, true, HardwareGates.ConsentProof.TypedGateName(videoGateInput)) == HardwareGates.AuthorizationResult.ENABLED
+                    if (!enabled) onMessage("Type ${gate.name} exactly") else {
+                        when (gate) {
+                            HardwareGates.Gate.LIVE_VIDEO_CAPTURE -> mainVideoEnabled = true
+                            HardwareGates.Gate.LIVE_VIDEO_SELFCAPTURE -> frontVideoEnabled = true
+                            HardwareGates.Gate.LIVE_MULTICAM_CAPTURE -> multicamEnabled = true
+                            HardwareGates.Gate.LIVE_SCREENRECORD_CAPTURE -> screenVideoEnabled = true
+                            else -> Unit
+                        }
+                        pendingVideoGate = null
+                    }
+                }) { Text("Authorize") }
+            },
+            dismissButton = { TextButton(onClick = { pendingVideoGate = null }) { Text("Cancel") } }
+        )
+    }
+
+    if (confirmCallAudio) {
+        AlertDialog(
+            onDismissRequest = { confirmCallAudio = false },
+            title = { Text("Authorize per-call audio capability?") },
+            text = { Text("The gate records your intent but cannot create a platform API or legal authority. Each call would still require a separate opt-in and capability check. ${CallAudioCapability.explanation(activity)}") },
+            confirmButton = {
+                Button(onClick = {
+                    callAudioEnabled = HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_CALL_AUDIO_CAPTURE, true, HardwareGates.ConsentProof.CapabilityConditionalConfirmation) == HardwareGates.AuthorizationResult.ENABLED
+                    confirmCallAudio = false
+                }) { Text("Authorize gate") }
+            },
+            dismissButton = { TextButton(onClick = { confirmCallAudio = false }) { Text("Cancel") } }
         )
     }
 }

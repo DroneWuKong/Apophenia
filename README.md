@@ -86,6 +86,7 @@ The app explains what works without a prompt and lets you review optional access
 - User-started CRC-validated CRSF/GHST link statistics, bounded owned Field-Kit detector snapshots, and TAK own-track context with a separate full-visible-traffic gate
 - Ground barometer/magnetic/solar context with public NOAA Kp/F10.7 observations, plus Tier-3 bounded RTL-SDR IQ windows through an owned receiver's local `rtl_tcp` driver
 - A deliberately armed microphone ring with a persistent indicator, encrypted 60-second pre-event/30-second post-event evidence, and permanent descriptive spectral/loudness metrics
+- Deliberately armed main/front/concurrent-camera and screen rings with separate encrypted streams, persistent indicators, and permanent motion/brightness/flicker/banding metrics
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 

@@ -48,6 +48,9 @@ Open **Settings**.
 - **Ground context:** enable the gate and test. A phone may lack a barometer; magnetic declination and solar phase require an authorized location. NOAA Kp/F10.7 also require the existing environment lookup gate and network access.
 - **RF survey:** start an `rtl_tcp`-compatible Android driver for an owned OTG RTL-SDR, enter its endpoint/tuning/window settings, deliberately enable the Tier-3 gate, and test. First hardware work is receiver/USB bench validation only; dBFS is not calibrated RF power.
 - **Audio ring:** type `LIVE_AUDIO_CAPTURE`, grant microphone and notification access, and confirm the persistent live indicator before logging an event. Wait 30 seconds for the full post window. First physical testing must compare the actual pre/post duration, encrypted artifact manifest, derived metrics, disarm action, screen-off survival, and battery use; emulator success is not microphone proof.
+- **Camera rings:** authorize the desired main/front/multicam gates by exact name, grant camera access, arm, and confirm the persistent indicator. Compare the active stream/degradation display with the phone's actual lenses. Log an event and wait ten seconds; emulator frames do not prove physical multicam.
+- **Screen ring:** authorize by exact name, arm, accept Android's MediaProjection dialog, and confirm the second persistent indicator. The consent is per arm. Verify app-switch/display-size behavior physically.
+- **Call audio:** choose the applicable jurisdiction state and run the per-call capability check. The expected current result is either Android platform-restricted or **Locked by statute, not by Apophenia**; no audio should be fabricated.
 
 Basic observation logging must continue when every optional permission is denied.
 

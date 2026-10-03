@@ -63,10 +63,13 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Tier-3 RTL-SDR survey windows over an operator-started `rtl_tcp` driver, with bounded app-private IQ, SHA-256 inventory, receiver-relative spectrum summaries, and retention pruning.
 - Deliberately armed microphone foreground capture with a persistent indicator, 60-second in-memory pre-event ring, 30-second post window, immediate encrypted pre-event checkpoint, and per-event Keystore AES-256-GCM artifact.
 - Permanent grouped audio-derived loudness curves, silence ratio, onset count, and descriptive hum/voice/high-frequency/broadband energy; POST audio metrics remain excluded from predictors.
+- Deliberate main/front/multicam camera and MediaProjection screen rings with per-stream 15-second pre/10-second post MJPEG evidence, Keystore encryption, persistent indicators, and explicit concurrent-camera degradation.
+- Permanent video brightness, motion, flicker, spatial PWM-banding, scene-change, and PWM-observability rows with POST exclusion.
+- Tier-3 per-call audio capability surface with user-configured jurisdiction, statutory-lock copy, and an honest Android public-API restriction stub.
 
 ### Validation
 
-- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, MAVLink framing/session/staleness/STATUSTEXT behavior, CRSF/GHST framing, Field-Kit parsing, TAK own/full filtering, ground/space-weather parsing, RF window/spectrum behavior, audio ring/freeze/feature/encryption behavior, and simulation-pipeline coverage run in the software-only unit suite.
+- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, MAVLink framing/session/staleness/STATUSTEXT behavior, CRSF/GHST framing, Field-Kit parsing, TAK own/full filtering, ground/space-weather parsing, RF window/spectrum behavior, audio and video ring/freeze/feature/encryption behavior, call-audio gap behavior, and simulation-pipeline coverage run in the software-only unit suite.
 
 ## [0.3.0-preview.2] - 2026-10-02
 

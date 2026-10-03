@@ -80,6 +80,10 @@ UI / widget / tile / external intent / Garmin
 | `AudioRingCaptureService` | Deliberately armed microphone foreground capture and persistent live indicator |
 | `AudioRingCaptureManager` | Timestamp-first circular freeze, overlapping post windows, encrypted checkpoint/finalization, and derived-row insertion |
 | `AudioArtifactStore` | Per-event Android Keystore AES-GCM raw-audio artifact and opportunistic 14-day pruning |
+| `CameraCaptureService` | Camera2 low-rate JPEG ring with Android-reported concurrent-set planning and explicit degradation |
+| `ScreenCaptureService` | Per-arm MediaProjection screen ring with persistent foreground indication |
+| `VideoRingCaptureManager` | Per-stream tap-time freeze, ten-second post windows, encrypted artifacts, and derived-row insertion |
+| `CallAudioCapability` | Tier-3 jurisdiction/platform gap model; no capture substitution |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |

@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.hardware.usb.UsbManager
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -41,6 +42,8 @@ class MainActivity : ComponentActivity() {
     private var networkResult: ((Boolean, String) -> Unit)? = null
     private var vehicleBluetoothResult: ((Boolean, String) -> Unit)? = null
     private var audioResult: ((Boolean, String) -> Unit)? = null
+    private var cameraResult: ((Boolean, String) -> Unit)? = null
+    private var screenCaptureResult: ((Int, Intent?) -> Unit)? = null
     private var tier2Result: ((Boolean, String) -> Unit)? = null
     private var pendingTier2Gate: HardwareGates.Gate? = null
     private var healthResult: ((String) -> Unit)? = null
@@ -121,6 +124,20 @@ class MainActivity : ComponentActivity() {
             else "Microphone access was not enabled; the audio ring remains stopped."
         )
         audioResult = null
+    }
+    private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+        permissionRevision++
+        cameraResult?.invoke(
+            allowed,
+            if (allowed) "Camera access enabled for the armed video ring."
+            else "Camera access was not enabled; camera rings remain stopped."
+        )
+        cameraResult = null
+    }
+    private val screenCapturePermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        permissionRevision++
+        screenCaptureResult?.invoke(result.resultCode, result.data)
+        screenCaptureResult = null
     }
     private val tier2Permission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         val gate = pendingTier2Gate
@@ -208,6 +225,28 @@ class MainActivity : ComponentActivity() {
         }
         audioResult = onResult
         audioPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    fun hasCameraPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+
+    fun requestCameraPermission(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
+        if (hasCameraPermission()) {
+            onResult(true, "Camera access is already enabled.")
+            return
+        }
+        cameraResult = onResult
+        cameraPermission.launch(Manifest.permission.CAMERA)
+    }
+
+    fun requestScreenCapture(onResult: (Int, Intent?) -> Unit) {
+        val manager = getSystemService(MediaProjectionManager::class.java)
+        if (manager == null) {
+            onResult(RESULT_CANCELED, null)
+            return
+        }
+        screenCaptureResult = onResult
+        screenCapturePermission.launch(manager.createScreenCaptureIntent())
     }
 
     fun requestVehicleBluetoothPermission(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
