@@ -53,7 +53,9 @@ class MainActivitySmokeTest {
         compose.onNodeWithText("Phone sensors").assertIsDisplayed()
         compose.onNodeWithText("Location + weather").assertIsDisplayed()
         compose.onNodeWithText("Health Connect").performScrollTo().assertIsDisplayed()
-        compose.onNode(hasScrollAction()).performScrollToIndex(10)
+        compose.onNode(hasScrollAction()).performScrollToIndex(8)
+        compose.onNodeWithText("Radio environment").assertIsDisplayed()
+        compose.onNode(hasScrollAction()).performScrollToIndex(12)
         compose.onNodeWithText("Octopod observer").assertIsDisplayed()
     }
 

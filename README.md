@@ -22,7 +22,7 @@ Writing down an explanation afterward is easy. Capturing what was actually happe
 
 1. Tap once.
 2. Save the exact event time immediately.
-3. Add whatever optional phone, environment, Health Connect, Garmin, or aggregate home context is available afterward.
+3. Add whatever optional phone, environment, radio, Health Connect, Garmin, or aggregate home context is available afterward.
 4. Compare event windows with ordinary control windows instead of eyeballing a chart and declaring a pattern.
 
 The point is not to prove a story. It is to collect better evidence before telling one.
@@ -76,6 +76,7 @@ The app explains what works without a prompt and lets you review optional access
 - A Garmin Epix Pro (Gen 2) logger with watch timestamps and a bounded offline queue
 - Durable watch receipts: events leave the queue only after Android confirms local storage
 - Optional aggregate home context through an existing Octopod/Home Assistant cluster
+- Optional privacy-reduced Wi-Fi, Bluetooth LE, and cellular radio snapshots
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 
@@ -85,7 +86,7 @@ There is no account, advertising SDK, analytics, continuous microphone recording
 
 Apophenia is currently a **development preview**, not a Play Store release.
 
-1. Prefer the tagged [0.3.0-preview.3 development pre-release](https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.3), or open the latest successful [Android workflow run](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml).
+1. Prefer the tagged [0.3.0-preview.4 development pre-release](https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.4), or open the latest successful [Android workflow run](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml).
 2. Download `app-debug.apk` from the pre-release, or unzip the workflow's `apophenia-debug-apk` artifact.
 3. Open `app-debug.apk` on an Android 8.0 or newer phone.
 4. Allow installation from the browser or file manager if Android asks.
@@ -200,11 +201,13 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Install and remote test guide](docs/INSTALL_AND_TEST.md)
 - [Garmin Epix Pro integration](docs/GARMIN_EPIX_PRO.md)
 - [Optional Octopod home context](docs/HOME_CONTEXT.md)
+- [Optional radio context](docs/RADIO_CONTEXT.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)
 - [Release notes](docs/RELEASE_NOTES_0.2.1.md)
 - [0.3.0-preview.3 release notes](docs/RELEASE_NOTES_0.3.0-preview.3.md)
+- [0.3.0-preview.4 release notes](docs/RELEASE_NOTES_0.3.0-preview.4.md)
 
 ## License and disclaimer
 

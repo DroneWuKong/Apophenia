@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private var locationResult: ((Boolean, String) -> Unit)? = null
     private var notificationResult: ((Boolean, String) -> Unit)? = null
+    private var radioResult: ((Boolean, String) -> Unit)? = null
     private var healthResult: ((String) -> Unit)? = null
     private var requestedHealthPermissions: Set<String> = emptySet()
 
@@ -49,6 +50,16 @@ class MainActivity : ComponentActivity() {
             else "Notifications are off. The recorder can run, but Android may hide its status."
         )
         notificationResult = null
+    }
+    private val radioPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        val allowed = hasRadioPermissions()
+        permissionRevision++
+        radioResult?.invoke(
+            allowed,
+            if (allowed) "Radio survey enabled. Snapshots contain aggregate signal data only."
+            else "Radio access was not enabled. You can retry or open Android app settings."
+        )
+        radioResult = null
     }
     private val healthPermission = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
         val coreGranted = granted.containsAll(HealthConnectAccess.readPermissions)
@@ -81,6 +92,27 @@ class MainActivity : ComponentActivity() {
 
     fun hasNotificationPermission(): Boolean =
         Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
+    fun hasRadioPermissions(): Boolean {
+        val location = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val nearby = Build.VERSION.SDK_INT < 31 ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+        return location && nearby
+    }
+
+    fun requestRadioPermissions(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
+        if (hasRadioPermissions()) {
+            onResult(true, "Radio access is already enabled.")
+            return
+        }
+        val permissions = buildList {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            if (Build.VERSION.SDK_INT >= 31) add(Manifest.permission.BLUETOOTH_SCAN)
+        }.toTypedArray()
+        radioResult = onResult
+        radioPermission.launch(permissions)
+    }
 
     fun requestLocationPermission(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
         if (hasLocationPermission()) {

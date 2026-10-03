@@ -2,7 +2,7 @@
 
 Apophenia is local-first.
 
-Stored locally: manual observations, phone context, rolling black-box samples, random controls, Garmin event context delivered through the paired-phone companion channel, and optional aggregate home-state counts when explicitly enabled.
+Stored locally: manual observations, phone context, rolling black-box samples, random controls, Garmin event context delivered through the paired-phone companion channel, optional aggregate home-state counts, and optional aggregate radio-environment metrics when explicitly enabled.
 
 Optional Health Connect reads are permission-gated and fail-soft. When authorized, Apophenia may read recent heart rate, resting heart rate, sleep, steps, SpO2, and exercise duration. The app does not write Health Connect records and logging still works when Health Connect is missing, unsupported, denied, or empty.
 
@@ -12,13 +12,14 @@ Network use:
 - Open-Meteo only when location permission and the environment gate are enabled. A weather request necessarily sends approximate latitude/longitude and time to that service; the app does not attach an account identity.
 - Garmin communication through the paired-phone Connect IQ companion service.
 - Optional Octopod requests to the user-configured local cluster. Apophenia stores aggregate counts and average temperature only—not entity/person names, camera images, raw audio/video, or Home Assistant/SmartThings/Wyze credentials.
+- Optional on-device radio surveys. Apophenia stores Wi-Fi/BLE/cellular counts, band or technology counts, and RSSI summaries. It discards SSIDs, BSSIDs, Bluetooth names/addresses, cell IDs, and raw scan rows.
 - Health Connect through Android's local Health Connect provider when explicitly authorized.
 
 Android cloud backup excludes the observation database. Android device-to-device transfer may copy the local database to a replacement device through the operating system's protected transfer mechanism. A user-selected JSON export is outside the app's local boundary once it is handed to another app or destination.
 
 Explicit phone-sensor, location, environment, Garmin, and rolling-recorder boundaries are identifiable in code. Simulation mode bypasses physical hardware while retaining storage and analysis behavior.
 
-Not collected by default: microphone recordings, camera recordings, contacts, message contents, or browsing history.
+Not collected by default: radio surveys, microphone recordings, camera recordings, contacts, message contents, or browsing history.
 
 JSON export and delete-all controls are available in Settings. Exported files leave the app's local boundary only when the user chooses a share destination.
 

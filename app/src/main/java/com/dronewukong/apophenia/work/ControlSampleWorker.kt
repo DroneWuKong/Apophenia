@@ -10,6 +10,7 @@ import com.dronewukong.apophenia.hardware.SensorSnapshotCollector
 import com.dronewukong.apophenia.rolling.RollingRecorderConfig
 import com.dronewukong.apophenia.health.HealthConnectProvider
 import com.dronewukong.apophenia.home.HomeContextProvider
+import com.dronewukong.apophenia.radio.RadioContextProvider
 import kotlinx.coroutines.runBlocking
 import java.util.UUID
 class ControlSampleWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
@@ -26,6 +27,7 @@ class ControlSampleWorker(context: Context, params: WorkerParameters) : Worker(c
    samples+=runCatching{EnvironmentProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    samples+=runBlocking{HealthConnectProvider(applicationContext).collect(null,true)}
    samples+=runCatching{HomeContextProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
+   samples+=runCatching{RadioContextProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    db.insertContext(samples.map{it.copy(captureId=captureId,metadata=if(it.metadata.isBlank())"control_source=$source" else "${it.metadata};control_source=$source")})
    if(source==SOURCE_RANDOM)ControlScheduler.scheduleNext(applicationContext)
    Result.success()

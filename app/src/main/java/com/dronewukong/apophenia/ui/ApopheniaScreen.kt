@@ -32,6 +32,8 @@ import com.dronewukong.apophenia.home.HomeContextSettings
 import com.dronewukong.apophenia.rolling.RollingRecorderService
 import com.dronewukong.apophenia.rolling.RollingRecorderHealth
 import com.dronewukong.apophenia.rolling.RollingRecorderState
+import com.dronewukong.apophenia.radio.RadioContextProvider
+import com.dronewukong.apophenia.radio.RadioContextSettings
 import com.dronewukong.apophenia.work.PromptedCheckInScheduler
 import com.dronewukong.apophenia.work.PromptedCheckInState
 import java.io.File
@@ -513,6 +515,10 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var homeEndpoint by remember { mutableStateOf(HomeContextSettings.endpoint(activity)) }
     var homeStatus by remember { mutableStateOf(if (homeEnabled) "Ready to check" else "Off") }
     var homeChecking by remember { mutableStateOf(false) }
+    var radioEnabled by remember { mutableStateOf(RadioContextSettings.isEnabled(activity)) }
+    var radioAllowed by remember { mutableStateOf(activity.hasRadioPermissions()) }
+    var radioStatus by remember { mutableStateOf(if (radioEnabled) "Ready to scan" else "Off") }
+    var radioChecking by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -531,6 +537,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     fun refreshPermissionState() {
         locationAllowed = activity.hasLocationPermission()
         notificationsAllowed = activity.hasNotificationPermission()
+        radioAllowed = activity.hasRadioPermissions()
         scope.launch { healthStatus = withContext(Dispatchers.IO) { HealthConnectAccess.permissionSummary(activity) } }
     }
 
@@ -571,6 +578,25 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
             homeChecking = false
             onMessage(homeStatus)
+        }
+    }
+
+    fun testRadioContext() {
+        if (radioChecking) return
+        radioChecking = true
+        radioStatus = "Scanning Wi-Fi, Bluetooth LE, and cellular…"
+        scope.launch {
+            val samples = withContext(Dispatchers.IO) { RadioContextProvider(activity).collect(null, false, force = true) }
+            val wifi = samples.firstOrNull { it.metric == "radio_wifi_ap_count" }?.value?.toInt()
+            val ble = samples.firstOrNull { it.metric == "radio_ble_advertiser_count" }?.value?.toInt()
+            val cells = samples.firstOrNull { it.metric == "radio_cell_count" }?.value?.toInt()
+            radioStatus = if (samples.isEmpty()) {
+                "No radio data · check Nearby devices, precise location, Bluetooth, and device location"
+            } else {
+                "Snapshot · ${wifi ?: 0} Wi-Fi · ${ble ?: 0} BLE · ${cells ?: 0} cells"
+            }
+            radioChecking = false
+            onMessage(radioStatus)
         }
     }
 
@@ -653,6 +679,64 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                         activity.requestHealthPermissions { message -> onMessage(message); refreshPermissionState() }
                     }
                 }
+            }
+        }
+
+        item { SectionLabel("Radio context") }
+        item {
+            SettingsCard(Icons.Default.CellTower, "Radio environment", "Optional aggregate snapshots from radios this phone exposes.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = radioEnabled, onCheckedChange = { enabled ->
+                        if (!enabled) {
+                            radioEnabled = false
+                            RadioContextSettings.setEnabled(activity, false)
+                            radioStatus = "Off"
+                        } else if (radioAllowed) {
+                            radioEnabled = true
+                            RadioContextSettings.setEnabled(activity, true)
+                            radioStatus = "Enabled · test a snapshot"
+                        } else {
+                            activity.requestRadioPermissions { granted, message ->
+                                radioAllowed = granted
+                                radioEnabled = granted
+                                RadioContextSettings.setEnabled(activity, granted)
+                                radioStatus = if (granted) "Enabled · test a snapshot" else "Permission required"
+                                onMessage(message)
+                            }
+                        }
+                    })
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (radioEnabled) "Included in events and controls" else "Not collecting", fontWeight = FontWeight.SemiBold)
+                        Text(radioStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                }
+                Text(
+                    "Wi-Fi 2.4/5/6 GHz, BLE advertisements, and cellular technology/signal. Counts and dBm only; identifiers are discarded.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+                OutlinedButton(
+                    onClick = {
+                        if (radioAllowed) testRadioContext()
+                        else activity.requestRadioPermissions { granted, message ->
+                            radioAllowed = granted
+                            onMessage(message)
+                            if (granted) testRadioContext()
+                        }
+                    },
+                    enabled = !radioChecking,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Radar, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (radioChecking) "Scanning…" else if (radioAllowed) "Take test snapshot" else "Allow and test")
+                }
+                Text(
+                    "This is a radio survey, not a full spectrum analyzer. External SDR hardware is required for arbitrary RF bands.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
             }
         }
 

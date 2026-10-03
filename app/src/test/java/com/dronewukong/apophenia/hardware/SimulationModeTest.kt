@@ -9,6 +9,7 @@ import com.dronewukong.apophenia.data.ObservationDb
 import com.dronewukong.apophenia.data.ObservationKind
 import com.dronewukong.apophenia.data.ObservationStore
 import com.dronewukong.apophenia.environment.EnvironmentProvider
+import com.dronewukong.apophenia.radio.RadioContextSettings
 import com.dronewukong.apophenia.work.EventEnrichmentWorker
 import com.dronewukong.apophenia.work.ControlSampleWorker
 import kotlinx.coroutines.runBlocking
@@ -37,6 +38,7 @@ class SimulationModeTest {
     @After
     fun tearDown() {
         HardwareGates.setRuntimeMode(context, HardwareGates.RuntimeMode.LIVE)
+        RadioContextSettings.setEnabled(context, false)
         ObservationStore.resetForTests()
         context.deleteDatabase("apophenia.db")
     }
@@ -57,6 +59,7 @@ class SimulationModeTest {
 
     @Test
     fun simulationUsesTheProductionEnrichmentAndDatabasePipeline() {
+        RadioContextSettings.setEnabled(context, true)
         val db = ObservationDb(context)
         val id = db.insertObservation(
             Observation(timestampMs = 1234L, kind = ObservationKind.OBSERVATION, label = "Simulation event")
@@ -70,6 +73,7 @@ class SimulationModeTest {
         assertTrue(samples.isNotEmpty())
         assertTrue(samples.all { it.source.startsWith("simulation") })
         assertTrue(samples.any { it.metric == "health_heart_rate_avg_bpm" })
+        assertTrue(samples.any { it.metric == "radio_wifi_ap_count" })
         db.close()
     }
 

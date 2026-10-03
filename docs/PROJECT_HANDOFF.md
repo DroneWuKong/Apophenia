@@ -10,7 +10,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 
 - Kotlin / Jetpack Compose native Android app
 - package: `com.dronewukong.apophenia`
-- v0.3.0-preview.3
+- v0.3.0-preview.4
 - Android min SDK 26
 - explicit hardware/simulation gates
 - local SQLite database
@@ -32,6 +32,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - database schema v3 with observation origin, external-event deduplication, and explicit context phase
 - application-scoped observation repository shared by UI, widget, tile, external intent, and Garmin ingest
 - optional privacy-reduced Octopod home context shared by event and control captures
+- optional privacy-reduced Wi-Fi/BLE/cellular radio snapshots shared by event and control captures
 - expandable timeline context capsules with explicit pre/instant/post phases
 
 ## Garmin Epix Pro (Gen 2)
@@ -112,7 +113,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 ## Validation status — 2026-10-03
 
 - `./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug`: passed locally on JDK 17.
-- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v3 migration, rolling pre/post separation, control grouping and matching, prompted neutral controls, hypothesis separation, JSON export, association statistics, Garmin packet parsing/ingest/retry behavior, and the full simulation enrichment/database path.
+- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v3 migration, rolling pre/post separation, control grouping and matching, prompted neutral controls, hypothesis separation, JSON export, association statistics, Garmin packet parsing/ingest/retry behavior, radio aggregation, and the full simulation enrichment/database path.
 - `./gradlew.bat connectedDebugAndroidTest`: two tests passed on an API 36.1 Android emulator; they cover the refined logging surface, **THAT WAS WEIRD**, the timeline entry, and the optional-context settings surface.
 - Native Android location and notification permission prompts were exercised on the emulator. Weather returned a live Open-Meteo result after location approval.
 - Health Connect's permission controller was exercised end-to-end on the emulator, including the required privacy-rationale declaration, six read permissions, and optional background access. The app returned to a connected state.
@@ -136,3 +137,4 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 7. Validate weather enrichment with real permission/network/location conditions.
 8. Merge the accepted release/documentation commits to `main` after review; the development pre-release already points to the tested branch commit.
 9. Test the optional Octopod observer on the home Wi-Fi; keep future ESP32 sources separately scoped.
+10. Validate Wi-Fi/BLE/cellular aggregate snapshots on representative phones; Android scan throttling and OEM behavior remain hardware gates.

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0-preview.4] - 2026-10-03
+
+### Added
+
+- Opt-in radio-environment snapshots for phone-visible Wi-Fi 2.4/5/6 GHz, Bluetooth LE advertisements, and cellular technologies/signals.
+- A permission-aware Settings card with a test snapshot and an explicit full-spectrum/SDR limitation.
+- Aggregate-only radio metrics for both events and random controls, plus a software-only simulation path and unit tests.
+
+### Privacy
+
+- SSIDs, BSSIDs, Bluetooth names/addresses, cellular IDs, and raw scan rows are never persisted.
+- Radio capture is disabled by default and fails soft when permissions, hardware, or background scan capacity are unavailable.
+
 ## [0.3.0-preview.3] - 2026-10-03
 
 ### Added

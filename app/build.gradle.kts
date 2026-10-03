@@ -11,8 +11,8 @@ android {
         applicationId = "com.dronewukong.apophenia"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.3.0-preview.3"
+        versionCode = 7
+        versionName = "0.3.0-preview.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "LIVE_SENSOR_CAPTURE", "true")

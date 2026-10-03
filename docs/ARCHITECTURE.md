@@ -30,7 +30,7 @@ UI / widget / tile / external intent / Garmin
                       v
           asynchronous context enrichment
           phone | device | location | weather
-          Health Connect | Garmin-delivered metrics | optional Octopod aggregates
+          Health Connect | Garmin-delivered metrics | optional Octopod/radio aggregates
                       |
                       v
             labeled context_samples rows
@@ -57,6 +57,7 @@ UI / widget / tile / external intent / Garmin
 | `HardwareGates` | Compile/runtime boundary for phone sensors, location, weather, and Garmin |
 | `HealthConnectProvider` | Optional read-only historical wearable context |
 | `HomeContextProvider` | Optional read-only aggregate Home Assistant/SmartThings/Wyze context through Octopod |
+| `RadioContextProvider` | Optional aggregate Wi-Fi, BLE-advertisement, and cellular signal snapshot with identifiers discarded |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -87,6 +88,10 @@ Health Connect is optional and read-only. Permission absence, provider absence, 
 ### Garmin
 
 The watch captures its timestamp and available watch context, then transmits through Garmin Connect's companion channel. Android preserves that watch timestamp and treats the phone receive time as transport timing, not event timing. A missing or invalid watch timestamp is explicitly diagnosed before the receive time is used as a fallback. Malformed messages and duplicate retries are also surfaced through the bridge's observable diagnostic state. See [GARMIN_EPIX_PRO.md](GARMIN_EPIX_PRO.md).
+
+### Radio context
+
+Radio context is disabled by default and requires explicit nearby-device and precise-location permission. One capture aggregates the phone-visible Wi-Fi, Bluetooth LE, and cellular environment into counts, band/technology counts, and RSSI summaries. SSIDs, BSSIDs, Bluetooth names/addresses, and cellular identifiers are discarded. The same provider runs for event and control captures, while Android scan throttling and unavailable hardware fail soft. This is not a wideband spectrum analyzer; arbitrary RF requires an external SDR adapter. See [RADIO_CONTEXT.md](RADIO_CONTEXT.md).
 
 ## Statistical boundary
 
