@@ -117,7 +117,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 - Native Android location and notification permission prompts were exercised on the emulator. Weather returned a live Open-Meteo result after location approval.
 - Health Connect's permission controller was exercised end-to-end on the emulator, including the required privacy-rationale declaration, six read permissions, and optional background access. The app returned to a connected state.
 - APK produced at `app/build/outputs/apk/debug/app-debug.apk`.
-- Preview.3 release artifacts are prepared locally; publish URL and checksums are recorded in the release notes after the final validation commit.
+- Development pre-release published at `https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.3` from tested commit `b8e712864e16ebf8ac442c319177670ee2062b1e`; attached APK SHA-256 is `EDF8ACF3C151F12137BCF83E4C2F15ABC087E529C6D0D6F37E5FFCDF254D846D` and the Epix Pro bundle SHA-256 is `575E8B6B267CA77DEF0C2B9676D1202DB9C9A3751B4A2032E2F27D55FADB6D65`.
 - Connect IQ SDK 9.2.0: all three Epix Pro targets compiled.
 - Garmin Run No Evil: all six pending-queue/receipt tests passed on the Epix Pro 47 mm simulator.
 - A freshly signed Connect IQ build was physically sideloaded and opened on an Epix Pro 51 mm running firmware 27.18. This proves installation and launch only.
