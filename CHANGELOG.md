@@ -4,6 +4,19 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 
 ## [Unreleased]
 
+## [0.3.0-preview.2] - 2026-10-02
+
+### Fixed
+
+- Garmin **Open logger** now selects from the SDK's live connected-device list and refreshes stale device statuses before reporting that no watch is connected.
+- Garmin event intake now accepts both flat SDK payloads and the nested batch shape produced when the watch flushes its pending-event queue.
+- Device and application listeners are registered independently so a failed cleanup call cannot prevent event listening.
+
+### Added
+
+- Regression tests for refreshed Garmin connection selection and flat/nested watch packet batches.
+- More specific bridge diagnostics for registration, message status, packet count, and connection refresh failures.
+
 ## [0.3.0-preview.1] - 2026-10-02
 
 ### Added

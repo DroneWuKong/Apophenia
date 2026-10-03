@@ -10,7 +10,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 
 - Kotlin / Jetpack Compose native Android app
 - package: `com.dronewukong.apophenia`
-- v0.3.0-preview.1
+- v0.3.0-preview.2
 - Android min SDK 26
 - explicit hardware/simulation gates
 - local SQLite database
@@ -53,7 +53,7 @@ A bounded watch-side pending queue preserves events during temporary disconnects
 
 Watch protocol v3 adds a persistent installation/sequence event ID. Android uses the Garmin origin plus this ID to suppress replay duplicates while retaining the original watch timestamp. Legacy v2 packets remain readable but cannot provide the same replay guarantee.
 
-The bridge exposes connection and diagnostic state as a `StateFlow`, and Compose observes it directly. Packet parsing/ingest is separated from the Garmin SDK callback behind an injectable store, with unit coverage for timestamp preservation, metric attachment, malformed packets, and disconnected/replayed event deduplication.
+The bridge exposes connection and diagnostic state as a `StateFlow`, and Compose observes it directly. It refreshes device status before opening the watch app and accepts both flat and nested Connect IQ batch payloads. Packet parsing/ingest is separated from the Garmin SDK callback behind an injectable store, with unit coverage for timestamp preservation, metric attachment, malformed packets, nested batches, stale device status, and disconnected/replayed event deduplication.
 
 The Android Garmin bridge uses app id:
 `4f4d0f7b3d6f4b36b3e88b91129c70a2`
@@ -116,13 +116,14 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 - Development pre-release published at `https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.1` from tested commit `49b2992f480cf8cee67ae777aafd439d5ac87948`; attached APK SHA-256 is `87335C2812B5C1553C4FA007AE101BFCCAA44D839D3E46C146AE7C43C12D4924`.
 - Connect IQ SDK 9.2.0: all three Epix Pro targets compiled.
 - Garmin Run No Evil: all four pending-queue tests passed on the Epix Pro 47 mm simulator.
-- None of the above is physical Android or Garmin hardware validation.
+- A freshly signed Connect IQ build was physically sideloaded and opened on an Epix Pro 51 mm running firmware 27.18. This proves installation and launch only.
+- Watch-to-phone event delivery has not yet passed physical acceptance. The first physical attempt exposed stale Android device selection and nested-batch decoding defects; both are repaired in `0.3.0-preview.2` and await retest on the phone/watch pair.
 
 ## Next work
 
-1. Download and physically install the debug APK.
-2. Sideload the compiled Connect IQ watch companion using the owner's Garmin signing key.
-3. Validate watch event → Garmin Connect → phone observation → attached Garmin metrics.
+1. Install the `0.3.0-preview.2` debug APK on the physical phone.
+2. Validate watch event → Garmin Connect → phone observation → attached Garmin metrics.
+3. Validate offline queue retry and duplicate suppression on the physical phone/watch pair.
 4. Validate 30-minute pre-event/post-event capture, foreground-service survival, widget, and Quick Settings tile on a real Android phone.
 5. Validate each available physical sensor and confirm unavailable values are omitted.
 6. Validate Health Connect permission and data behavior on supported physical devices.

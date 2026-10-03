@@ -54,6 +54,10 @@ Metrics may include heart rate, stress, Body Battery, Pulse Ox, pressure, temper
 
 Android checks whether Garmin Connect is installed before starting the Connect IQ SDK. When it is missing, Settings reports that cleanly and no Garmin UI is opened. SIMULATION bypasses all Garmin SDK calls.
 
+Connect IQ device objects can carry stale status fields. The Android bridge therefore uses the SDK's live connected-device list and refreshes known-device status before **Open logger** decides that no watch is connected. Incoming payload decoding walks both flat and nested lists because a Monkey C array of queued dictionaries may arrive as a nested Android list.
+
+On 2026-10-02, the signed watch app was physically installed and opened on an Epix Pro 51 mm running firmware 27.18. Watch-to-phone delivery remains pending until the `0.3.0-preview.2` Android transport fixes pass the steps below.
+
 ## Physical validation
 
 1. Pair Epix Pro in Garmin Connect.

@@ -36,7 +36,7 @@ Alternative titles:
 >
 > Source: https://github.com/DroneWuKong/Apophenia
 >
-> Download: https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.1
+> Download: https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.2
 >
 > I’d especially appreciate feedback on the one-tap flow, permission onboarding, battery behavior on different Android vendors, and whether the analysis language feels appropriately cautious. Please don’t post real location or health exports in public issues.
 
