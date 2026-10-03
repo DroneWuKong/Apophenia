@@ -19,6 +19,8 @@ import com.dronewukong.apophenia.wifi.WifiContextProvider
 import com.dronewukong.apophenia.vehicle.DriveSessionManager
 import com.dronewukong.apophenia.vehicle.ObdContextProvider
 import com.dronewukong.apophenia.vehicle.AutomotiveContextProvider
+import com.dronewukong.apophenia.mavlink.MavlinkContextProvider
+import com.dronewukong.apophenia.mavlink.MavlinkSessionManager
 import kotlinx.coroutines.runBlocking
 import java.util.UUID
 class ControlSampleWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
@@ -42,8 +44,9 @@ class ControlSampleWorker(context: Context, params: WorkerParameters) : Worker(c
    samples+=runCatching{AuxiliaryPresenceProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    samples+=runCatching{ObdContextProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    samples+=runCatching{AutomotiveContextProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
-   val driveSession=DriveSessionManager.activeId()
-   db.insertContext(samples.map{it.copy(captureId=captureId,metadata=if(it.metadata.isBlank())"control_source=$source" else "${it.metadata};control_source=$source",sessionId=it.sessionId?:driveSession)})
+   samples+=runCatching{MavlinkContextProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
+   val activeSession=MavlinkSessionManager.activeId()?:DriveSessionManager.activeId()
+   db.insertContext(samples.map{it.copy(captureId=captureId,metadata=if(it.metadata.isBlank())"control_source=$source" else "${it.metadata};control_source=$source",sessionId=it.sessionId?:activeSession)})
    db.insertSensitiveContext(runCatching{SensitiveContextProvider(applicationContext).collect(null,true,captureId)}.getOrDefault(emptyList()))
    if(source==SOURCE_RANDOM)ControlScheduler.scheduleNext(applicationContext)
    Result.success()

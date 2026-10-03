@@ -41,6 +41,7 @@ Open **Settings**.
 - **Tier-2 contents:** enablement requires typing the exact enum gate name, then the corresponding Android access. Expected: the gate can remain visibly armed while denied access produces no content rows. Current JSON export must contain no Tier-2 contents.
 - **OBD-II drive session:** pair an ELM327-style adapter in Android first, enable the vehicle gate, choose the paired adapter, and confirm the persistent drive-capture notification. Do this parked and treat the first physical run as bench validation; simulator PID/DTC results are not a hardware claim.
 - **Native Automotive properties:** on Automotive OS, enable the separate property gate and log a parked event. On a phone, Android Auto, or CarPlay projection-only host, expected behavior is an armed-but-unavailable gap—not fabricated vehicle values.
+- **MAVLink flight session:** enable the gate, then deliberately start UDP, TCP, or an attached USB/SiK device. Expected: a persistent flight-capture notification appears immediately; a durable session begins only after a valid airframe heartbeat. SIMULATION verifies software flow only. Keep the aircraft disarmed for first physical transport/telemetry checks and record link/airframe testing separately from build evidence.
 
 Basic observation logging must continue when every optional permission is denied.
 

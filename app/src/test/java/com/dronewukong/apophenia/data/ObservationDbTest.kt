@@ -186,7 +186,7 @@ class ObservationDbTest {
         legacy.close()
 
         db = ObservationDb(context)
-        assertEquals(6, db.readableDatabase.version)
+        assertEquals(7, db.readableDatabase.version)
         assertEquals("Legacy", db.observations().single().label)
         assertEquals(ObservationOrigin.ANDROID, db.observations().single().origin)
     }
@@ -207,6 +207,18 @@ class ObservationDbTest {
                 type = CaptureSessionType.DRIVE_SESSION,
                 startedAtMs = 450,
                 identityHash = "idhash:v1:test"
+            )
+        )
+        db.insertSessionEvents(
+            listOf(
+                SessionEvent(
+                    timestampMs = 475,
+                    sessionId = "drive:test",
+                    eventType = "STATUSTEXT",
+                    severity = 4,
+                    text = "verbatim flight text",
+                    metadata = "message_id=253"
+                )
             )
         )
         db.insertContext(listOf(sample(490, 1009.2).copy(observationId = observationId, phase = ContextPhase.PRE, sessionId = "drive:test")))
@@ -232,7 +244,7 @@ class ObservationDbTest {
         val exported = ExportManager.exportJson(db, outputDirectory)
         val json = JSONObject(exported.readText())
 
-        assertEquals(6, json.getInt("schema"))
+        assertEquals(7, json.getInt("schema"))
         val observation = json.getJSONArray("observations").getJSONObject(0)
         assertEquals(4, observation.getInt("vibeRating"))
         assertFalse(observation.getBoolean("egress"))
@@ -244,6 +256,7 @@ class ObservationDbTest {
         assertFalse(exported.readText().contains("should-never-export"))
         assertEquals("DRIVE_SESSION", json.getJSONArray("sessions").getJSONObject(0).getString("type"))
         assertEquals("drive:test", json.getJSONArray("sessionContext").getJSONObject(0).getString("sessionId"))
+        assertEquals("verbatim flight text", json.getJSONArray("sessionEvents").getJSONObject(0).getString("text"))
         outputDirectory.deleteRecursively()
     }
 

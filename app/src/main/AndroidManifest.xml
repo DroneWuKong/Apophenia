@@ -111,6 +111,11 @@
             android:foregroundServiceType="connectedDevice" />
 
         <service
+            android:name=".mavlink.FlightSessionService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <service
             android:name=".phone.NotificationCaptureService"
             android:exported="true"
             android:label="Apophenia notification context"

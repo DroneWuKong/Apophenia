@@ -8,6 +8,8 @@ When the vehicle gate is enabled and the operator starts a session, Apophenia co
 
 The separate native-Automotive gate reads only properties the Android Automotive host and vehicle permissions expose. Android Auto or Apple CarPlay projection does not automatically expose vehicle properties; on a projection-only host the app stores no invented substitute. Native rows contain property/area provenance and join the active drive session when present.
 
+The MAVLink gate opens no transport until the operator starts USB, UDP, or TCP capture. The foreground flight-session indicator remains visible while capture is armed. The first valid airframe system ID is locally hashed before persistence; exact `STATUSTEXT` and received position/telemetry values are local evidence and can be sensitive. UDP/TCP traffic stays within the operator-selected transport path, and no telemetry is uploaded by Apophenia. Simulator coverage is not hardware, link, field, or flight validation.
+
 Optional Health Connect reads are permission-gated and fail-soft. When authorized, Apophenia may read recent heart rate, resting heart rate, sleep, steps, SpO2, and exercise duration. The app does not write Health Connect records and logging still works when Health Connect is missing, unsupported, denied, or empty.
 
 The rolling buffer is bounded and pruned. It is not an unlimited surveillance log.
@@ -18,6 +20,7 @@ Network use:
 - Optional Octopod requests to the user-configured local cluster. Apophenia stores aggregate counts and average temperature only—not entity/person names, camera images, raw audio/video, or Home Assistant/SmartThings/Wyze credentials.
 - Optional on-device radio and presence snapshots. Wi-Fi stores a locally keyed BSSID hash, band/frequency, and RSSI while discarding SSIDs and raw BSSIDs. Bluetooth stores a locally keyed address hash, coarse advertised class/name category, and RSSI while discarding raw addresses and names. Network state stores connectivity, carrier/network type, roaming, and signal where Android exposes them; no cell ID is persisted.
 - Health Connect through Android's local Health Connect provider when explicitly authorized.
+- Operator-started MAVLink UDP/TCP traffic to or from the explicitly selected endpoint; no background connection is opened merely because the gate is enabled.
 
 Android cloud backup excludes the observation database. Android device-to-device transfer may copy the local database to a replacement device through the operating system's protected transfer mechanism. A user-selected JSON export is outside the app's local boundary once it is handed to another app or destination.
 

@@ -45,7 +45,7 @@ UI / widget / tile / external intent / Garmin
 | Component | Responsibility |
 | --- | --- |
 | `ObservationRepository` | Timestamp-first logging, pre-window copy, hypothesis routing, enrichment scheduling |
-| `ObservationDb` | SQLite schema, migrations, observations, hypotheses, scalar context, isolated encrypted contents, rolling buffer, controls |
+| `ObservationDb` | SQLite schema, migrations, observations, hypotheses, scalar context, session events, isolated encrypted contents, rolling buffer, controls |
 | `RollingRecorderService` | User-enabled foreground lifecycle for bounded rolling capture |
 | `RollingRecorder` | Samples and prunes the rolling scratch buffer |
 | `EventEnrichmentWorker` | Fail-soft instant context enrichment after the observation exists |
@@ -68,6 +68,9 @@ UI / widget / tile / external intent / Garmin
 | `Elm327Client` | Transport-independent AT initialization, standard PID polling, DTC parsing, and honest unsupported-command tracking |
 | `AutomotiveContextProvider` | Gate-backed Android Automotive property mapping with platform/permission degradation |
 | `ReflectionAutomotivePropertySource` | Optional `android.car` boundary loaded only on Automotive OS so the phone APK remains portable |
+| `MavlinkParser` / `MavlinkDecoder` | Streaming MAVLink 1/2 framing, CRC validation, and supported telemetry/event mapping |
+| `MavlinkSessionManager` | First-heartbeat airframe binding, hashed sysid session lifecycle, stream persistence, sequence gaps, and event/control snapshots |
+| `FlightSessionService` | Persistent foreground indicator and owner for UDP, TCP, USB/SiK, or simulated transport lifetime |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
@@ -116,6 +119,10 @@ The operator selects an already paired Bluetooth device. `BluetoothElm327Transpo
 ### Native Automotive properties
 
 The portable APK cannot directly link the optional `android.car` library on ordinary phones, so a narrow reflection adapter resolves only public Automotive class, property, config, and value methods when the device declares Automotive OS. Each property is permission-isolated and fail-soft. Projection-only Android Auto/CarPlay hosts return a visible platform gap rather than phone-derived substitutes. See [VEHICLE_AUTOMOTIVE.md](VEHICLE_AUTOMOTIVE.md).
+
+### MAVLink flight sessions
+
+An explicitly started foreground service owns one UDP listener, TCP client, USB bulk/CDC input, or deterministic simulation stream. The streaming parser accepts fragmented MAVLink 1/2 frames only after message-specific CRC validation. A durable session begins on the first valid nonzero-system heartbeat, whose raw sysid is hashed before persistence; frames from other systems are excluded. Scalar stream rows, exact `STATUSTEXT`, mode/failsafe transitions, component sequence gaps, and event/control telemetry-age snapshots share that flight-session timeline. See [MAVLINK.md](MAVLINK.md).
 
 ## Statistical boundary
 

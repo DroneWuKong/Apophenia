@@ -8,7 +8,7 @@ import com.dronewukong.apophenia.correlation.TimedCaptureValue
 
 data class ObservationInsertResult(val id: Long, val inserted: Boolean)
 
-class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 6) {
+class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db", null, 7) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -36,6 +36,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         createHypothesisTable(db)
         createSensitiveContextTable(db)
         createCaptureSessionTable(db)
+        createSessionEventTable(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -65,6 +66,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
             db.execSQL("ALTER TABLE context_samples ADD COLUMN session_id TEXT")
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_context_session ON context_samples(session_id,timestamp_ms)")
         }
+        if (oldVersion < 7) createSessionEventTable(db)
     }
 
     private fun createObservationIndexes(db: SQLiteDatabase) {
@@ -166,6 +168,23 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_session_status ON capture_sessions(status,type)")
     }
 
+    private fun createSessionEventTable(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS session_events(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              timestamp_ms INTEGER NOT NULL,
+              session_id TEXT NOT NULL,
+              event_type TEXT NOT NULL,
+              severity INTEGER,
+              text TEXT NOT NULL,
+              metadata TEXT NOT NULL DEFAULT '',
+              FOREIGN KEY(session_id) REFERENCES capture_sessions(id) ON DELETE CASCADE
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_session_event_time ON session_events(session_id,timestamp_ms)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_session_event_type ON session_events(event_type,timestamp_ms)")
+    }
+
     fun insertObservation(o: Observation): Long = insertObservationOrGet(o).id
 
     fun insertObservationOrGet(o: Observation): ObservationInsertResult {
@@ -256,6 +275,45 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
             put("status", session.status.name)
             put("metadata", session.metadata)
         })
+    }
+
+    fun insertSessionEvents(events: List<SessionEvent>) {
+        if (events.isEmpty()) return
+        writableDatabase.beginTransaction()
+        try {
+            events.forEach { event ->
+                writableDatabase.insertOrThrow("session_events", null, ContentValues().apply {
+                    put("timestamp_ms", event.timestampMs)
+                    put("session_id", event.sessionId)
+                    put("event_type", event.eventType)
+                    if (event.severity == null) putNull("severity") else put("severity", event.severity)
+                    put("text", event.text)
+                    put("metadata", event.metadata)
+                })
+            }
+            writableDatabase.setTransactionSuccessful()
+        } finally {
+            writableDatabase.endTransaction()
+        }
+    }
+
+    fun sessionEvents(sessionId: String? = null, limit: Int = 100_000): List<SessionEvent> {
+        val where = if (sessionId == null) "" else " WHERE session_id=?"
+        val args = if (sessionId == null) arrayOf(limit.toString()) else arrayOf(sessionId, limit.toString())
+        val out = mutableListOf<SessionEvent>()
+        readableDatabase.rawQuery(
+            "SELECT id,timestamp_ms,session_id,event_type,severity,text,metadata FROM session_events$where ORDER BY timestamp_ms LIMIT ?",
+            args
+        ).use { c -> while (c.moveToNext()) out += SessionEvent(
+            id = c.getLong(0),
+            timestampMs = c.getLong(1),
+            sessionId = c.getString(2),
+            eventType = c.getString(3),
+            severity = if (c.isNull(4)) null else c.getInt(4),
+            text = c.getString(5),
+            metadata = c.getString(6)
+        ) }
+        return out
     }
 
     fun endSession(
@@ -521,7 +579,7 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
 
     fun deleteAllData(){
         writableDatabase.beginTransaction()
-        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.setTransactionSuccessful() }
+        try { writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("session_events",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.setTransactionSuccessful() }
         finally { writableDatabase.endTransaction() }
     }
 

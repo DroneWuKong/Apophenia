@@ -37,13 +37,17 @@ Schema v5 adds scalar phone-context metrics for Wi-Fi presence, connectivity/net
 
 Schema v6 adds nullable `session_id` to scalar context. When a drive session is active, OBD values and concurrently captured phone/Bluetooth context carry the same ID. Session-stream rows use a unique `capture_id` per polling instant; event/control rows retain their event/control capture identity. Dense stream rows therefore remain distinguishable from independent human observations.
 
+MAVLink stream rows use source `mavlink` and the active `FLIGHT_SESSION`. Each row carries receive-time message/version provenance while raw system/component identifiers remain in memory only. Event/control snapshots store the latest received scalar with its original telemetry timestamp, age, and stale flag. `mavlink_telemetry_age_ms` uses a documented three-second staleness threshold. `mavlink_sequence_drops` counts receiver-observed forward sequence gaps; it is not an exactly-once or complete RF-loss measure.
+
 ## Capture session
 
-`capture_sessions` stores a random session ID, type (`DRIVE_SESSION` or future `FLIGHT_SESSION`), start/end timestamps, locally keyed equipment-identity hash, status (`ACTIVE`, `COMPLETED`, or `INTERRUPTED`), and non-identifying boundary metadata. A process restart marks an unclosed active drive session interrupted rather than pretending it ended cleanly.
+`capture_sessions` stores a random session ID, type (`DRIVE_SESSION` or `FLIGHT_SESSION`), start/end timestamps, locally keyed equipment-identity hash, status (`ACTIVE`, `COMPLETED`, or `INTERRUPTED`), and non-identifying boundary metadata. A process restart marks an unclosed active drive or flight session interrupted rather than pretending it ended cleanly.
 
 For an OBD drive session, one deliberate paired-adapter connection is the software boundary. Physical testing must determine how closely adapter connection lifetime matches one ignition cycle on a specific vehicle/adapter combination.
 
 Native Automotive OS rows use the same scalar context table and active drive-session ID when one exists. Every row retains the public vehicle-property name and area ID. Fuel level is stored in milliliters, EV battery level in watt-hours, speed in metres per second, and odometer in kilometres as exposed by Android Automotive; the app does not relabel raw capacity units as percentages.
+
+For MAVLink, one transport plus the first valid airframe `HEARTBEAT` defines the software flight-session boundary. The raw system ID is locally hashed before the session row is written. Schema v7 adds `session_events` for exact `STATUSTEXT`, mode/arm transitions, and failsafe-state transitions. Events retain receive time, type, optional severity, text, and message provenance. This boundary does not itself prove one physical flight.
 
 ## Sensitive context
 

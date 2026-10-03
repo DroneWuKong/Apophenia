@@ -81,6 +81,16 @@ data class CaptureSession(
     val metadata: String = ""
 )
 
+data class SessionEvent(
+    val id: Long = 0,
+    val timestampMs: Long,
+    val sessionId: String,
+    val eventType: String,
+    val severity: Int? = null,
+    val text: String,
+    val metadata: String = ""
+)
+
 /**
  * Encrypted Tier-2 content. Ciphertext and IV are the only content-bearing fields persisted.
  * These rows deliberately live outside context_samples so the normal data export cannot include

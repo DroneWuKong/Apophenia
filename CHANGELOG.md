@@ -54,10 +54,12 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Schema v6 capture sessions and `session_id` joins on context rows.
 - User-started ELM327 Bluetooth `DRIVE_SESSION` capture with standard OBD-II PIDs, stored/pending DTCs, hashed adapter identity, ten-second session samples, and a persistent foreground notification.
 - Fail-soft Android Automotive OS property capture for cabin/outside temperature, speed, gear, fuel/charge, and odometer, with area/property provenance and explicit projection-host limitations.
+- Schema v7 flight-session events plus user-started MAVLink 1/2 capture over UDP, TCP, and class-compliant USB/SiK transports.
+- CRC-validated flight telemetry for mode/arm state, GPS, position/velocity, EKF, battery, link health, exact `STATUSTEXT`, mode/failsafe transitions, observed sequence gaps, and telemetry age.
 
 ### Validation
 
-- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, and simulation-pipeline coverage run in the software-only unit suite.
+- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, MAVLink framing/session/staleness/STATUSTEXT behavior, and simulation-pipeline coverage run in the software-only unit suite.
 
 ## [0.3.0-preview.2] - 2026-10-02
 

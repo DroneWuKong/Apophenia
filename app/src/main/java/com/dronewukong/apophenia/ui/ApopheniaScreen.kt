@@ -44,6 +44,10 @@ import com.dronewukong.apophenia.work.PromptedCheckInState
 import com.dronewukong.apophenia.vehicle.DriveSessionManager
 import com.dronewukong.apophenia.vehicle.PairedObdAdapter
 import com.dronewukong.apophenia.vehicle.DriveSessionService
+import com.dronewukong.apophenia.mavlink.FlightSessionService
+import com.dronewukong.apophenia.mavlink.MavlinkEndpoint
+import com.dronewukong.apophenia.mavlink.MavlinkSessionManager
+import com.dronewukong.apophenia.mavlink.UsbMavlinkDevice
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -657,6 +661,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var promptedCheckIns by remember { mutableStateOf(PromptedCheckInState.isEnabled(activity)) }
     val garminBridge by GarminBridge.state.collectAsState()
     val driveState by DriveSessionManager.state.collectAsState()
+    val flightState by MavlinkSessionManager.state.collectAsState()
     var rollingSummary by remember { mutableStateOf("No samples yet") }
     var healthStatus by remember { mutableStateOf("Checking…") }
     var locationAllowed by remember { mutableStateOf(activity.hasLocationPermission()) }
@@ -694,6 +699,13 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     }
     var pairedObdAdapters by remember { mutableStateOf<List<PairedObdAdapter>>(emptyList()) }
     var showObdAdapterPicker by remember { mutableStateOf(false) }
+    var mavlinkEnabled by remember {
+        mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_MAVLINK_CAPTURE))
+    }
+    var mavlinkHost by remember { mutableStateOf("127.0.0.1") }
+    var mavlinkPort by remember { mutableStateOf("14550") }
+    var usbMavlinkDevices by remember { mutableStateOf<List<UsbMavlinkDevice>>(emptyList()) }
+    var showUsbMavlinkPicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -839,6 +851,25 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 showObdAdapterPicker = true
             }
         }
+    }
+
+    fun startMavlink(endpoint: MavlinkEndpoint) {
+        if (!notificationsAllowed) {
+            activity.requestNotificationPermission { granted, message ->
+                notificationsAllowed = granted
+                onMessage(message)
+                if (granted) startMavlink(endpoint)
+            }
+            return
+        }
+        FlightSessionService.start(activity, endpoint)
+        onMessage("MAVLink capture armed · waiting for a valid airframe heartbeat")
+    }
+
+    fun openUsbMavlinkPicker() {
+        usbMavlinkDevices = activity.usbMavlinkDevices()
+        if (usbMavlinkDevices.isEmpty()) onMessage("No attached USB serial/SiK device found")
+        else showUsbMavlinkPicker = true
     }
 
     LaunchedEffect(permissionRevision) { refreshPermissionState() }
@@ -1272,6 +1303,100 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
         }
 
+        item { SectionLabel("Flight / MAVLink") }
+        item {
+            SettingsCard(Icons.Default.Flight, "MAVLink flight session", "USB serial/SiK, UDP, or TCP telemetry binds to the first valid airframe heartbeat and groups one FLIGHT_SESSION.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = mavlinkEnabled, onCheckedChange = { enabled ->
+                        mavlinkEnabled = if (!enabled) {
+                            if (flightState.armed) FlightSessionService.stop(activity)
+                            HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_MAVLINK_CAPTURE, false)
+                            false
+                        } else {
+                            HardwareGates.setAuthorized(
+                                activity,
+                                HardwareGates.Gate.LIVE_MAVLINK_CAPTURE,
+                                true,
+                                HardwareGates.ConsentProof.SingleConfirmation
+                            ) == HardwareGates.AuthorizationResult.ENABLED
+                        }
+                    })
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            when {
+                                flightState.sessionId != null -> "FLIGHT_SESSION active"
+                                flightState.armed -> "Armed · awaiting heartbeat"
+                                mavlinkEnabled -> "Armed · no transport"
+                                else -> "Off"
+                            },
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            flightState.lastError ?: if (flightState.armed) {
+                                "${flightState.endpointLabel} · sysid ${flightState.systemId ?: "pending"} · ${flightState.frameCount} frames · ${flightState.packetDropCount} observed gaps"
+                            } else "Airframe sysid is locally hashed before session persistence",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                if (flightState.armed) {
+                    Button(onClick = { FlightSessionService.stop(activity) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("End flight session")
+                    }
+                } else if (simulation) {
+                    OutlinedButton(
+                        onClick = { startMavlink(MavlinkEndpoint.Simulation) },
+                        enabled = mavlinkEnabled,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Start simulated flight") }
+                } else {
+                    OutlinedTextField(
+                        value = mavlinkHost,
+                        onValueChange = { mavlinkHost = it.trim() },
+                        label = { Text("TCP host") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = mavlinkPort,
+                        onValueChange = { mavlinkPort = it.filter(Char::isDigit).take(5) },
+                        label = { Text("Port") },
+                        supportingText = { Text("UDP usually 14550 · TCP stacks commonly 5760") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { mavlinkPort.toIntOrNull()?.takeIf { it in 1..65535 }?.let { startMavlink(MavlinkEndpoint.Udp(it)) } ?: onMessage("Enter a valid UDP port") },
+                            enabled = mavlinkEnabled,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Listen UDP") }
+                        OutlinedButton(
+                            onClick = {
+                                val port = mavlinkPort.toIntOrNull()
+                                if (mavlinkHost.isBlank() || port == null || port !in 1..65535) onMessage("Enter a valid TCP host and port")
+                                else startMavlink(MavlinkEndpoint.Tcp(mavlinkHost, port))
+                            },
+                            enabled = mavlinkEnabled,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Connect TCP") }
+                    }
+                    OutlinedButton(
+                        onClick = ::openUsbMavlinkPicker,
+                        enabled = mavlinkEnabled,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Choose USB serial / SiK") }
+                }
+                Text(
+                    "STATUSTEXT is stored verbatim. Sequence gaps and telemetry age are evidence of the received stream, not an exactly-once-delivery claim. Physical link, radio, and airframe behavior still require hardware validation.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
         item { SectionLabel("Watch") }
         item {
             SettingsCard(Icons.Default.Watch, "Garmin Epix Pro (Gen 2)", garminBridge.deviceText) {
@@ -1438,6 +1563,36 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             },
             confirmButton = {},
             dismissButton = { TextButton(onClick = { showObdAdapterPicker = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (showUsbMavlinkPicker) {
+        AlertDialog(
+            onDismissRequest = { showUsbMavlinkPicker = false },
+            title = { Text("Choose attached MAVLink USB device") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    usbMavlinkDevices.forEach { device ->
+                        TextButton(
+                            onClick = {
+                                showUsbMavlinkPicker = false
+                                activity.requestUsbMavlinkPermission(device.deviceId) { granted, message ->
+                                    onMessage(message)
+                                    if (granted) startMavlink(MavlinkEndpoint.Usb(device.deviceId))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(device.displayName, fontWeight = FontWeight.SemiBold)
+                                Text("57,600 baud · class-compliant bulk/CDC", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showUsbMavlinkPicker = false }) { Text("Cancel") } }
         )
     }
 }

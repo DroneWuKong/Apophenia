@@ -2,8 +2,13 @@ package com.dronewukong.apophenia.ui
 
 import android.Manifest
 import android.app.AppOpsManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -24,6 +29,7 @@ import androidx.lifecycle.lifecycleScope
 import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import com.dronewukong.apophenia.hardware.HardwareGates
+import com.dronewukong.apophenia.mavlink.UsbMavlinkDevice
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -38,6 +44,7 @@ class MainActivity : ComponentActivity() {
     private var pendingTier2Gate: HardwareGates.Gate? = null
     private var healthResult: ((String) -> Unit)? = null
     private var requestedHealthPermissions: Set<String> = emptySet()
+    private var usbPermissionReceiver: BroadcastReceiver? = null
 
     var permissionRevision by mutableIntStateOf(0)
         private set
@@ -141,6 +148,12 @@ class MainActivity : ComponentActivity() {
         permissionRevision++
     }
 
+    override fun onDestroy() {
+        usbPermissionReceiver?.let { runCatching { unregisterReceiver(it) } }
+        usbPermissionReceiver = null
+        super.onDestroy()
+    }
+
     fun hasLocationPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -182,6 +195,56 @@ class MainActivity : ComponentActivity() {
         }
         vehicleBluetoothResult = onResult
         vehicleBluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+    }
+
+    fun usbMavlinkDevices(): List<UsbMavlinkDevice> {
+        val manager = getSystemService(UsbManager::class.java) ?: return emptyList()
+        return manager.deviceList.values.map { device ->
+            val label = listOfNotNull(
+                device.productName?.takeIf(String::isNotBlank),
+                device.manufacturerName?.takeIf(String::isNotBlank)
+            ).distinct().joinToString(" · ").ifBlank {
+                "USB ${device.vendorId.toString(16).padStart(4, '0')}:${device.productId.toString(16).padStart(4, '0')}"
+            }
+            UsbMavlinkDevice(device.deviceId, label)
+        }.sortedBy { it.displayName.lowercase() }
+    }
+
+    fun requestUsbMavlinkPermission(deviceId: Int, onResult: (Boolean, String) -> Unit) {
+        val manager = getSystemService(UsbManager::class.java)
+        val device = manager?.deviceList?.values?.firstOrNull { it.deviceId == deviceId }
+        if (manager == null || device == null) {
+            onResult(false, "USB device is no longer attached")
+            return
+        }
+        if (manager.hasPermission(device)) {
+            onResult(true, "USB device access is already enabled")
+            return
+        }
+        usbPermissionReceiver?.let { runCatching { unregisterReceiver(it) } }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action != ACTION_MAVLINK_USB_PERMISSION) return
+                val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                runCatching { unregisterReceiver(this) }
+                usbPermissionReceiver = null
+                onResult(granted, if (granted) "USB device access enabled" else "USB device access was not enabled")
+            }
+        }
+        usbPermissionReceiver = receiver
+        ContextCompat.registerReceiver(
+            this,
+            receiver,
+            IntentFilter(ACTION_MAVLINK_USB_PERMISSION),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        val pending = PendingIntent.getBroadcast(
+            this,
+            deviceId,
+            Intent(ACTION_MAVLINK_USB_PERMISSION).setPackage(packageName),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+        manager.requestPermission(device, pending)
     }
 
     fun hasTier2PlatformAccess(gate: HardwareGates.Gate): Boolean = when (gate) {
@@ -379,5 +442,6 @@ class MainActivity : ComponentActivity() {
         private const val PERMISSION_PREFS = "permission_requests"
         private const val KEY_LOCATION_REQUESTED = "location_requested"
         private const val KEY_NOTIFICATION_REQUESTED = "notification_requested"
+        private const val ACTION_MAVLINK_USB_PERMISSION = "com.dronewukong.apophenia.MAVLINK_USB_PERMISSION"
     }
 }
