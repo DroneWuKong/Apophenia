@@ -33,7 +33,8 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - database schema v4 with observation origin, external-event deduplication, explicit context phase, VIBE rating, and egress
 - application-scoped observation repository shared by UI, widget, tile, external intent, and Garmin ingest
 - optional privacy-reduced Octopod home context shared by event and control captures
-- optional privacy-reduced Wi-Fi/BLE/cellular radio snapshots shared by event and control captures
+- optional privacy-reduced Wi-Fi/cellular aggregate snapshots shared by event and control captures
+- gate-backed Bluetooth LE presence rows with locally keyed address hashes plus capture-level count/strongest-RSSI metrics
 - expandable timeline context capsules with explicit pre/instant/post phases
 
 ## Garmin Epix Pro (Gen 2)
@@ -133,7 +134,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 
 ## Next work
 
-The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Step 1 establishes gates, identifier hashing, and schema v4. Step 2 adds app/widget quick VIBE and egress capture. Neither step claims later channel adapters or physical validation.
+The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Step 1 establishes gates, identifier hashing, and schema v4. Step 2 adds app/widget quick VIBE and egress capture. Step 3 adds the Bluetooth channel in event/control/simulation paths. None of these software steps claims physical validation.
 
 ### Next physical-validation checklist — 3 October 2026
 

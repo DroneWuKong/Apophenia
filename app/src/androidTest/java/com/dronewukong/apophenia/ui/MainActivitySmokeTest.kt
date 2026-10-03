@@ -1,13 +1,11 @@
 package com.dronewukong.apophenia.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performScrollToIndex
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.dronewukong.apophenia.data.ObservationDb
 import org.junit.After
@@ -70,10 +68,9 @@ class MainActivitySmokeTest {
         compose.onNodeWithText("Phone sensors").assertIsDisplayed()
         compose.onNodeWithText("Location + weather").assertIsDisplayed()
         compose.onNodeWithText("Health Connect").performScrollTo().assertIsDisplayed()
-        compose.onNode(hasScrollAction()).performScrollToIndex(8)
-        compose.onNodeWithText("Radio environment").assertIsDisplayed()
-        compose.onNode(hasScrollAction()).performScrollToIndex(12)
-        compose.onNodeWithText("Octopod observer").assertIsDisplayed()
+        compose.onNodeWithText("Bluetooth presence").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Radio environment").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Octopod observer").performScrollTo().assertIsDisplayed()
     }
 
     private fun dismissContextIntroIfPresent() {

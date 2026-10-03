@@ -2,6 +2,7 @@ package com.dronewukong.apophenia.work
 import android.content.Context
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import com.dronewukong.apophenia.bluetooth.BluetoothContextProvider
 import com.dronewukong.apophenia.data.ContextSample
 import com.dronewukong.apophenia.data.ObservationStore
 import com.dronewukong.apophenia.environment.EnvironmentProvider
@@ -28,6 +29,7 @@ class ControlSampleWorker(context: Context, params: WorkerParameters) : Worker(c
    samples+=runBlocking{HealthConnectProvider(applicationContext).collect(null,true)}
    samples+=runCatching{HomeContextProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    samples+=runCatching{RadioContextProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
+   samples+=runCatching{BluetoothContextProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    db.insertContext(samples.map{it.copy(captureId=captureId,metadata=if(it.metadata.isBlank())"control_source=$source" else "${it.metadata};control_source=$source")})
    if(source==SOURCE_RANDOM)ControlScheduler.scheduleNext(applicationContext)
    Result.success()

@@ -5,7 +5,6 @@ Apophenia can optionally attach a privacy-reduced radio-environment snapshot to 
 ## What the phone can observe
 
 - visible Wi-Fi access-point count, 2.4/5/6 GHz band counts, and mean/strongest RSSI;
-- visible Bluetooth Low Energy advertiser count and mean/strongest RSSI;
 - visible cellular count, serving-cell count, radio-technology counts, and mean/strongest signal where Android exposes it.
 
 The collector stores one aggregate capture, not one statistical observation per access point, BLE device, or cell. Event and random-control captures use the same provider.
@@ -13,11 +12,12 @@ The collector stores one aggregate capture, not one statistical observation per 
 ## What is deliberately discarded
 
 - SSIDs and BSSIDs;
-- Bluetooth names and addresses;
 - cell identifiers and carrier-specific identity fields;
 - raw scan rows.
 
-The Settings toggle is off by default. Android requires precise location for Wi-Fi/cellular scan results and Nearby devices permission for BLE on Android 12+. Permission denial, disabled radios, missing telephony, scan throttling, and OEM background restrictions all fail soft.
+The Settings toggle is off by default. Android requires precise location for Wi-Fi/cellular scan results. Permission denial, disabled radios, missing telephony, scan throttling, and OEM background restrictions all fail soft.
+
+Bluetooth now has its own explicit gate and persistence contract; see [BLUETOOTH_CONTEXT.md](BLUETOOTH_CONTEXT.md).
 
 ## Important limitation
 

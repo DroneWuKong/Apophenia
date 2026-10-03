@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dronewukong.apophenia.correlation.AssociationEngine
 import com.dronewukong.apophenia.correlation.CaptureMatcher
+import com.dronewukong.apophenia.bluetooth.BluetoothContextProvider
 import com.dronewukong.apophenia.data.*
 import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.export.ExportManager
@@ -665,6 +667,11 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var radioAllowed by remember { mutableStateOf(activity.hasRadioPermissions()) }
     var radioStatus by remember { mutableStateOf(if (radioEnabled) "Ready to scan" else "Off") }
     var radioChecking by remember { mutableStateOf(false) }
+    var bluetoothEnabled by remember {
+        mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_BLUETOOTH_CAPTURE))
+    }
+    var bluetoothStatus by remember { mutableStateOf(if (bluetoothEnabled) "Ready to scan" else "Off") }
+    var bluetoothChecking by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -730,19 +737,38 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     fun testRadioContext() {
         if (radioChecking) return
         radioChecking = true
-        radioStatus = "Scanning Wi-Fi, Bluetooth LE, and cellular…"
+        radioStatus = "Scanning Wi-Fi and cellular…"
         scope.launch {
             val samples = withContext(Dispatchers.IO) { RadioContextProvider(activity).collect(null, false, force = true) }
             val wifi = samples.firstOrNull { it.metric == "radio_wifi_ap_count" }?.value?.toInt()
-            val ble = samples.firstOrNull { it.metric == "radio_ble_advertiser_count" }?.value?.toInt()
             val cells = samples.firstOrNull { it.metric == "radio_cell_count" }?.value?.toInt()
             radioStatus = if (samples.isEmpty()) {
                 "No radio data · check Nearby devices, precise location, Bluetooth, and device location"
             } else {
-                "Snapshot · ${wifi ?: 0} Wi-Fi · ${ble ?: 0} BLE · ${cells ?: 0} cells"
+                "Snapshot · ${wifi ?: 0} Wi-Fi · ${cells ?: 0} cells"
             }
             radioChecking = false
             onMessage(radioStatus)
+        }
+    }
+
+    fun testBluetoothContext() {
+        if (bluetoothChecking) return
+        bluetoothChecking = true
+        bluetoothStatus = "Scanning nearby Bluetooth LE advertisements…"
+        scope.launch {
+            val samples = withContext(Dispatchers.IO) {
+                BluetoothContextProvider(activity).collect(null, false)
+            }
+            val count = samples.firstOrNull { it.metric == "bt_nearby_count" }?.value?.toInt()
+            val strongest = samples.firstOrNull { it.metric == "bt_rssi_max" }?.value?.toInt()
+            bluetoothStatus = if (samples.isEmpty()) {
+                "No Bluetooth data · check the gate, Nearby devices, location, and Bluetooth"
+            } else {
+                "Snapshot · ${count ?: 0} devices" + (strongest?.let { " · strongest $it dBm" } ?: "")
+            }
+            bluetoothChecking = false
+            onMessage(bluetoothStatus)
         }
     }
 
@@ -830,6 +856,73 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
 
         item { SectionLabel("Radio context") }
         item {
+            SettingsCard(Icons.AutoMirrored.Filled.BluetoothSearching, "Bluetooth presence", "Hashed per-device BLE presence and capture-level counts/RSSI.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = bluetoothEnabled, onCheckedChange = { enabled ->
+                        if (!enabled) {
+                            HardwareGates.setAuthorized(
+                                activity,
+                                HardwareGates.Gate.LIVE_BLUETOOTH_CAPTURE,
+                                enabled = false
+                            )
+                            bluetoothEnabled = false
+                            bluetoothStatus = "Off"
+                        } else if (simulation || radioAllowed) {
+                            val result = HardwareGates.setAuthorized(
+                                activity,
+                                HardwareGates.Gate.LIVE_BLUETOOTH_CAPTURE,
+                                enabled = true,
+                                proof = HardwareGates.ConsentProof.SingleConfirmation
+                            )
+                            bluetoothEnabled = result == HardwareGates.AuthorizationResult.ENABLED
+                            bluetoothStatus = if (bluetoothEnabled) "Enabled · test a snapshot" else "Confirmation rejected"
+                        } else {
+                            activity.requestRadioPermissions { granted, message ->
+                                radioAllowed = granted
+                                if (granted) {
+                                    HardwareGates.setAuthorized(
+                                        activity,
+                                        HardwareGates.Gate.LIVE_BLUETOOTH_CAPTURE,
+                                        enabled = true,
+                                        proof = HardwareGates.ConsentProof.SingleConfirmation
+                                    )
+                                }
+                                bluetoothEnabled = granted
+                                bluetoothStatus = if (granted) "Enabled · test a snapshot" else "Permission required"
+                                onMessage(message)
+                            }
+                        }
+                    })
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (bluetoothEnabled) "Included in events and controls" else "Not collecting", fontWeight = FontWeight.SemiBold)
+                        Text(bluetoothStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                }
+                Text(
+                    "Stores a locally keyed address hash, advertised-device class, name category, and RSSI. Raw addresses and names never enter SQLite.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+                OutlinedButton(
+                    onClick = {
+                        if ((simulation || radioAllowed) && bluetoothEnabled) testBluetoothContext()
+                        else activity.requestRadioPermissions { granted, message ->
+                            radioAllowed = granted
+                            onMessage(message)
+                            if (granted && bluetoothEnabled) testBluetoothContext()
+                        }
+                    },
+                    enabled = !bluetoothChecking && bluetoothEnabled,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Radar, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (bluetoothChecking) "Scanning…" else "Take test snapshot")
+                }
+            }
+        }
+        item {
             SettingsCard(Icons.Default.CellTower, "Radio environment", "Optional aggregate snapshots from radios this phone exposes.") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = radioEnabled, onCheckedChange = { enabled ->
@@ -858,7 +951,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                     }
                 }
                 Text(
-                    "Wi-Fi 2.4/5/6 GHz, BLE advertisements, and cellular technology/signal. Counts and dBm only; identifiers are discarded.",
+                    "Wi-Fi 2.4/5/6 GHz and cellular technology/signal. Counts and dBm only; identifiers are discarded.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )

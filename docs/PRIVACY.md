@@ -12,7 +12,7 @@ Network use:
 - Open-Meteo only when location permission and the environment gate are enabled. A weather request necessarily sends approximate latitude/longitude and time to that service; the app does not attach an account identity.
 - Garmin communication through the paired-phone Connect IQ companion service.
 - Optional Octopod requests to the user-configured local cluster. Apophenia stores aggregate counts and average temperature only—not entity/person names, camera images, raw audio/video, or Home Assistant/SmartThings/Wyze credentials.
-- Optional on-device radio surveys. Apophenia stores Wi-Fi/BLE/cellular counts, band or technology counts, and RSSI summaries. It discards SSIDs, BSSIDs, Bluetooth names/addresses, cell IDs, and raw scan rows.
+- Optional on-device radio surveys. The Wi-Fi/cellular aggregate channel stores counts, band or technology counts, and RSSI summaries while discarding SSIDs, BSSIDs, cell IDs, and raw scan rows. The separately gated Bluetooth-presence channel stores a locally keyed hash of each visible address, a coarse advertised class/name category, and RSSI; raw Bluetooth addresses and names are never persisted.
 - Health Connect through Android's local Health Connect provider when explicitly authorized.
 
 Android cloud backup excludes the observation database. Android device-to-device transfer may copy the local database to a replacement device through the operating system's protected transfer mechanism. A user-selected JSON export is outside the app's local boundary once it is handed to another app or destination.

@@ -77,7 +77,7 @@ The app explains what works without a prompt and lets you review optional access
 - A Garmin Epix Pro (Gen 2) logger with watch timestamps and a bounded offline queue
 - Durable watch receipts: events leave the queue only after Android confirms local storage
 - Optional aggregate home context through an existing Octopod/Home Assistant cluster
-- Optional privacy-reduced Wi-Fi, Bluetooth LE, and cellular radio snapshots
+- Optional Wi-Fi/cellular aggregates plus gate-backed Bluetooth LE presence with locally keyed device hashes
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
 - Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 
@@ -205,6 +205,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Garmin Epix Pro integration](docs/GARMIN_EPIX_PRO.md)
 - [Optional Octopod home context](docs/HOME_CONTEXT.md)
 - [Optional radio context](docs/RADIO_CONTEXT.md)
+- [Bluetooth presence channel](docs/BLUETOOTH_CONTEXT.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)

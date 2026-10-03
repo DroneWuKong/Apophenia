@@ -1,10 +1,6 @@
 package com.dronewukong.apophenia.radio
 
 import android.Manifest
-import android.bluetooth.BluetoothManager
-import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanResult
-import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
@@ -20,7 +16,6 @@ import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import com.dronewukong.apophenia.data.ContextSample
 import com.dronewukong.apophenia.hardware.HardwareGates
-import java.util.concurrent.ConcurrentHashMap
 
 object RadioContextSettings {
     private const val PREFS = "radio_context"
@@ -40,7 +35,12 @@ data class RadioMetric(val name: String, val value: Double, val unit: String)
 
 /** Converts one radio snapshot into aggregate metrics. Device and network identifiers never leave memory. */
 object RadioSnapshotAggregator {
-    fun aggregate(wifi: List<WifiSignal>, ble: List<BleSignal>, cells: List<CellSignal>): List<RadioMetric> {
+    fun aggregate(
+        wifi: List<WifiSignal>,
+        ble: List<BleSignal>,
+        cells: List<CellSignal>,
+        includeBle: Boolean = true
+    ): List<RadioMetric> {
         val out = mutableListOf<RadioMetric>()
         fun signals(prefix: String, levels: List<Int>) {
             out += RadioMetric("${prefix}_count", levels.size.toDouble(), "count")
@@ -54,7 +54,7 @@ object RadioSnapshotAggregator {
         out += RadioMetric("radio_wifi_2g_count", wifi.count { it.frequencyMhz in 2_400..2_500 }.toDouble(), "count")
         out += RadioMetric("radio_wifi_5g_count", wifi.count { it.frequencyMhz in 4_900..5_895 }.toDouble(), "count")
         out += RadioMetric("radio_wifi_6g_count", wifi.count { it.frequencyMhz in 5_925..7_125 }.toDouble(), "count")
-        signals("radio_ble_advertiser", ble.map { it.rssiDbm })
+        if (includeBle) signals("radio_ble_advertiser", ble.map { it.rssiDbm })
         out += RadioMetric("radio_cell_count", cells.size.toDouble(), "count")
         out += RadioMetric("radio_cell_registered_count", cells.count { it.registered }.toDouble(), "count")
         cells.groupingBy { it.technology.lowercase() }.eachCount().toSortedMap().forEach { (technology, count) ->
@@ -78,17 +78,22 @@ class RadioContextProvider(private val context: Context) {
                 isControl,
                 RadioSnapshotAggregator.aggregate(
                     wifi = listOf(WifiSignal(2_437, -54), WifiSignal(5_180, -68), WifiSignal(5_955, -72)),
-                    ble = listOf(BleSignal(-61), BleSignal(-79)),
-                    cells = listOf(CellSignal("nr", -93, true), CellSignal("lte", -105, false))
+                    ble = emptyList(),
+                    cells = listOf(CellSignal("nr", -93, true), CellSignal("lte", -105, false)),
+                    includeBle = false
                 ),
                 source = "simulation/radio"
             )
         }
         val wifi = collectWifi()
-        val ble = collectBle()
         val cells = collectCells()
-        if (wifi.isEmpty() && ble.isEmpty() && cells.isEmpty()) return emptyList()
-        return toSamples(observationId, isControl, RadioSnapshotAggregator.aggregate(wifi, ble, cells), "android_radio")
+        if (wifi.isEmpty() && cells.isEmpty()) return emptyList()
+        return toSamples(
+            observationId,
+            isControl,
+            RadioSnapshotAggregator.aggregate(wifi, emptyList(), cells, includeBle = false),
+            "android_radio"
+        )
     }
 
     private fun collectWifi(): List<WifiSignal> {
@@ -99,33 +104,6 @@ class RadioContextProvider(private val context: Context) {
             manager.startScan()
             @Suppress("DEPRECATION")
             manager.scanResults.map { WifiSignal(it.frequency, it.level) }
-        }.getOrDefault(emptyList())
-    }
-
-    private fun collectBle(windowMs: Long = 1_500): List<BleSignal> {
-        if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) return emptyList()
-        if (Build.VERSION.SDK_INT < 31 && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return emptyList()
-        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter ?: return emptyList()
-        val scanner = runCatching { adapter.bluetoothLeScanner }.getOrNull() ?: return emptyList()
-        val results = ConcurrentHashMap<String, Int>()
-        val callback = object : ScanCallback() {
-            override fun onScanResult(callbackType: Int, result: ScanResult) {
-                val key = runCatching { result.device.address }.getOrElse { "result:${result.hashCode()}" }
-                results[key] = result.rssi
-            }
-
-            override fun onBatchScanResults(batchResults: MutableList<ScanResult>) {
-                batchResults.forEach { onScanResult(0, it) }
-            }
-        }
-        return runCatching {
-            scanner.startScan(null, ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build(), callback)
-            try {
-                Thread.sleep(windowMs)
-            } finally {
-                runCatching { scanner.stopScan(callback) }
-            }
-            results.values.map(::BleSignal)
         }.getOrDefault(emptyList())
     }
 
