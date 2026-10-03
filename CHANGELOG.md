@@ -59,10 +59,12 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - User-started CRSF/ELRS and GHST/IRONghost USB link-stat capture with a persistent indicator, directional CRSF values, explicit GHST downlink gaps, and flight-session joins.
 - Event/control-window Field-Kit UDP snapshots for band RSSI, threshold crossings, and trigger events with hashed ESP32 identity.
 - TAK CoT multicast snapshots with hashed own-UID filtering by default and a separate Tier-3 full-visible-traffic gate that labels connection visibility and omits callsign text.
+- Gate-backed ground snapshots with normalized barometer trend, magnetic magnitude/declination, local solar phase, and cached public NOAA Kp/F10.7 observations.
+- Tier-3 RTL-SDR survey windows over an operator-started `rtl_tcp` driver, with bounded app-private IQ, SHA-256 inventory, receiver-relative spectrum summaries, and retention pruning.
 
 ### Validation
 
-- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, MAVLink framing/session/staleness/STATUSTEXT behavior, CRSF/GHST framing, Field-Kit parsing, TAK own/full filtering, and simulation-pipeline coverage run in the software-only unit suite.
+- Gate-confirmation, hash-stability/rotation, VIBE invariants, schema migration, Tier-2 encryption/AAD rejection, export exclusion, channel bypass, ELM327 parsing/PID/DTC/session behavior, MAVLink framing/session/staleness/STATUSTEXT behavior, CRSF/GHST framing, Field-Kit parsing, TAK own/full filtering, ground/space-weather parsing, RF window/spectrum behavior, and simulation-pipeline coverage run in the software-only unit suite.
 
 ## [0.3.0-preview.2] - 2026-10-02
 

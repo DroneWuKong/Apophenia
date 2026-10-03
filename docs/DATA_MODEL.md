@@ -55,6 +55,10 @@ Field-Kit rows use source `field_kit` and contain a locally keyed device hash, s
 
 TAK rows use `tak_own` or `tak_visible`. The configured own UID and every received UID are locally keyed hashes; callsign text is omitted. Full-gate rows carry `scope=visible_on_your_connection`, while default rows require the own-asset UID hash. CoT location, error, track, and receive-age values remain scalar context and join an active flight session when present.
 
+Ground rows use `android_ground`, `local_solar`, or `noaa_swpc`. Pressure is normalized to hPa; trend is hPa/hour from a prior snapshot no more than 24 hours old. Magnetic axes/magnitude are microtesla, platform geomagnetic declination and local solar elevation are degrees, Kp is an index, and F10.7 is solar flux units. Public-source timestamps stay in metadata so fetch time is not misrepresented as observation time.
+
+RF survey rows use source `rf_survey` and one event/control `capture_id`. Scalar rows include center frequency, sample rate, bounded IQ byte count, receiver-relative RMS/peak dBFS, and peak offset. Metadata inventories the app-private raw IQ by opaque ID, SHA-256, window, and retention; it does not persist a filesystem path or represent dBFS as calibrated field strength.
+
 ## Sensitive context
 
 `sensitive_context` is deliberately separate from `context_samples`. A row contains timestamp, optional observation ID, control flag, source, content type, `capture_id`, AES-GCM ciphertext, IV, and a non-secret key alias. Plaintext is encrypted in memory before the database insert. The associated data binds source, content type, and capture ID, so moving ciphertext to a different capture or channel makes authentication fail.

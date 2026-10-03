@@ -55,6 +55,10 @@ import com.dronewukong.apophenia.fieldkit.FieldKitContextProvider
 import com.dronewukong.apophenia.fieldkit.FieldKitSettings
 import com.dronewukong.apophenia.tak.TakContextProvider
 import com.dronewukong.apophenia.tak.TakSettings
+import com.dronewukong.apophenia.ground.GroundContextProvider
+import com.dronewukong.apophenia.rf.RfSurveyConfig
+import com.dronewukong.apophenia.rf.RfSurveyContextProvider
+import com.dronewukong.apophenia.rf.RfSurveySettings
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -727,6 +731,16 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var takGroup by remember { mutableStateOf(TakSettings.group(activity)) }
     var takPort by remember { mutableStateOf(TakSettings.port(activity).toString()) }
     var confirmTakFull by remember { mutableStateOf(false) }
+    var groundEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_GROUND_CONTEXT_CAPTURE)) }
+    var rfSurveyEnabled by remember { mutableStateOf(HardwareGates.isAuthorized(activity, HardwareGates.Gate.LIVE_RF_SURVEY_CAPTURE)) }
+    val initialRfConfig = remember { RfSurveySettings.load(activity) }
+    var rfHost by remember { mutableStateOf(initialRfConfig.host) }
+    var rfPort by remember { mutableStateOf(initialRfConfig.port.toString()) }
+    var rfCenterMhz by remember { mutableStateOf((initialRfConfig.centerFrequencyHz / 1_000_000.0).toString()) }
+    var rfSampleRate by remember { mutableStateOf(initialRfConfig.sampleRateHz.toString()) }
+    var rfWindowMs by remember { mutableStateOf(initialRfConfig.windowMs.toString()) }
+    var rfRetentionDays by remember { mutableStateOf(initialRfConfig.retentionDays.toString()) }
+    var confirmRfSurvey by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val permissionRevision = activity.permissionRevision
 
@@ -1558,6 +1572,88 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
         }
 
+        item { SectionLabel("Ground context + owned RF receiver") }
+        item {
+            SettingsCard(Icons.Default.Explore, "Ground context", "Local barometer, magnetic field and declination, solar phase, plus gated public NOAA Kp and F10.7 indices.") {
+                GateSwitchRow(
+                    title = "Ground-context snapshots",
+                    detail = "Event/control windows only. NOAA lookup additionally follows the existing environment lookup gate.",
+                    enabled = groundEnabled,
+                    onCheckedChange = { enabled ->
+                        groundEnabled = if (enabled) HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_GROUND_CONTEXT_CAPTURE, true, HardwareGates.ConsentProof.SingleConfirmation) == HardwareGates.AuthorizationResult.ENABLED
+                        else { HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_GROUND_CONTEXT_CAPTURE, false); false }
+                    }
+                )
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val rows = withContext(Dispatchers.IO) { GroundContextProvider(activity).collect(null, false) }
+                            val local = rows.count { it.source.contains("ground") || it.source == "local_solar" }
+                            val space = rows.count { it.metric.startsWith("space_weather_") }
+                            onMessage(if (rows.isEmpty()) "No ground channels available in this window" else "Ground snapshot · $local local · $space space-weather metrics")
+                        }
+                    },
+                    enabled = groundEnabled,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Test ground snapshot") }
+                Text("Pressure is normalized to hPa. Declination and solar phase need an authorized location fix; missing phone sensors remain absent rather than synthesized.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
+        item {
+            SettingsCard(Icons.Default.GraphicEq, "RTL-SDR survey window", "Tier 3 · bounded IQ from your attached OTG receiver through a user-started rtl_tcp-compatible Android driver.") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("RF survey capture", fontWeight = FontWeight.SemiBold)
+                        Text("Raw IQ is app-private, SHA-256 inventoried, and purged after the configured retention period.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                    Switch(checked = rfSurveyEnabled, onCheckedChange = { enabled ->
+                        if (!enabled) { HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_RF_SURVEY_CAPTURE, false); rfSurveyEnabled = false }
+                        else confirmRfSurvey = true
+                    })
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = rfHost, onValueChange = { rfHost = it.trim() }, label = { Text("rtl_tcp host") }, singleLine = true, modifier = Modifier.weight(1.3f))
+                    OutlinedTextField(value = rfPort, onValueChange = { rfPort = it.filter(Char::isDigit).take(5) }, label = { Text("Port") }, singleLine = true, modifier = Modifier.weight(0.7f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = rfCenterMhz, onValueChange = { rfCenterMhz = it.filter { c -> c.isDigit() || c == '.' }.take(10) }, label = { Text("Center MHz") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = rfSampleRate, onValueChange = { rfSampleRate = it.filter(Char::isDigit).take(8) }, label = { Text("Sample rate") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = rfWindowMs, onValueChange = { rfWindowMs = it.filter(Char::isDigit).take(4) }, label = { Text("Window ms") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = rfRetentionDays, onValueChange = { rfRetentionDays = it.filter(Char::isDigit).take(4) }, label = { Text("Retention days") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+                fun configuredRf(): RfSurveyConfig? = runCatching {
+                    RfSurveyConfig(
+                        host = rfHost,
+                        port = rfPort.toInt(),
+                        centerFrequencyHz = (rfCenterMhz.toDouble() * 1_000_000.0).toLong(),
+                        sampleRateHz = rfSampleRate.toInt(),
+                        windowMs = rfWindowMs.toInt(),
+                        retentionDays = rfRetentionDays.toInt()
+                    )
+                }.getOrNull()
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        configuredRf()?.let { RfSurveySettings.save(activity, it); onMessage("RF survey settings saved") }
+                            ?: onMessage("Check RTL host, port, frequency, sample rate, window, and retention")
+                    }, modifier = Modifier.weight(1f)) { Text("Save") }
+                    OutlinedButton(onClick = {
+                        val config = configuredRf()
+                        if (config == null) onMessage("Check RF survey settings") else {
+                            RfSurveySettings.save(activity, config)
+                            scope.launch {
+                                val rows = withContext(Dispatchers.IO) { runCatching { RfSurveyContextProvider(activity).collect(null, false) }.getOrDefault(emptyList()) }
+                                val bytes = rows.firstOrNull { it.metric == "rf_iq_bytes" }?.value?.toInt()
+                                onMessage(if (bytes == null) "No rtl_tcp IQ window · check OTG driver and endpoint" else "RF snapshot · $bytes bounded IQ bytes")
+                            }
+                        }
+                    }, enabled = rfSurveyEnabled, modifier = Modifier.weight(1f)) { Text("Test window") }
+                }
+                Text("This records what the configured receiver hears during the capture window. It does not identify transmitters, decode communications, or claim calibrated RF power.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
+
         item { SectionLabel("Watch") }
         item {
             SettingsCard(Icons.Default.Watch, "Garmin Epix Pro (Gen 2)", garminBridge.deviceText) {
@@ -1798,6 +1894,21 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 }) { Text("Enable full traffic") }
             },
             dismissButton = { TextButton(onClick = { confirmTakFull = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (confirmRfSurvey) {
+        AlertDialog(
+            onDismissRequest = { confirmRfSurvey = false },
+            title = { Text("Enable live RF survey windows?") },
+            text = { Text("At event and control windows, Apophenia will command your configured rtl_tcp receiver, retain a bounded raw IQ file in app-private storage, and store spectrum summary metrics. Receiver availability, tuning limits, local law, calibration, and antenna behavior remain external capabilities that Apophenia will not invent.") },
+            confirmButton = {
+                Button(onClick = {
+                    rfSurveyEnabled = HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_RF_SURVEY_CAPTURE, true, HardwareGates.ConsentProof.CapabilityConditionalConfirmation) == HardwareGates.AuthorizationResult.ENABLED
+                    confirmRfSurvey = false
+                }) { Text("Enable RF survey") }
+            },
+            dismissButton = { TextButton(onClick = { confirmRfSurvey = false }) { Text("Cancel") } }
         )
     }
 }

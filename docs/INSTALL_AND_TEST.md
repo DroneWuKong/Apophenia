@@ -45,6 +45,8 @@ Open **Settings**.
 - **CRSF/GHST:** enable the control-link gate, select protocol/baud and the attached radio/transmitter USB device. Expected: a persistent indicator and CRC-valid link frames only. Compare values with the source display before trusting units.
 - **Field-Kit:** enable the gate, configure the owned ESP32's UDP port, then use **Test window** while it broadcasts. Expected: a bounded snapshot or a specific no-datagram result; the listener is not continuous.
 - **TAK:** enter the own CoT UID once (stored only as a hash), configure the multicast group/port, and test. Default results must be own-track only. The separate full-visible-traffic switch requires another confirmation and must label other tracks as visible on your connection.
+- **Ground context:** enable the gate and test. A phone may lack a barometer; magnetic declination and solar phase require an authorized location. NOAA Kp/F10.7 also require the existing environment lookup gate and network access.
+- **RF survey:** start an `rtl_tcp`-compatible Android driver for an owned OTG RTL-SDR, enter its endpoint/tuning/window settings, deliberately enable the Tier-3 gate, and test. First hardware work is receiver/USB bench validation only; dBFS is not calibrated RF power.
 
 Basic observation logging must continue when every optional permission is denied.
 

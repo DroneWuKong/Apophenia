@@ -75,6 +75,8 @@ UI / widget / tile / external intent / Garmin
 | `ControlLinkManager` / `ControlLinkService` | Latest-value snapshots, flight-session joins, and persistent USB capture ownership |
 | `FieldKitContextProvider` | Bounded event/control UDP window and hashed detector snapshot mapping |
 | `TakContextProvider` | Bounded CoT multicast window, keyed own-UID filtering, and separately gated full-visible traffic |
+| `GroundContextProvider` | Gate-backed barometer/magnetic/solar snapshot plus cached NOAA Kp/F10.7 observations |
+| `RfSurveyContextProvider` | Tier-3 bounded `rtl_tcp` IQ window, app-private artifact inventory, and receiver-relative spectral summary |
 | `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
 | `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
 | `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |

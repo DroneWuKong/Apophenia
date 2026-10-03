@@ -18,6 +18,7 @@ The rolling buffer is bounded and pruned. It is not an unlimited surveillance lo
 
 Network use:
 - Open-Meteo only when location permission and the environment gate are enabled. A weather request necessarily sends approximate latitude/longitude and time to that service; the app does not attach an account identity.
+- NOAA SWPC Kp/F10.7 only when both ground-context and environment-lookup gates are enabled. The request contains no device identifier or location. Raw RTL-SDR IQ stays in app-private storage under the configured retention period and leaves only through a later explicit evidence-export route.
 - Garmin communication through the paired-phone Connect IQ companion service.
 - Optional Octopod requests to the user-configured local cluster. Apophenia stores aggregate counts and average temperature only—not entity/person names, camera images, raw audio/video, or Home Assistant/SmartThings/Wyze credentials.
 - Optional on-device radio and presence snapshots. Wi-Fi stores a locally keyed BSSID hash, band/frequency, and RSSI while discarding SSIDs and raw BSSIDs. Bluetooth stores a locally keyed address hash, coarse advertised class/name category, and RSSI while discarding raw addresses and names. Network state stores connectivity, carrier/network type, roaming, and signal where Android exposes them; no cell ID is persisted.
