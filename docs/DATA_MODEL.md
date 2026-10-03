@@ -26,6 +26,8 @@ The stable presentation mapping is:
 
 **FUCK THIS, I'M OUT** records `VIBE=5` plus `egress=true`. Egress is intentionally distinct from rating 5 without departure so later analysis can compare moments the operator left with moments they stayed. Non-VIBE rows cannot contain either VIBE field.
 
+Quick capture constructs the complete request at the initial tap/press. Repository scheduling, enrichment, widget delivery, and optional note entry never replace that timestamp with a later receive, sync, or save time.
+
 ## Context sample
 A scalar measurement with timestamp, source, metric, value and unit. It may be attached to an observation or marked as a random control.
 

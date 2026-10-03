@@ -1,6 +1,8 @@
 package com.dronewukong.apophenia.ui
 
 import android.content.Context
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -15,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,6 +54,12 @@ private data class QuickAction(
     val captureLabel: String = title,
     val kind: ObservationKind = ObservationKind.OBSERVATION,
     val icon: ImageVector
+)
+
+private data class PendingVibeNote(
+    val grade: VibeGrade,
+    val egress: Boolean,
+    val timestampMs: Long
 )
 
 private val appColors = darkColorScheme(
@@ -154,6 +163,8 @@ private fun LogTab(repo: ObservationRepository, onSaved: () -> Unit, onOpenSetti
     var label by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf(ObservationKind.OBSERVATION) }
+    var pendingVibeNote by remember { mutableStateOf<PendingVibeNote?>(null) }
+    var vibeNote by remember { mutableStateOf("") }
     var common by remember { mutableStateOf<List<String>>(emptyList()) }
     val context = LocalContext.current
     val recorderEnabled = RollingRecorderState.isEnabled(context)
@@ -170,6 +181,14 @@ private fun LogTab(repo: ObservationRepository, onSaved: () -> Unit, onOpenSetti
             QuickAction("Hypothesis", "I think this happens when…", ObservationKind.HYPOTHESIS_NOTE, Icons.Default.Science),
             QuickAction("Other", "", icon = Icons.Default.MoreHoriz)
         )
+    }
+    fun captureVibe(grade: VibeGrade, egress: Boolean = false) {
+        val capturedAt = System.currentTimeMillis()
+        repo.log(VibeCapture.request(grade, capturedAt, egress = egress), onSaved = { onSaved() })
+    }
+    fun openVibeNote(grade: VibeGrade, egress: Boolean = false) {
+        pendingVibeNote = PendingVibeNote(grade, egress, System.currentTimeMillis())
+        vibeNote = ""
     }
 
     LaunchedEffect(Unit) {
@@ -208,6 +227,38 @@ private fun LogTab(repo: ObservationRepository, onSaved: () -> Unit, onOpenSetti
                     Text("Timestamp now · context follows", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
             }
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                SectionLabel("Vibe")
+                Text(
+                    "Single tap logs immediately · hold for an optional note",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        VibeGrade.entries.chunked(2).forEach { rowGrades ->
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rowGrades.forEach { grade ->
+                        VibeCaptureButton(
+                            grade = grade,
+                            modifier = Modifier.weight(1f),
+                            onCapture = { captureVibe(grade) },
+                            onNote = { openVibeNote(grade) }
+                        )
+                    }
+                    if (rowGrades.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+        item {
+            EgressCaptureButton(
+                onCapture = { captureVibe(VibeGrade.FUCKY, egress = true) },
+                onNote = { openVibeNote(VibeGrade.FUCKY, egress = true) }
+            )
         }
 
         item {
@@ -305,6 +356,101 @@ private fun LogTab(repo: ObservationRepository, onSaved: () -> Unit, onOpenSetti
             },
             dismissButton = { TextButton(onClick = { showForm = false }) { Text("Cancel") } }
         )
+    }
+
+
+    pendingVibeNote?.let { pending ->
+        AlertDialog(
+            onDismissRequest = { pendingVibeNote = null },
+            title = { Text(if (pending.egress) VibeGrade.EGRESS_LABEL else pending.grade.renderedLabel) },
+            text = {
+                OutlinedTextField(
+                    label = { Text("Optional note") },
+                    value = vibeNote,
+                    onValueChange = { vibeNote = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    repo.log(
+                        VibeCapture.request(
+                            grade = pending.grade,
+                            timestampMs = pending.timestampMs,
+                            note = vibeNote,
+                            egress = pending.egress
+                        ),
+                        onSaved = { onSaved() }
+                    )
+                    pendingVibeNote = null
+                    vibeNote = ""
+                }) { Text("Save stamped vibe") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingVibeNote = null }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun VibeCaptureButton(
+    grade: VibeGrade,
+    modifier: Modifier = Modifier,
+    onCapture: () -> Unit,
+    onNote: () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .height(58.dp)
+            .combinedClickable(
+                role = Role.Button,
+                onClickLabel = "Log ${grade.renderedLabel}",
+                onLongClickLabel = "Add a note to ${grade.renderedLabel}",
+                onClick = onCapture,
+                onLongClick = onNote
+            ),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Box(Modifier.fillMaxSize().padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+            Text(
+                grade.renderedLabel,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun EgressCaptureButton(onCapture: () -> Unit, onNote: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .combinedClickable(
+                role = Role.Button,
+                onClickLabel = "Log egress",
+                onLongClickLabel = "Add a note to egress",
+                onClick = onCapture,
+                onLongClick = onNote
+            ),
+        color = Color(0xFFB3261E),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Box(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+            Text(
+                VibeGrade.EGRESS_LABEL,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }
 

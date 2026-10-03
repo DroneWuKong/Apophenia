@@ -43,6 +43,8 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Total Circumstances gate inventory with standard, deliberate, and capability-conditional consent contracts plus explicit runtime gap reasons.
 - Keystore-backed, generation-versioned HMAC identifiers for MAC addresses, BSSIDs, and adapter/system IDs.
 - Schema v4 `VIBE` evidence with exact 1–5 presentation labels and a first-class `egress` flag.
+- One-tap VIBE controls in the app and a six-option home-screen widget, including the full-width red egress action.
+- App long-press note capture that preserves the initial press timestamp while the optional note is entered.
 
 ### Validation
 

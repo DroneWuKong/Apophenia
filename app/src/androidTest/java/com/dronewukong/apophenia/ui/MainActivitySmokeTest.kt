@@ -47,6 +47,23 @@ class MainActivitySmokeTest {
     }
 
     @Test
+    fun logsVibeAndEgressWithoutLeavingTheCaptureSurface() {
+        dismissContextIntroIfPresent()
+
+        compose.onNodeWithText("Bad 🙁").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithText("FUCK THIS, I'M OUT").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithText("Timeline").performClick()
+
+        compose.waitUntil(timeoutMillis = 10_000) {
+            runCatching {
+                compose.onNodeWithText("Bad 🙁").assertIsDisplayed()
+                compose.onNodeWithText("FUCK THIS, I'M OUT").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
+    }
+
+    @Test
     fun settingsExposeOptionalContextPermissions() {
         dismissContextIntroIfPresent()
         compose.onNodeWithText("Settings").performClick()

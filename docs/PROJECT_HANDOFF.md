@@ -15,6 +15,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - explicit hardware/simulation gates
 - local SQLite database
 - observation types: observation, coincidence, hypothesis note, weird, and schema-backed VIBE/egress evidence
+- one-tap app and widget VIBE capture with the five exact ordinal labels and a distinct full-width egress action
 - immediate timestamp-first logging
 - widget and Quick Settings tile
 - random control sampling
@@ -132,7 +133,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 
 ## Next work
 
-The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Step 1 establishes gates, identifier hashing, and schema v4; a gate in this foundation does not claim its adapter has been implemented or physically validated.
+The Total Circumstances implementation is deliberately split into the 23 review steps in the v0.3 master plan. Step 1 establishes gates, identifier hashing, and schema v4. Step 2 adds app/widget quick VIBE and egress capture. Neither step claims later channel adapters or physical validation.
 
 ### Next physical-validation checklist — 3 October 2026
 

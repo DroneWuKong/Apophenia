@@ -65,6 +65,7 @@ The app explains what works without a prompt and lets you review optional access
 ## What I made
 
 - A **THAT WAS WEIRD** button that timestamps first and enriches second
+- One-tap graded VIBE capture plus a distinct red **FUCK THIS, I'M OUT** egress event in the app and widget
 - Quick logging for observations, headache, sinus/congestion, light, sound, body sensations, coincidences, hypotheses, and custom entries
 - A home-screen widget and Quick Settings tile
 - Local SQLite storage, JSON export, and delete controls
@@ -199,6 +200,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Architecture](docs/ARCHITECTURE.md)
 - [Data model and statistical boundaries](docs/DATA_MODEL.md)
 - [Capture gates and consent tiers](docs/CAPTURE_GATES.md)
+- [Quick VIBE capture](docs/QUICK_VIBE.md)
 - [Install and remote test guide](docs/INSTALL_AND_TEST.md)
 - [Garmin Epix Pro integration](docs/GARMIN_EPIX_PRO.md)
 - [Optional Octopod home context](docs/HOME_CONTEXT.md)
