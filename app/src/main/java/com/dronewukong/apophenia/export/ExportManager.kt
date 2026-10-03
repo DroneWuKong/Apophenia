@@ -33,7 +33,9 @@ object ExportManager {
         evidenceMaterializer: ExportEvidenceMaterializer = AndroidExportEvidenceMaterializer(context)
     ): PreparedExport {
         requireLiveDatabase(db)
-        require(tier != ExportTier.FULL_BACKUP) { "Full backups are built by BackupManager" }
+        require(tier == ExportTier.DATA_ONLY || tier == ExportTier.FULL_EVIDENCE) {
+            "${tier.displayName} is built by its dedicated exporter"
+        }
         dir.mkdirs()
         val payloads = mutableListOf(
             ExportPayload(

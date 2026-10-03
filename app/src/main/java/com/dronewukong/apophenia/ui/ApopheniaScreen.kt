@@ -43,6 +43,7 @@ import com.dronewukong.apophenia.backup.RawDatabaseSnapshot
 import com.dronewukong.apophenia.data.*
 import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.export.ExportManager
+import com.dronewukong.apophenia.export.EventReportManager
 import com.dronewukong.apophenia.export.ExportTier
 import com.dronewukong.apophenia.export.PreparedExport
 import com.dronewukong.apophenia.export.LanDestinationType
@@ -926,6 +927,11 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var lanUsername by remember { mutableStateOf(lanConfiguration.username) }
     var lanPassword by remember { mutableStateOf("") }
     var lanPushBusy by remember { mutableStateOf(false) }
+    var reportEvents by remember { mutableStateOf<List<Observation>>(emptyList()) }
+    var selectedReportEventIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var reportIncludeStills by remember { mutableStateOf(false) }
+    var confirmDossierEventId by remember { mutableStateOf<Long?>(null) }
+    var confirmReport by remember { mutableStateOf(false) }
     var pendingMediaScrub by remember { mutableStateOf<Long?>(null) }
     var mediaAssets by remember { mutableStateOf<List<MediaAsset>>(emptyList()) }
     var purgeLedger by remember { mutableStateOf<List<PurgeLedgerEntry>>(emptyList()) }
@@ -994,6 +1000,13 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     fun refreshDemoSummary() {
         if (!demoMode.active) { demoSummary = null; return }
         scope.launch { demoSummary = withContext(Dispatchers.IO) { DemoFixtureInstaller.summary(ObservationStore.demoRepository(activity).db()) } }
+    }
+
+    fun refreshReportEvents() {
+        scope.launch {
+            reportEvents = withContext(Dispatchers.IO) { ObservationStore.liveRepository(activity).db().observations(20) }
+            selectedReportEventIds = selectedReportEventIds.intersect(reportEvents.map { it.id }.toSet())
+        }
     }
 
     fun prepareExport(tier: ExportTier) {
@@ -1084,6 +1097,42 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 pendingExport = null
                 onMessage("LAN push completed · ${it.bytesWritten} bytes · explicit transfer only")
             }.onFailure { onMessage("LAN push failed; prepared bundle kept locally: ${it.message ?: "unknown error"}") }
+        }
+    }
+
+    fun prepareDossier(observationId: Long) {
+        if (exportPreparing) return
+        exportPreparing = true
+        scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    EventReportManager(activity).prepareDossier(
+                        ObservationStore.liveRepository(activity).db(), observationId,
+                        File(activity.cacheDir, "exports")
+                    )
+                }
+            }
+            exportPreparing = false
+            result.onSuccess { pendingExport = it }
+                .onFailure { onMessage("Dossier preparation failed: ${it.message ?: "unknown error"}") }
+        }
+    }
+
+    fun prepareReport() {
+        if (exportPreparing || selectedReportEventIds.isEmpty()) return
+        exportPreparing = true
+        scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    EventReportManager(activity).prepareReport(
+                        ObservationStore.liveRepository(activity).db(), selectedReportEventIds,
+                        reportIncludeStills, File(activity.cacheDir, "exports")
+                    )
+                }
+            }
+            exportPreparing = false
+            result.onSuccess { pendingExport = it }
+                .onFailure { onMessage("Report preparation failed: ${it.message ?: "unknown error"}") }
         }
     }
 
@@ -1286,7 +1335,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     }
 
     LaunchedEffect(permissionRevision) { refreshPermissionState() }
-    LaunchedEffect(Unit) { refreshRolling(); refreshMedia(); refreshDemoSummary() }
+    LaunchedEffect(Unit) { refreshRolling(); refreshMedia(); refreshDemoSummary(); refreshReportEvents() }
     LaunchedEffect(demoMode.active) { simulation = HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION; refreshDemoSummary() }
     DisposableEffect(Unit) {
         onDispose { runCatching { audioTrack?.stop() }; audioTrack?.release(); audioTrack = null }
@@ -2368,6 +2417,42 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
         }
         item {
+            SettingsCard(Icons.Default.Description, "Selected-event dossiers + reports", "Dossier: one event with every available channel and raw evidence. Report: selected events as HTML/PDF with honest tiers, gaps, tables, and derived charts.") {
+                if (reportEvents.isEmpty()) {
+                    Text("No live events available. Demo fixtures are never eligible.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                } else {
+                    reportEvents.forEach { event ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = event.id in selectedReportEventIds,
+                                onCheckedChange = { checked ->
+                                    selectedReportEventIds = if (checked) selectedReportEventIds + event.id else selectedReportEventIds - event.id
+                                },
+                                modifier = Modifier.semantics { contentDescription = "Select report event ${event.id}" }
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(event.label, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                                Text("#${event.id} · ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(event.timestampMs))}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            TextButton(onClick = { confirmDossierEventId = event.id }, enabled = !exportPreparing) { Text("Dossier") }
+                        }
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = reportIncludeStills, onCheckedChange = { reportIncludeStills = it })
+                        Column {
+                            Text("Include retained AV stills", fontWeight = FontWeight.SemiBold)
+                            Text("First available pre-event video frame per selected event; no raw audio or Tier-2 plaintext.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Button(onClick = { confirmReport = true }, enabled = selectedReportEventIds.isNotEmpty() && !exportPreparing, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.PictureAsPdf, null); Spacer(Modifier.width(8.dp)); Text("Prepare HTML + PDF report (${selectedReportEventIds.size})")
+                    }
+                    Text("Reports redact Tier-2 plaintext and preserve gap reasons. Dossiers can contain plaintext Tier-2 contents, raw AV, and retained RF IQ, so they use the two-confirmation manifest flow.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        item {
             SettingsCard(Icons.Default.Lan, "Explicit LAN export", "Standard gate · one deliberate push to a configured local document provider or literal private HTTP(S) address. No background upload and no delivery guarantee.") {
                 GateSwitchRow(
                     "LIVE_EXPORT_LAN",
@@ -2442,6 +2527,27 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             text = { Text("Confirmation 1 of 2. The ZIP contains a checkpointed raw SQLite database, portable plaintext copies of retained AV and Tier-2 contents, RF IQ files, and SHA-256 manifests. The backup is integrity-checked, not encrypted as a whole. No destination receives it until you review the manifest.") },
             confirmButton = { Button(onClick = { confirmFullBackup = false; prepareBackup() }) { Text("Build verified backup") } },
             dismissButton = { TextButton(onClick = { confirmFullBackup = false }) { Text("Cancel") } }
+        )
+    }
+
+    confirmDossierEventId?.let { eventId ->
+        val event = reportEvents.firstOrNull { it.id == eventId }
+        AlertDialog(
+            onDismissRequest = { confirmDossierEventId = null },
+            title = { Text("Build event #$eventId dossier?") },
+            text = { Text("Confirmation 1 of 2. This packages ${event?.label ?: "the selected event"}, every stored scalar and channel gap, session telemetry, available plaintext AV and Tier-2 contents, retained event RF IQ, a plain-language summary, CSV, and SVG chart. Nothing leaves until you review the manifest.") },
+            confirmButton = { Button(onClick = { confirmDossierEventId = null; prepareDossier(eventId) }) { Text("Build dossier preview") } },
+            dismissButton = { TextButton(onClick = { confirmDossierEventId = null }) { Text("Cancel") } }
+        )
+    }
+
+    if (confirmReport) {
+        AlertDialog(
+            onDismissRequest = { confirmReport = false },
+            title = { Text("Build selected-event report?") },
+            text = { Text("Confirmation 1 of 2. The report contains ${selectedReportEventIds.size} selected live event(s), scalar timelines, channel tables and gaps, derived-metric charts, and honest result tiers in both HTML and PDF.${if (reportIncludeStills) " It also includes one retained video still per event where available." else " It excludes raw AV."} Tier-2 plaintext is redacted.") },
+            confirmButton = { Button(onClick = { confirmReport = false; prepareReport() }) { Text("Build report preview") } },
+            dismissButton = { TextButton(onClick = { confirmReport = false }) { Text("Cancel") } }
         )
     }
 

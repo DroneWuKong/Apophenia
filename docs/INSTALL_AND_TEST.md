@@ -90,10 +90,12 @@ For a real phone or Garmin watch, continue with [PHYSICAL_ACCEPTANCE.md](PHYSICA
 - Prepare **Raw SQLite snapshot**. Confirm schema version 9, row counts, byte size, and SHA-256 in the preview; save the `.db`, open it with a local SQLite tool, and require `PRAGMA integrity_check` to return `ok`. The checkpointed snapshot does not require a companion WAL file and does not contain raw AV/RF files.
 - Prepare **Full restorable backup** using disposable content. Verify the outer ZIP manifest, nested full-evidence manifest, `database/schema.json`, and raw SQLite integrity. Add a new disposable event, disarm every capture service, restore the backup, and confirm the later event disappears while backed-up rows and protected assets return. Corrupt one copied payload and confirm restore refuses it without changing the current live store.
 - Enable `LIVE_EXPORT_LAN` with its switch. Configure either a document tree from a controlled SMB/NFS-capable Android DocumentsProvider or a literal private/link-local HTTP(S) fixture. From the manifest preview, press **Push LAN** once and compare received bytes/hash. Confirm a hostname, public address, redirect, gate-off state, or revoked document permission is refused. This is bench software/transport evidence, not proof of destination durability or exactly-once delivery.
+- Create a disposable live event with ordinary context, retained AV, Tier-2 content, and (where available) referenced RF IQ. Prepare its **Dossier**, verify every payload is event-scoped, compare the RF hash, and confirm the manifest flags raw AV/Tier-2. Purged evidence must remain an inventory gap and must not be reconstructed.
+- Select several live events and prepare an HTML+PDF **Report**. Verify the timeline, channel/gap tables, JSON/CSV/SVG attachments, honest evidence tier, and Tier-2 redaction. Repeat with retained stills off and on; only the latter may mark raw AV. Demo fixtures must never appear.
 - Test **Delete all local data** only after saving anything you want to keep.
 - Expected: delete-all removes active encrypted AV files and their Keystore keys before clearing SQLite. This is destructive and is not a substitute for the separate EJECT flow.
 
-See [EXPORT.md](EXPORT.md) for the exact tier, manifest, route, and current implementation boundaries.
+See [EXPORT.md](EXPORT.md) and [REPORTS.md](REPORTS.md) for the exact tier, report, manifest, route, and current implementation boundaries.
 
 ## Garmin acceptance test
 

@@ -186,6 +186,8 @@ The overlay separately collects the current process-wide AV ring state. It label
 
 `LanExportManager` can act only when `LIVE_EXPORT_LAN` is independently authorized and the operator presses **Push LAN** on a prepared manifest. Document-tree output relies on persisted Android provider access; direct HTTP(S) rejects public/DNS destinations and redirects. Optional credentials are Keystore-encrypted. There is no scheduler, retry worker, background uploader, or exactly-once claim.
 
+`EventReportManager` is the event-scoped projection boundary. A dossier combines one observation, its context/session rows, an event-specific Omniprobe inventory, retained protected evidence, and hash-verified referenced RF IQ into the same verified bundle contract. Selected-event report mode produces self-contained HTML, Android `PdfDocument` output, JSON/CSV, and SVG-derived charts. It redacts Tier-2 plaintext and includes raw AV only when retained stills are explicitly requested. Report selection never manufactures a new association result; it reuses immutable stored evaluation wording or labels the output descriptive. See [REPORTS.md](REPORTS.md).
+
 ## Software-only boundary
 
 SIMULATION bypasses physical sensor, GPS, weather, Garmin, and Health Connect calls while exercising observation creation, SQLite persistence, rolling-window behavior, control creation, and analysis. Software validation cannot establish battery life, OEM background-process behavior, physical sensor accuracy, BLE delivery, or watch/phone compatibility.

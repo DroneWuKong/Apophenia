@@ -12,6 +12,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.dronewukong.apophenia.data.ObservationDb
+import com.dronewukong.apophenia.data.Observation
+import com.dronewukong.apophenia.data.ObservationKind
 import com.dronewukong.apophenia.demo.DemoModeManager
 import org.junit.After
 import org.junit.Before
@@ -157,6 +159,28 @@ class MainActivitySmokeTest {
             compose.onAllNodesWithText("Raw SQLite preview").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("schema_version 9", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Cancel + delete").performClick()
+    }
+
+    @Test
+    fun selectedEventReportBuildsHtmlAndPdfBeforeAnyRoute() {
+        dismissContextIntroIfPresent()
+        val eventId = ObservationDb(compose.activity).use { db ->
+            db.insertObservation(Observation(timestampMs = System.currentTimeMillis(), kind = ObservationKind.WEIRD, label = "Report smoke event"))
+        }
+        compose.onNodeWithText("Settings").performClick()
+        scrollSettingsTo("Selected-event dossiers + reports")
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText("Report smoke event").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithContentDescription("Select report event $eventId").performClick()
+        compose.onNodeWithText("Prepare HTML + PDF report (1)").performScrollTo().performClick()
+        compose.onNodeWithText("Build report preview").performClick()
+        compose.waitUntil(timeoutMillis = 20_000) {
+            compose.onAllNodesWithText("Manifest preview · Selected-event report").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("report/report.html").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("report/report.pdf").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Cancel + delete").performClick()
     }
 

@@ -123,3 +123,7 @@ Each `AssociationResult` records `comparisonsTested`, `comparisonsEligible`, the
 ## Identifier hashes
 
 Raw MAC addresses, Wi-Fi BSSIDs, adapter/system identifiers, Field-Kit device IDs, and TAK UIDs must not enter durable evidence rows. Providers pass a raw identifier directly to the Keystore-backed HMAC utility and persist only the returned `idhash:v<generation>:...` token. A channel namespace is included in the HMAC input. Formatting-equivalent MAC/BSSID values normalize to the same token, and rotating the local key advances the generation and intentionally invalidates future comparisons with older hashes.
+
+## Dossier and report projections
+
+Single-event dossiers and selected-event reports add no authority tables and do not rewrite stored evidence. They are verified projections of `observations`, `context_samples`, session events, immutable hypothesis evaluations, media inventory, Tier-2 rows where the tier permits them, and current Omniprobe gap accounting. Dossier RF bytes are included only when referenced by the event context and matching its stored SHA-256. Report JSON redacts Tier-2 values; optional retained stills are the only raw-AV report payload. Post-event rows remain visible for reconstruction but are excluded from derived predictor charts.

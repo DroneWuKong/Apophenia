@@ -60,6 +60,18 @@ The outer manifest hashes every file. Because Android Keystore keys cannot be ex
 
 Restore verifies the outer manifest, every nested manifest, SQLite integrity and required tables, schema version, protected-row counts, each active AV asset's portable sidecar/frame inventory, and RF file naming before isolating or mutating the live store. It then imports all application tables transactionally, re-encrypts portable AV and Tier-2 contents under fresh device-local keys, and restores RF files. A failed apply rolls back the prior database and AV/RF directories. Capture sessions must be disarmed before selection and are checked again at confirmation.
 
+### Single-event dossier
+
+A dossier scopes the evidence package to one selected live observation. It includes the observation and VIBE/egress fields, ordinary context, joined session events, event-specific Omniprobe inventory, context CSV, descriptive summary, derived-metric SVG, retained AV, Tier-2 contents, and retained RF IQ referenced by that event. RF bytes are checked against the SHA-256 recorded in context; expired/missing windows remain named in the RF inventory.
+
+Because retained AV and Tier-2 contents are portable plaintext, preparation requires the deliberate evidence warning and routing still requires the manifest-preview confirmation. See [REPORTS.md](REPORTS.md).
+
+### Selected-event report
+
+Report mode accepts up to 100 selected live events and creates self-contained HTML plus a real Android-rendered PDF, machine-readable JSON, context CSV, and a derived-metric SVG. It carries the timestamped timeline, channel tables, Omniprobe gaps, honest result tiers, and stored pre-registration evaluations that apply to the selected cohorts. Tier-2 plaintext is redacted. Raw AV is excluded unless the operator explicitly requests retained pre-event stills; any included still is marked in the manifest.
+
+Report selection is not a new causal analysis. When no eligible stored evaluation exists, the output says it is descriptive; small selections use **interesting, not yet established**. See [REPORTS.md](REPORTS.md).
+
 ## Manifest contract
 
 Every ZIP contains `manifest.json` using `apophenia.export.manifest.v1`. It declares:
@@ -84,7 +96,6 @@ Demo fixtures are structurally excluded: `ExportManager` refuses `apophenia-demo
 
 The following remain separately reviewable work:
 
-- single-event dossier and HTML/PDF report mode (step 21);
 - sealed flags, durable export-audit ledger, and EJECT export-then-wipe (step 22).
 
 Until those steps land, a manifest preview is proof of the prepared bundle's bytes—not proof that a destination retained them, not an export-audit record, and not an exactly-once-delivery claim.

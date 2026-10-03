@@ -8,10 +8,18 @@ import org.json.JSONObject
 
 /** Serializes the same per-event channel accounting shown by Omniprobe. */
 class ExportInventoryMaterializer(private val context: Context, private val db: ObservationDb) {
-    fun payload(): ExportPayload {
+    fun payload(): ExportPayload = payloadFor(db.observations(100_000), "inventories/omniprobe.json")
+
+    fun payloadForEvent(observationId: Long): ExportPayload {
+        val observation = db.observations(100_000).firstOrNull { it.id == observationId }
+            ?: error("Observation $observationId does not exist")
+        return payloadFor(listOf(observation), "inventories/omniprobe-event-$observationId.json")
+    }
+
+    private fun payloadFor(observations: List<com.dronewukong.apophenia.data.Observation>, path: String): ExportPayload {
         val inspector = OmniprobeInspector(context, db)
         val events = JSONArray()
-        db.observations(100_000).sortedBy { it.timestampMs }.forEach { observation ->
+        observations.sortedBy { it.timestampMs }.forEach { observation ->
             val snapshot = inspector.inspect(observation)
             events.put(
                 JSONObject()
@@ -55,9 +63,9 @@ class ExportInventoryMaterializer(private val context: Context, private val db: 
             .put("gapReasonBoundary", "Absent-channel reasons use the gate, permission, platform, and hardware state visible at export time; they are accounting aids, not retroactive hardware proof.")
             .put("events", events)
         return ExportPayload(
-            path = "inventories/omniprobe.json",
+            path = path,
             bytes = root.toString(2).toByteArray(Charsets.UTF_8),
-            containsTier2Contents = db.allSensitiveContext(1).isNotEmpty()
+            containsTier2Contents = observations.any { db.sensitiveContextForObservation(it.id).isNotEmpty() }
         )
     }
 }

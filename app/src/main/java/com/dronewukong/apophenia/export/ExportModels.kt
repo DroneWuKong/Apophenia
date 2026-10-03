@@ -5,7 +5,9 @@ import java.io.File
 enum class ExportTier(val displayName: String) {
     DATA_ONLY("Data-only"),
     FULL_EVIDENCE("Full evidence package"),
-    FULL_BACKUP("Full backup")
+    FULL_BACKUP("Full backup"),
+    SINGLE_EVENT_DOSSIER("Single-event dossier"),
+    REPORT("Selected-event report")
 }
 
 data class ExportManifestEntry(

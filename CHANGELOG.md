@@ -80,6 +80,8 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Schema-v9 raw SQLite snapshots after a required FULL WAL checkpoint, with integrity/table checks and SHA-256 preview.
 - Full restorable backups containing the checkpointed store, nested portable protected evidence, RF IQ files, and independent manifests; restore verifies completeness before mutation, rekeys protected evidence, and rolls back failed applies.
 - Separately gated, manifest-previewed LAN push to a persisted Android document tree or literal private/link-local HTTP(S) endpoint. SMB/NFS uses the operator-selected DocumentsProvider; optional credentials are Keystore-encrypted, public/DNS destinations and redirects are refused, and no background retry or exactly-once claim is made.
+- Verified single-event dossiers with observation/context/session evidence, per-event Omniprobe inventory, portable retained AV and Tier-2 content, derived charts, and hash-checked referenced RF IQ.
+- Selected-event self-contained HTML and Android-rendered PDF reports with timeline/channel tables, JSON/CSV/SVG companions, optional manifest-labeled AV stills, Tier-2 redaction, and honest stored-result/descriptive tiers.
 - First-class **Egress · bailed** and **Bad vibes · stayed** analysis cohorts, kept separate from ordinary label cohorts.
 - Binary hashed-device presence features for every observed BLE/Wi-Fi identity, with missing channel windows excluded rather than treated as absence.
 - Required multiple-comparisons scope on every result: total features tested, eligible features, Benjamini-Hochberg method, and explicit **indistinguishable from noise** labeling after correction.
