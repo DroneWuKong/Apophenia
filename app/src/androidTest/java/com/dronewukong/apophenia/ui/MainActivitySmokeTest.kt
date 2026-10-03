@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.dronewukong.apophenia.data.ObservationDb
 import org.junit.After
@@ -49,7 +50,7 @@ class MainActivitySmokeTest {
         compose.onNodeWithText("Settings").performClick()
         compose.onNodeWithText("Phone sensors").assertIsDisplayed()
         compose.onNodeWithText("Location + weather").assertIsDisplayed()
-        compose.onNodeWithText("Health Connect").assertIsDisplayed()
+        compose.onNodeWithText("Health Connect").performScrollTo().assertIsDisplayed()
     }
 
     private fun dismissContextIntroIfPresent() {
