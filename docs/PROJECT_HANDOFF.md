@@ -18,6 +18,8 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - immediate timestamp-first logging
 - widget and Quick Settings tile
 - random control sampling
+- one-to-one control matching by local four-hour block and weekday/weekend
+- optional, explicitly enabled neutral check-in prompts using the same control pipeline
 - phone sensors
 - device context
 - location/weather enrichment
@@ -61,6 +63,8 @@ The Android Garmin bridge uses app id:
 - Dense rolling samples are aggregated at event/control level so they are not treated as independent observations.
 - Post-event samples are preserved for exploration but excluded from predictor calculations.
 - Correlation does not establish causation.
+- Effect magnitude and evidence strength are separate outputs.
+- Permutation seeds and attainable p-value resolution are recorded; metric families use Benjamini-Hochberg FDR adjustment.
 
 ## Hardware boundary
 
@@ -101,7 +105,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 ## Validation status — 2026-10-02
 
 - `./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug`: passed locally on JDK 17.
-- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v3 migration, rolling pre/post separation, control grouping, hypothesis separation, JSON export, association statistics, Garmin packet parsing, and the full simulation enrichment/database path.
+- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v3 migration, rolling pre/post separation, control grouping and matching, prompted neutral controls, hypothesis separation, JSON export, association statistics, Garmin packet parsing, and the full simulation enrichment/database path.
 - `./gradlew.bat connectedDebugAndroidTest`: two tests passed on an API 36.1 Android emulator; they cover the refined logging surface, **THAT WAS WEIRD**, the timeline entry, and the optional-context settings surface.
 - Native Android location and notification permission prompts were exercised on the emulator. Weather returned a live Open-Meteo result after location approval.
 - Health Connect's permission controller was exercised end-to-end on the emulator, including the required privacy-rationale declaration, six read permissions, and optional background access. The app returned to a connected state.

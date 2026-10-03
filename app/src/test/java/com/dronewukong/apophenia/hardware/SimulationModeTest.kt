@@ -9,6 +9,7 @@ import com.dronewukong.apophenia.data.ObservationDb
 import com.dronewukong.apophenia.data.ObservationKind
 import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.work.EventEnrichmentWorker
+import com.dronewukong.apophenia.work.ControlSampleWorker
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -67,5 +68,24 @@ class SimulationModeTest {
         assertTrue(samples.all { it.source.startsWith("simulation") })
         assertTrue(samples.any { it.metric == "health_heart_rate_avg_bpm" })
         db.close()
+    }
+
+    @Test
+    fun promptedNeutralCheckInUsesTheControlPipeline() {
+        val capturedAt = 1_780_000_000_000L
+        val worker = TestListenableWorkerBuilder<ControlSampleWorker>(context)
+            .setInputData(
+                Data.Builder()
+                    .putString(ControlSampleWorker.KEY_CONTROL_SOURCE, ControlSampleWorker.SOURCE_PROMPTED)
+                    .putLong(ControlSampleWorker.KEY_CAPTURED_AT, capturedAt)
+                    .build()
+            )
+            .build()
+
+        assertEquals(androidx.work.ListenableWorker.Result.success(), worker.doWork())
+        val controls = ObservationDb(context).allContext().filter { it.isControl }
+        assertTrue(controls.isNotEmpty())
+        assertTrue(controls.all { it.captureId.startsWith("prompted-control:") })
+        assertTrue(controls.all { it.metadata.contains("control_source=prompted") })
     }
 }

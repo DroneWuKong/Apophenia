@@ -9,11 +9,15 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 - Public contribution, security, conduct, installation, architecture, release, and launch documentation.
 - GitHub issue forms, pull-request template, and dependency-update configuration.
 - A five-screen Android emulator gallery and public repository metadata.
+- Optional neutral check-in prompts that create user-confirmed controls through the normal control pipeline.
+- One-to-one control matching by local four-hour block and weekday/weekend.
+- Bootstrap effect intervals plus recorded permutation seed, count, and attainable p-value resolution.
 
 ### Changed
 
 - README reworked as a screenshot-led, first-person project story with a clearer try-it path.
 - GitHub Actions upgraded to current supported action majors.
+- Analysis now separates estimated effect magnitude from strength of evidence and retains Benjamini-Hochberg FDR correction.
 
 ## [0.2.1] - 2026-10-02
 

@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dronewukong.apophenia.correlation.AssociationEngine
+import com.dronewukong.apophenia.correlation.CaptureMatcher
 import com.dronewukong.apophenia.data.*
 import com.dronewukong.apophenia.environment.EnvironmentProvider
 import com.dronewukong.apophenia.export.ExportManager
@@ -28,6 +29,8 @@ import com.dronewukong.apophenia.hardware.HardwareGates
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import com.dronewukong.apophenia.rolling.RollingRecorderService
 import com.dronewukong.apophenia.rolling.RollingRecorderState
+import com.dronewukong.apophenia.work.PromptedCheckInScheduler
+import com.dronewukong.apophenia.work.PromptedCheckInState
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -358,28 +361,32 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
         val selectedLabel = selected ?: return@LaunchedEffect
         results = withContext(Dispatchers.IO) {
             val values = linkedMapOf<String, Pair<List<Double>, List<Double>>>()
+            fun addMatched(name: String, events: List<com.dronewukong.apophenia.correlation.TimedCaptureValue>, controls: List<com.dronewukong.apophenia.correlation.TimedCaptureValue>) {
+                val matched = CaptureMatcher.match(events, controls)
+                values[name] = matched.events to matched.controls
+            }
             repo.db().metricsForLabel(selectedLabel).forEach { metric ->
-                values[metric] = repo.db().eventFeatureValues(selectedLabel, metric) to repo.db().controlFeatureValues(metric)
-                val eventDelta = repo.db().eventBeforeDeltaValues(selectedLabel, metric)
-                val controlDelta = repo.db().controlBeforeDeltaValues(metric)
-                if (eventDelta.isNotEmpty() || controlDelta.isNotEmpty()) values["$metric · before delta"] = eventDelta to controlDelta
+                addMatched(metric, repo.db().eventFeatureCaptures(selectedLabel, metric), repo.db().controlFeatureCaptures(metric))
+                val eventDelta = repo.db().eventBeforeDeltaCaptures(selectedLabel, metric)
+                val controlDelta = repo.db().controlBeforeDeltaCaptures(metric)
+                if (eventDelta.isNotEmpty() || controlDelta.isNotEmpty()) addMatched("$metric · before delta", eventDelta, controlDelta)
                 listOf(0L to 600_000L, 600_000L to 1_200_000L, 1_200_000L to 1_800_000L).forEachIndexed { index, (from, to) ->
-                    val events = repo.db().eventLagFeatureValues(selectedLabel, metric, from, to)
-                    val controls = repo.db().controlLagFeatureValues(metric, from, to)
-                    if (events.isNotEmpty() || controls.isNotEmpty()) values["$metric · ${index * 10}-${(index + 1) * 10}m pre"] = events to controls
+                    val events = repo.db().eventLagFeatureCaptures(selectedLabel, metric, from, to)
+                    val controls = repo.db().controlLagFeatureCaptures(metric, from, to)
+                    if (events.isNotEmpty() || controls.isNotEmpty()) addMatched("$metric · ${index * 10}-${(index + 1) * 10}m pre", events, controls)
                 }
             }
             AssociationEngine.compareAll(values).toList().sortedByDescending { kotlin.math.abs(it.second.standardizedEffect ?: 0.0) }
         }
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { ScreenHeader("Patterns", "Event windows compared with equivalent random controls.") }
+        item { ScreenHeader("Patterns", "Event windows compared with one-to-one matched control windows.") }
         item {
             Surface(color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f), shape = RoundedCornerShape(16.dp)) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
                     Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(9.dp))
-                    Text("Post-event samples are excluded from prediction. Associations are evidence to inspect, not proof of cause.", style = MaterialTheme.typography.bodyMedium)
+                    Text("Controls are matched by local 4-hour time block and weekday/weekend. Post-event samples are excluded. Associations are evidence to inspect, not proof of cause.", style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -415,6 +422,7 @@ private fun PatternsTab(repo: ObservationRepository, refresh: Int) {
 private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, scope: CoroutineScope, onMessage: (String) -> Unit) {
     var simulation by remember { mutableStateOf(HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION) }
     var rolling by remember { mutableStateOf(RollingRecorderState.isEnabled(activity)) }
+    var promptedCheckIns by remember { mutableStateOf(PromptedCheckInState.isEnabled(activity)) }
     var garminStatus by remember { mutableStateOf(GarminBridge.statusText) }
     var garminDevice by remember { mutableStateOf(GarminBridge.deviceText) }
     var rollingSummary by remember { mutableStateOf("No samples yet") }
@@ -477,6 +485,37 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                     Column {
                         Text(if (rolling) "Recording" else "Off", fontWeight = FontWeight.SemiBold)
                         Text(rollingSummary, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        item { SectionLabel("Study design") }
+        item {
+            SettingsCard(Icons.Default.Alarm, "Neutral check-ins", "Optional prompts every 3–6 hours create user-confirmed baseline captures.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = promptedCheckIns, onCheckedChange = { enabled ->
+                        if (!enabled) {
+                            promptedCheckIns = false
+                            PromptedCheckInScheduler.setEnabled(activity, false)
+                            onMessage("Neutral check-ins disabled")
+                        } else if (notificationsAllowed) {
+                            promptedCheckIns = true
+                            PromptedCheckInScheduler.setEnabled(activity, true)
+                            onMessage("Neutral check-ins enabled")
+                        } else {
+                            activity.requestNotificationPermission { granted, message ->
+                                notificationsAllowed = granted
+                                promptedCheckIns = granted
+                                if (granted) PromptedCheckInScheduler.setEnabled(activity, true)
+                                onMessage(if (granted) "Neutral check-ins enabled" else message)
+                            }
+                        }
+                    })
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(if (promptedCheckIns) "Enabled" else "Off", fontWeight = FontWeight.SemiBold)
+                        Text("Tap “Nothing unusual” to store a prompted control, or open the app to log an event.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     }
                 }
             }

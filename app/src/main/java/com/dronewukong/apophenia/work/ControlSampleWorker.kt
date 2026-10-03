@@ -13,7 +13,10 @@ import kotlinx.coroutines.runBlocking
 import java.util.UUID
 class ControlSampleWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
  override fun doWork(): Result {
-  val db=ObservationDb(applicationContext); val captureId="control:${UUID.randomUUID()}"; val now=System.currentTimeMillis()
+  val source=inputData.getString(KEY_CONTROL_SOURCE)?:SOURCE_RANDOM
+  val requestedAt=inputData.getLong(KEY_CAPTURED_AT,-1L)
+  val now=if(requestedAt>0L)requestedAt else System.currentTimeMillis()
+  val db=ObservationDb(applicationContext); val captureId="$source-control:${UUID.randomUUID()}"
   return try {
    db.copyRollingToControl(captureId, now-RollingRecorderConfig.PRE_WINDOW_MS, now)
    val samples=mutableListOf<ContextSample>()
@@ -21,7 +24,15 @@ class ControlSampleWorker(context: Context, params: WorkerParameters) : Worker(c
    samples+=runCatching{DeviceContextCollector(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    samples+=runCatching{EnvironmentProvider(applicationContext).collect(null,true)}.getOrDefault(emptyList())
    samples+=runBlocking{HealthConnectProvider(applicationContext).collect(null,true)}
-   db.insertContext(samples.map{it.copy(captureId=captureId)}); ControlScheduler.scheduleNext(applicationContext); Result.success()
+   db.insertContext(samples.map{it.copy(captureId=captureId,metadata=if(it.metadata.isBlank())"control_source=$source" else "${it.metadata};control_source=$source")})
+   if(source==SOURCE_RANDOM)ControlScheduler.scheduleNext(applicationContext)
+   Result.success()
   } catch(_:Exception) { Result.retry() }
+ }
+ companion object {
+  const val KEY_CONTROL_SOURCE="control_source"
+  const val KEY_CAPTURED_AT="captured_at"
+  const val SOURCE_RANDOM="random"
+  const val SOURCE_PROMPTED="prompted"
  }
 }

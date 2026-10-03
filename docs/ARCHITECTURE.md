@@ -50,8 +50,10 @@ UI / widget / tile / external intent / Garmin
 | `RollingRecorder` | Samples and prunes the rolling scratch buffer |
 | `EventEnrichmentWorker` | Fail-soft instant context enrichment after the observation exists |
 | `PostEventWindowWorker` | Collects context labeled `POST` after an event |
-| `ControlSampleWorker` | Generates baseline captures with equivalent pre-window treatment |
-| `AssociationEngine` | Event/control summaries, robust spread, effect size, permutation and persistence results |
+| `ControlSampleWorker` | Generates random and user-confirmed prompted baseline captures with equivalent pre-window treatment |
+| `PromptedCheckInWorker` | Optionally asks for a neutral “nothing unusual” response without fabricating a control from an unanswered prompt |
+| `CaptureMatcher` | Selects one-to-one controls in the same local four-hour and weekday/weekend stratum |
+| `AssociationEngine` | Matched event/control summaries, robust spread, effect interval, seeded permutation, persistence, and FDR-adjusted results |
 | `HardwareGates` | Compile/runtime boundary for phone sensors, location, weather, and Garmin |
 | `HealthConnectProvider` | Optional read-only historical wearable context |
 | `GarminBridge` | Connect IQ discovery, connection state, messages, parsing, deduplication, and app launch |
@@ -85,7 +87,9 @@ The watch captures its timestamp and available watch context, then transmits thr
 
 ## Statistical boundary
 
-The engine describes associations rather than causes. Its unit of comparison is an event/control capture, not every dense sensor row. It reports insufficient data, weak association, possible association, or a repeatable association worth investigating. These labels are exploratory and do not establish clinical or causal meaning.
+The engine describes associations rather than causes. Its unit of comparison is an event/control capture, not every dense sensor row. Controls are used at most once and matched on local four-hour block plus weekday/weekend. Effect magnitude is kept separate from evidence strength so a large but uncertain estimate is not mislabeled as a strong finding. The engine records its random seed, permutation count and p-value resolution; reports a bootstrap 95% effect interval; and adjusts families of metric comparisons with Benjamini-Hochberg FDR. It reports insufficient data, not enough evidence, possible association, or a repeatable association worth investigating. These labels remain exploratory and do not establish clinical or causal meaning.
+
+The current matcher does not control for activity, location, sleep/wake state, or attention. Optional prompted neutral check-ins reduce reliance on passive random times but do not remove self-selection bias.
 
 ## Software-only boundary
 

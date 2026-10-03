@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import com.dronewukong.apophenia.correlation.TimedCaptureValue
 
 data class ObservationInsertResult(val id: Long, val inserted: Boolean)
 
@@ -254,73 +255,79 @@ class ObservationDb(context: Context) : SQLiteOpenHelper(context, "apophenia.db"
         arrayOf(observationId.toString())
     )
 
-    fun eventFeatureValues(label:String,metric:String):List<Double>{
-        val out=mutableListOf<Double>()
+    fun eventFeatureCaptures(label:String,metric:String):List<TimedCaptureValue>{
+        val out=mutableListOf<TimedCaptureValue>()
         readableDatabase.rawQuery("""
-            SELECT AVG(cs.value) FROM context_samples cs JOIN observations o ON o.id=cs.observation_id
+            SELECT o.timestamp_ms,AVG(cs.value) FROM context_samples cs JOIN observations o ON o.id=cs.observation_id
             WHERE o.label=? COLLATE NOCASE AND o.kind<>? AND cs.metric=? AND cs.is_control=0 AND cs.phase<>'POST' GROUP BY o.id ORDER BY o.timestamp_ms
-        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name,metric)).use{c->while(c.moveToNext())out+=c.getDouble(0)}
+        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name,metric)).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
         return out
     }
+    fun eventFeatureValues(label:String,metric:String):List<Double> = eventFeatureCaptures(label,metric).map{it.value}
 
-    fun controlFeatureValues(metric:String):List<Double>{
-        val out=mutableListOf<Double>()
+    fun controlFeatureCaptures(metric:String):List<TimedCaptureValue>{
+        val out=mutableListOf<TimedCaptureValue>()
         readableDatabase.rawQuery("""
-            SELECT AVG(value) FROM context_samples WHERE is_control=1 AND metric=? AND phase='CONTROL'
+            SELECT MAX(timestamp_ms),AVG(value) FROM context_samples WHERE is_control=1 AND metric=? AND phase='CONTROL'
             GROUP BY CASE WHEN capture_id='' THEN CAST(timestamp_ms AS TEXT) ELSE capture_id END ORDER BY MIN(timestamp_ms)
-        """.trimIndent(),arrayOf(metric)).use{c->while(c.moveToNext())out+=c.getDouble(0)}
+        """.trimIndent(),arrayOf(metric)).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
         return out
     }
+    fun controlFeatureValues(metric:String):List<Double> = controlFeatureCaptures(metric).map{it.value}
 
-    fun eventLagFeatureValues(label:String,metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<Double>{
-        val out=mutableListOf<Double>()
+    fun eventLagFeatureCaptures(label:String,metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<TimedCaptureValue>{
+        val out=mutableListOf<TimedCaptureValue>()
         readableDatabase.rawQuery("""
-            SELECT AVG(cs.value) FROM context_samples cs JOIN observations o ON o.id=cs.observation_id
+            SELECT o.timestamp_ms,AVG(cs.value) FROM context_samples cs JOIN observations o ON o.id=cs.observation_id
             WHERE o.label=? COLLATE NOCASE AND o.kind<>? AND cs.metric=? AND cs.phase='PRE'
               AND cs.timestamp_ms>=o.timestamp_ms-? AND cs.timestamp_ms<o.timestamp_ms-? GROUP BY o.id ORDER BY o.timestamp_ms
-        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name,metric,toBeforeMs.toString(),fromBeforeMs.toString())).use{c->while(c.moveToNext())out+=c.getDouble(0)}
+        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name,metric,toBeforeMs.toString(),fromBeforeMs.toString())).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
         return out
     }
+    fun eventLagFeatureValues(label:String,metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<Double> = eventLagFeatureCaptures(label,metric,fromBeforeMs,toBeforeMs).map{it.value}
 
-    fun controlLagFeatureValues(metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<Double>{
-        val out=mutableListOf<Double>()
+    fun controlLagFeatureCaptures(metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<TimedCaptureValue>{
+        val out=mutableListOf<TimedCaptureValue>()
         readableDatabase.rawQuery("""
             WITH anchors AS (SELECT capture_id,MAX(timestamp_ms) anchor FROM context_samples WHERE is_control=1 AND phase='CONTROL' AND capture_id<>'' GROUP BY capture_id)
-            SELECT AVG(c.value) FROM context_samples c JOIN anchors a ON a.capture_id=c.capture_id
+            SELECT a.anchor,AVG(c.value) FROM context_samples c JOIN anchors a ON a.capture_id=c.capture_id
             WHERE c.metric=? AND c.phase='CONTROL' AND c.source LIKE 'rolling/%'
               AND c.timestamp_ms>=a.anchor-? AND c.timestamp_ms<a.anchor-? GROUP BY c.capture_id ORDER BY a.anchor
-        """.trimIndent(),arrayOf(metric,toBeforeMs.toString(),fromBeforeMs.toString())).use{c->while(c.moveToNext())out+=c.getDouble(0)}
+        """.trimIndent(),arrayOf(metric,toBeforeMs.toString(),fromBeforeMs.toString())).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
         return out
     }
+    fun controlLagFeatureValues(metric:String,fromBeforeMs:Long,toBeforeMs:Long):List<Double> = controlLagFeatureCaptures(metric,fromBeforeMs,toBeforeMs).map{it.value}
 
-    fun eventBeforeDeltaValues(label:String,metric:String):List<Double>{
-        val out=mutableListOf<Double>()
+    fun eventBeforeDeltaCaptures(label:String,metric:String):List<TimedCaptureValue>{
+        val out=mutableListOf<TimedCaptureValue>()
         readableDatabase.rawQuery("""
-            SELECT AVG(CASE WHEN cs.timestamp_ms>=o.timestamp_ms-600000 THEN cs.value END)-
+            SELECT o.timestamp_ms,AVG(CASE WHEN cs.timestamp_ms>=o.timestamp_ms-600000 THEN cs.value END)-
                    AVG(CASE WHEN cs.timestamp_ms<o.timestamp_ms-1200000 THEN cs.value END)
             FROM context_samples cs JOIN observations o ON o.id=cs.observation_id
             WHERE o.label=? COLLATE NOCASE AND o.kind<>? AND cs.metric=? AND cs.phase='PRE'
               AND cs.timestamp_ms>=o.timestamp_ms-1800000 AND cs.timestamp_ms<o.timestamp_ms
             GROUP BY o.id HAVING COUNT(CASE WHEN cs.timestamp_ms>=o.timestamp_ms-600000 THEN 1 END)>0
               AND COUNT(CASE WHEN cs.timestamp_ms<o.timestamp_ms-1200000 THEN 1 END)>0 ORDER BY o.timestamp_ms
-        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name,metric)).use{c->while(c.moveToNext())out+=c.getDouble(0)}
+        """.trimIndent(),arrayOf(label,ObservationKind.HYPOTHESIS_NOTE.name,metric)).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
         return out
     }
+    fun eventBeforeDeltaValues(label:String,metric:String):List<Double> = eventBeforeDeltaCaptures(label,metric).map{it.value}
 
-    fun controlBeforeDeltaValues(metric:String):List<Double>{
-        val out=mutableListOf<Double>()
+    fun controlBeforeDeltaCaptures(metric:String):List<TimedCaptureValue>{
+        val out=mutableListOf<TimedCaptureValue>()
         readableDatabase.rawQuery("""
             WITH anchors AS (SELECT capture_id,MAX(timestamp_ms) anchor FROM context_samples WHERE is_control=1 AND phase='CONTROL' AND capture_id<>'' GROUP BY capture_id)
-            SELECT AVG(CASE WHEN c.timestamp_ms>=a.anchor-600000 THEN c.value END)-
+            SELECT a.anchor,AVG(CASE WHEN c.timestamp_ms>=a.anchor-600000 THEN c.value END)-
                    AVG(CASE WHEN c.timestamp_ms<a.anchor-1200000 THEN c.value END)
             FROM context_samples c JOIN anchors a ON a.capture_id=c.capture_id
             WHERE c.metric=? AND c.phase='CONTROL' AND c.source LIKE 'rolling/%'
               AND c.timestamp_ms>=a.anchor-1800000 AND c.timestamp_ms<a.anchor
             GROUP BY c.capture_id HAVING COUNT(CASE WHEN c.timestamp_ms>=a.anchor-600000 THEN 1 END)>0
               AND COUNT(CASE WHEN c.timestamp_ms<a.anchor-1200000 THEN 1 END)>0 ORDER BY a.anchor
-        """.trimIndent(),arrayOf(metric)).use{c->while(c.moveToNext())out+=c.getDouble(0)}
+        """.trimIndent(),arrayOf(metric)).use{c->while(c.moveToNext())out+=TimedCaptureValue(c.getLong(0),c.getDouble(1))}
         return out
     }
+    fun controlBeforeDeltaValues(metric:String):List<Double> = controlBeforeDeltaCaptures(metric).map{it.value}
 
     fun metricsForLabel(label:String):List<String>{
         val out=mutableListOf<String>()

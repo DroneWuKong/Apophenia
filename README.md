@@ -23,7 +23,7 @@ Writing down an explanation afterward is easy. Capturing what was actually happe
 1. Tap once.
 2. Save the exact event time immediately.
 3. Add whatever optional phone, environment, Health Connect, or Garmin context is available afterward.
-4. Compare event windows with ordinary random control windows instead of eyeballing a chart and declaring a pattern.
+4. Compare event windows with ordinary control windows instead of eyeballing a chart and declaring a pattern.
 
 The point is not to prove a story. It is to collect better evidence before telling one.
 
@@ -69,12 +69,13 @@ The app explains what works without a prompt and lets you review optional access
 - A home-screen widget and Quick Settings tile
 - Local SQLite storage, JSON export, and delete controls
 - A user-enabled rolling black box with 30 minutes of pre-event context and a labeled post-event window
-- Random control captures that use the same pipeline as event captures
+- Random control captures that use the same pipeline as event captures, then match one-to-one by local time block and weekday/weekend
+- Optional neutral check-in prompts that let you record “nothing unusual” through the control pipeline
 - Optional phone sensors, device state, battery, network, location, and Open-Meteo weather context
 - Optional read-only Health Connect history
 - A Garmin Epix Pro (Gen 2) logger with watch timestamps and a bounded offline queue
 - A full simulation mode that exercises storage, rolling windows, controls, and analysis without hardware
-- Cautious event-vs-control analysis with robust summaries and permutation tests
+- Cautious event-vs-control analysis with robust summaries, recorded permutation seeds, confidence intervals, p-value resolution, and false-discovery-rate correction
 
 There is no account, advertising SDK, analytics, continuous microphone recording, or camera recording.
 
@@ -111,13 +112,15 @@ Apophenia has a few non-negotiable rules:
 
 - observations are evidence, not conclusions;
 - hypotheses stay separate from raw observations;
-- event windows are compared with equivalent random controls;
+- event windows are compared with one-to-one controls matched by local four-hour block and weekday/weekend;
 - dense sensor samples are grouped by window, not counted as independent events;
 - post-event samples may be explored but are not predictors of the event;
 - unavailable metrics are omitted, never invented;
 - correlation is never presented as proven causation, diagnosis, or a paranormal claim.
 
 That means the app is allowed to say **insufficient data**. In fact, it should say that a lot at first.
+
+The matching is intentionally modest: it reduces obvious time-of-day and weekday confounding, but it does not yet match activity, location, sleep/wake state, or attention. Optional neutral check-ins help measure moments when nothing unusual was noticed, but they do not eliminate self-selection bias.
 
 ## Under the hood
 
