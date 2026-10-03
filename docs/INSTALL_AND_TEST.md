@@ -2,13 +2,13 @@
 
 This guide is for development-preview testers. Apophenia is not yet distributed through Google Play.
 
-## Install remotely from GitHub Actions
+## Install remotely
 
-1. On the phone or another computer, open the [Android Actions page](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml).
-2. Open the newest green workflow run.
-3. Download the `apophenia-debug-apk` artifact and unzip it.
-4. Transfer `app-debug.apk` to the Android phone if necessary.
-5. Open it and approve installation from that browser or file manager.
+The shortest path is to open the [latest development release](https://github.com/DroneWuKong/Apophenia/releases/tag/v0.3.0-preview.4) on the phone and download `app-debug.apk`. Open it and approve installation from that browser or file manager.
+
+Alternatively, open the [Android Actions page](https://github.com/DroneWuKong/Apophenia/actions/workflows/android.yml), select the newest green run, and download/unzip the `apophenia-debug-apk` artifact before transferring it to the phone.
+
+For a direct developer push over the local network, Android **Wireless debugging** must first be enabled and paired with the development computer. Merely sharing a Wi-Fi network does not authorize ADB access.
 
 GitHub may require a signed-in account to download workflow artifacts. If Android reports that the package conflicts with an existing installation, the older APK was probably signed by a different debug key. Export any data you need, uninstall the older debug build, and install the new APK. Uninstalling deletes the app's local database.
 
@@ -35,6 +35,7 @@ Open **Settings**.
 - **Location + weather:** tap **Allow**, accept an Android location choice, then tap **Test**. Expected: a result or a specific network/location error, never a silent button.
 - **Recorder notifications:** tap **Allow**. Expected on Android 13+: the native notification prompt appears.
 - **Health Connect:** tap **Connect**. Expected on supported devices: Android's Health Connect permission UI appears and returns to a connected, partially connected, or denied state.
+- **Radio environment:** turn it on, approve precise location and Nearby devices, then tap **Take test snapshot**. Expected: aggregate Wi-Fi/BLE/cellular counts or a specific permission/radio limitation. No network or device identifiers are stored.
 
 Basic observation logging must continue when every optional permission is denied.
 
