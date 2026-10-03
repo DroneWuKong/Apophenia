@@ -65,7 +65,9 @@ object HardwareGates {
         LIVE_SCREENRECORD_CAPTURE(GateTier.DELIBERATE),
         LIVE_CALL_AUDIO_CAPTURE(GateTier.CAPABILITY_CONDITIONAL),
 
-        LIVE_EXPORT_LAN(GateTier.STANDARD)
+        LIVE_EXPORT_LAN(GateTier.STANDARD),
+        LIVE_TASKER_CAPTURE(GateTier.DELIBERATE),
+        LIVE_TASKER_EXPORT(GateTier.DELIBERATE)
     }
 
     sealed interface ConsentProof {

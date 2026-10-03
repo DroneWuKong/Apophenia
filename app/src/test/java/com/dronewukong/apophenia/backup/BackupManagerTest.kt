@@ -12,6 +12,8 @@ import com.dronewukong.apophenia.data.ExportOutcome
 import com.dronewukong.apophenia.data.ExportRoute
 import com.dronewukong.apophenia.export.ExportEvidenceMaterializer
 import com.dronewukong.apophenia.export.ExportPayload
+import com.dronewukong.apophenia.ingest.IncomingAttachment
+import com.dronewukong.apophenia.ingest.ObservationAttachmentStore
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -40,6 +42,7 @@ class BackupManagerTest {
         context.deleteDatabase(DB_NAME)
         File(context.filesDir, "av").deleteRecursively()
         File(context.filesDir, "rf-survey").deleteRecursively()
+        File(context.filesDir, ObservationAttachmentStore.DIRECTORY).deleteRecursively()
         output = File(context.cacheDir, "backup-manager-test").apply { deleteRecursively(); mkdirs() }
         db = ObservationDb(context, DB_NAME)
         manager = BackupManager(context, emptyMaterializer, object : ProtectedEvidenceRestorer {
@@ -54,6 +57,7 @@ class BackupManagerTest {
         output.deleteRecursively()
         File(context.filesDir, "av").deleteRecursively()
         File(context.filesDir, "rf-survey").deleteRecursively()
+        File(context.filesDir, ObservationAttachmentStore.DIRECTORY).deleteRecursively()
     }
 
     @Test
@@ -67,24 +71,29 @@ class BackupManagerTest {
             payloadCount = 1, totalPayloadBytes = 10, containsRawAv = false, containsTier2Contents = false,
             scope = "events:$backedUpId", detail = "chooser opened"
         ))
+        ObservationAttachmentStore(context, db).store(backedUpId, IncomingAttachment.Text("share evidence"), 1_050)
         File(context.filesDir, "rf-survey").apply { mkdirs() }.resolve("window.iq").writeBytes(byteArrayOf(9, 8, 7))
         val prepared = manager.prepare(db, output, nowMs = 5_000)
         val inspection = manager.inspect(prepared.bundle)
         assertEquals(ObservationDb.SCHEMA_VERSION, inspection.schemaVersion)
         assertEquals(1, inspection.observationCount)
         assertEquals(1, inspection.rfIqFileCount)
+        assertEquals(1, inspection.attachmentCount)
 
         db.deleteAllData()
         File(context.filesDir, "rf-survey").deleteRecursively()
+        File(context.filesDir, ObservationAttachmentStore.DIRECTORY).deleteRecursively()
         db.insertObservation(Observation(timestampMs = 2_000, kind = ObservationKind.OBSERVATION, label = "After backup"))
         val result = manager.restore(db, prepared.bundle)
 
         assertEquals(1, result.observationCount)
         assertEquals(1, result.restoredRfIqCount)
+        assertEquals(1, result.restoredAttachmentCount)
         assertEquals(listOf("Backed up"), db.observations().map { it.label })
         assertEquals(listOf(backedUpId), db.evidenceSeals().map { it.observationId })
         assertEquals(ExportOutcome.HANDOFF_TO_CHOOSER, db.exportAuditLog().single().outcome)
         assertArrayEquals(byteArrayOf(9, 8, 7), File(context.filesDir, "rf-survey/window.iq").readBytes())
+        assertEquals("share evidence", File(context.filesDir, db.observationAttachments(backedUpId).single().relativePath).readText())
     }
 
     @Test

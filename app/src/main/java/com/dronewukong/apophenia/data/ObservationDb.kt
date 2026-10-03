@@ -42,6 +42,7 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
         createSessionEventTable(db)
         createMediaTables(db)
         createExportSafetyTables(db)
+        createAttachmentTable(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -83,6 +84,7 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
             createAnalysisViewTable(db)
         }
         if (oldVersion < 10) createExportSafetyTables(db)
+        if (oldVersion < 11) createAttachmentTable(db)
     }
 
     private fun createObservationIndexes(db: SQLiteDatabase) {
@@ -314,6 +316,23 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
             )
         """.trimIndent())
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_export_audit_time ON export_audit_log(occurred_at_ms)")
+    }
+
+    private fun createAttachmentTable(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS observation_attachments(
+              id TEXT PRIMARY KEY,
+              observation_id INTEGER NOT NULL,
+              created_at_ms INTEGER NOT NULL,
+              mime_type TEXT NOT NULL,
+              display_name TEXT NOT NULL,
+              relative_path TEXT NOT NULL UNIQUE,
+              sha256 TEXT NOT NULL,
+              size_bytes INTEGER NOT NULL CHECK(size_bytes >= 0),
+              FOREIGN KEY(observation_id) REFERENCES observations(id) ON DELETE CASCADE
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_attachment_observation ON observation_attachments(observation_id,created_at_ms)")
     }
 
     fun insertObservation(o: Observation): Long = insertObservationOrGet(o).id
@@ -1043,6 +1062,32 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
     fun evidenceSealCount(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM evidence_seals", null).use { it.moveToFirst(); it.getInt(0) }
     fun exportAuditCount(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM export_audit_log", null).use { it.moveToFirst(); it.getInt(0) }
 
+    fun insertAttachment(attachment: ObservationAttachment): Boolean = writableDatabase.insertOrThrow(
+        "observation_attachments",
+        null,
+        ContentValues().apply {
+            put("id", attachment.id); put("observation_id", attachment.observationId)
+            put("created_at_ms", attachment.createdAtMs); put("mime_type", attachment.mimeType)
+            put("display_name", attachment.displayName); put("relative_path", attachment.relativePath)
+            put("sha256", attachment.sha256); put("size_bytes", attachment.sizeBytes)
+        }
+    ) != -1L
+
+    fun observationAttachments(observationId: Long? = null, limit: Int = 10_000): List<ObservationAttachment> {
+        val where = if (observationId == null) "" else " WHERE observation_id=?"
+        val args = if (observationId == null) arrayOf(limit.toString()) else arrayOf(observationId.toString(), limit.toString())
+        val out = mutableListOf<ObservationAttachment>()
+        readableDatabase.rawQuery(
+            "SELECT id,observation_id,created_at_ms,mime_type,display_name,relative_path,sha256,size_bytes FROM observation_attachments$where ORDER BY created_at_ms,id LIMIT ?",
+            args
+        ).use { c -> while (c.moveToNext()) out += ObservationAttachment(
+            id = c.getString(0), observationId = c.getLong(1), createdAtMs = c.getLong(2),
+            mimeType = c.getString(3), displayName = c.getString(4), relativePath = c.getString(5),
+            sha256 = c.getString(6), sizeBytes = c.getLong(7)
+        ) }
+        return out
+    }
+
     /** Removes the evidence store after a verified EJECT route while retaining only audit and purge receipts. */
     fun wipeEvidenceForEject() {
         writableDatabase.beginTransaction()
@@ -1055,6 +1100,7 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
             writableDatabase.delete("hypothesis_evaluations", null, null)
             writableDatabase.delete("analysis_views", null, null)
             writableDatabase.delete("media_assets", null, null)
+            writableDatabase.delete("observation_attachments", null, null)
             writableDatabase.delete("hypotheses", null, null)
             writableDatabase.delete("observations", null, null)
             writableDatabase.delete("capture_sessions", null, null)
@@ -1066,7 +1112,7 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
 
     fun deleteAllData(){
         writableDatabase.beginTransaction()
-        try { writableDatabase.delete("evidence_seals",null,null); writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("session_events",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypothesis_evaluations",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("analysis_views",null,null); writableDatabase.delete("media_assets",null,null); writableDatabase.delete("purge_ledger",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.delete("export_audit_log",null,null); writableDatabase.setTransactionSuccessful() }
+        try { writableDatabase.delete("evidence_seals",null,null); writableDatabase.delete("sensitive_context",null,null); writableDatabase.delete("session_events",null,null); writableDatabase.delete("context_samples",null,null); writableDatabase.delete("rolling_samples",null,null); writableDatabase.delete("hypothesis_evaluations",null,null); writableDatabase.delete("hypotheses",null,null); writableDatabase.delete("analysis_views",null,null); writableDatabase.delete("media_assets",null,null); writableDatabase.delete("observation_attachments",null,null); writableDatabase.delete("purge_ledger",null,null); writableDatabase.delete("observations",null,null); writableDatabase.delete("capture_sessions",null,null); writableDatabase.delete("export_audit_log",null,null); writableDatabase.setTransactionSuccessful() }
         finally { writableDatabase.endTransaction() }
     }
 
@@ -1082,7 +1128,7 @@ class ObservationDb(context: Context, val databaseFileName: String = "apophenia.
     }
 
     companion object {
-        const val SCHEMA_VERSION = 10
+        const val SCHEMA_VERSION = 11
         private const val GLOBAL_SEAL_KEY = "global"
     }
 }

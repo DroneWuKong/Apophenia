@@ -236,6 +236,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [TOTAL_EVIDENCE and session presets](docs/TOTAL_EVIDENCE.md)
 - [Isolated demo mode and fixtures](docs/DEMO_MODE.md)
 - [Export, raw backup/restore, and explicit LAN routes](docs/EXPORT.md)
+- [Inbound shares and Tasker/intent automation](docs/AUTOMATION.md)
 - [SQLite schema contract](docs/SCHEMA.md)
 - [Project handoff and validation status](docs/PROJECT_HANDOFF.md)
 - [Roadmap](ROADMAP.md)
@@ -243,6 +244,7 @@ If you want to share the project, there is a copy-ready [Reddit launch kit](docs
 - [Release notes](docs/RELEASE_NOTES_0.2.1.md)
 - [0.3.0-preview.3 release notes](docs/RELEASE_NOTES_0.3.0-preview.3.md)
 - [0.3.0-preview.4 release notes](docs/RELEASE_NOTES_0.3.0-preview.4.md)
+- [0.3.0 release notes](docs/RELEASE_NOTES_0.3.0.md)
 
 ## License and disclaimer
 

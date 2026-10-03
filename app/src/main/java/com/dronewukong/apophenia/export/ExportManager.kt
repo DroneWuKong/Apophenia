@@ -3,6 +3,7 @@ package com.dronewukong.apophenia.export
 import android.content.Context
 import com.dronewukong.apophenia.data.ContextSample
 import com.dronewukong.apophenia.data.ObservationDb
+import com.dronewukong.apophenia.ingest.ObservationAttachmentStore
 import java.io.File
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
@@ -46,6 +47,7 @@ object ExportManager {
         if (tier == ExportTier.FULL_EVIDENCE) {
             payloads += evidenceMaterializer.sensitivePayloads(db.allSensitiveContext(100_000))
             payloads += evidenceMaterializer.mediaPayloads(db.mediaAssets(includePurged = false, limit = 10_000))
+            payloads += ObservationAttachmentStore(context, db).exportPayloads(db.observationAttachments(limit = 100_000))
             payloads += ExportInventoryMaterializer(context, db).payload()
         }
         return preparePayloadBundle(tier, dir, nowMs, payloads, includesAllEvidence = true)
@@ -131,6 +133,7 @@ object ExportManager {
             .put("payloadScope", ExportTier.DATA_ONLY.name)
             .put("rawAvIncludedInThisFile", false)
             .put("tier2ContentsIncludedInThisFile", false)
+            .put("attachmentBytesIncludedInThisFile", false)
         val observations = JSONArray()
         db.observations(100_000).forEach { observation ->
             val contexts = JSONArray()
@@ -198,6 +201,14 @@ object ExportManager {
                     .put("createdAtMs", asset.createdAtMs).put("retentionUntilMs", asset.retentionUntilMs)
                     .put("keepForever", asset.keepForever).put("status", asset.status.name)
                     .put("ciphertextSha256", asset.ciphertextSha256).put("sizeBytes", asset.sizeBytes)
+            )
+        } })
+        root.put("attachmentInventory", JSONArray().also { rows -> db.observationAttachments(limit = 100_000).forEach { attachment ->
+            rows.put(
+                JSONObject().put("id", attachment.id).put("observationId", attachment.observationId)
+                    .put("createdAtMs", attachment.createdAtMs).put("mimeType", attachment.mimeType)
+                    .put("displayName", attachment.displayName).put("sha256", attachment.sha256)
+                    .put("sizeBytes", attachment.sizeBytes).put("rawBytesIncludedInThisFile", false)
             )
         } })
         root.put("purgeLedger", JSONArray().also { rows -> db.purgeLedger(100_000).forEach { entry ->

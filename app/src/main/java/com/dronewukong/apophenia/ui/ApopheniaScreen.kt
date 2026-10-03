@@ -65,6 +65,7 @@ import com.dronewukong.apophenia.media.VideoEvidenceFrame
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import com.dronewukong.apophenia.home.HomeContextProvider
 import com.dronewukong.apophenia.home.HomeContextSettings
+import com.dronewukong.apophenia.ingest.ObservationAttachmentStore
 import com.dronewukong.apophenia.network.NetworkStateProvider
 import com.dronewukong.apophenia.rolling.RollingRecorderService
 import com.dronewukong.apophenia.rolling.RollingRecorderHealth
@@ -165,6 +166,11 @@ fun ApopheniaScreen(activity: MainActivity) {
     var showContextIntro by remember { mutableStateOf(!introPrefs.getBoolean("context_intro_v1", false)) }
     fun message(text: String) { scope.launch { snackbar.showSnackbar(text) } }
     LaunchedEffect(demoMode.active) { refresh++ }
+    val automationRevision = activity.automationRevision
+    LaunchedEffect(automationRevision) {
+        activity.consumeAutomationMessage()?.let(::message)
+        if (activity.peekAutomationExportRequest() != null) tab = Tab.SETTINGS
+    }
 
     MaterialTheme(colorScheme = appColors, typography = appTypography) {
         Scaffold(
@@ -1221,7 +1227,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                     } }
                     result.onSuccess {
                         prepared.bundle.delete(); pendingExport = null; refreshExportSafety()
-                        onMessage("EJECT complete · evidence saved · local evidence wiped · ${it.purgedMediaCount} AV and ${it.deletedRfFileCount} RF files deleted")
+                        onMessage("EJECT complete · evidence saved · local evidence wiped · ${it.purgedMediaCount} AV, ${it.deletedAttachmentFileCount} attachment, and ${it.deletedRfFileCount} RF files deleted")
                         activity.recreate()
                     }.onFailure { onMessage("EJECT evidence-table wipe stopped after save; any successful file purges remain in the purge ledger: ${it.message ?: "unknown error"}") }
                 }
@@ -1527,6 +1533,16 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     LaunchedEffect(permissionRevision) { refreshPermissionState() }
     LaunchedEffect(Unit) { refreshRolling(); refreshMedia(); refreshDemoSummary(); refreshReportEvents(); refreshExportSafety() }
     LaunchedEffect(demoMode.active) { simulation = HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION; refreshDemoSummary() }
+    LaunchedEffect(activity.automationRevision) {
+        when (activity.consumeAutomationExportRequest()) {
+            ExportTier.DATA_ONLY -> prepareExport(ExportTier.DATA_ONLY)
+            ExportTier.FULL_EVIDENCE -> {
+                confirmFullExport = true
+                onMessage("Full-evidence automation request received; review both confirmations and the manifest before routing")
+            }
+            else -> Unit
+        }
+    }
     DisposableEffect(Unit) {
         onDispose { runCatching { audioTrack?.stop() }; audioTrack?.release(); audioTrack = null }
     }
@@ -2695,6 +2711,32 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             }
         }
         item {
+            SettingsCard(Icons.Default.Bolt, "Tasker + intent hooks", "Both interfaces are deliberate gates. Tasker can log only while capture is armed; export intents can prepare a preview but can never choose a route or bypass confirmations.") {
+                gateRevision
+                listOf(
+                    HardwareGates.Gate.LIVE_TASKER_CAPTURE to "Receive com.dronewukong.apophenia.TASKER_LOG_OBSERVATION and freeze the receipt-time context window.",
+                    HardwareGates.Gate.LIVE_TASKER_EXPORT to "Receive data/full export activity intents and open the normal manifest-preview flow."
+                ).forEachIndexed { index, (gate, detail) ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                    GateSwitchRow(
+                        title = gate.name,
+                        detail = detail,
+                        enabled = HardwareGates.isAuthorized(activity, gate),
+                        onCheckedChange = { enabled ->
+                            if (!enabled) {
+                                HardwareGates.setAuthorized(activity, gate, false)
+                                gateRevision++
+                            } else {
+                                pendingDeliberateGate = gate
+                                deliberateGateInput = ""
+                            }
+                        }
+                    )
+                }
+                Text("Automation timestamps are assigned on receipt. Caller-supplied timestamps are ignored. The existing signature-protected integration receiver remains separate.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
+        item {
             SettingsCard(Icons.Default.Lan, "Explicit LAN export", "Standard gate · one deliberate push to a configured local document provider or literal private HTTP(S) address. No background upload and no delivery guarantee.") {
                 GateSwitchRow(
                     "LIVE_EXPORT_LAN",
@@ -2900,7 +2942,8 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             },
             confirmButton = {
                 Column(horizontalAlignment = Alignment.End) {
-                    if (manifest.tier == ExportTier.SINGLE_EVENT_DOSSIER && (manifest.containsRawAv || manifest.containsTier2Contents)) {
+                    if (manifest.tier == ExportTier.SINGLE_EVENT_DOSSIER &&
+                        (manifest.containsRawAv || manifest.containsTier2Contents || manifest.entries.any { it.path.startsWith("attachments/") })) {
                         TextButton(onClick = { scrubDossier(prepared) }, enabled = !exportPreparing) { Text(if (exportPreparing) "Scrubbing…" else "Scrub copy before share") }
                     }
                     if (lanEnabled && lanConfiguration.type != LanDestinationType.NONE) {
@@ -2932,7 +2975,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                     Text("${snapshot.file.name} · ${formatBytes(snapshot.file.length())}", fontWeight = FontWeight.SemiBold)
                     Text("schema_version ${snapshot.schemaVersion} · ${snapshot.observationCount} observations · ${snapshot.contextSampleCount} context samples")
                     Text("SHA-256\n${snapshot.sha256}", fontSize = 11.sp)
-                    Text("The WAL was checkpointed with FULL and the copied database passed SQLite integrity_check. This raw database can contain sensitive stored ciphertext and identifiers as stored; it does not include portable AV files.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text("The WAL was checkpointed with FULL and the copied database passed SQLite integrity_check. This raw database can contain sensitive stored ciphertext, identifiers, and attachment inventory as stored; it does not include portable attachment, AV, or RF files.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
             },
             confirmButton = {
@@ -2954,8 +2997,8 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("The bundle and every nested payload passed declared SHA-256 hashes, SQLite integrity_check, schema checks, and protected-evidence completeness checks before this confirmation.")
                     Text("schema ${inspection.schemaVersion} · ${inspection.observationCount} observations · ${inspection.contextSampleCount} context samples")
-                    Text("${inspection.activeMediaCount} active AV streams · ${inspection.sensitiveRecordCount} Tier-2 rows · ${inspection.rfIqFileCount} RF IQ files")
-                    Text("This replaces the live database and retained AV/RF files. Portable AV and Tier-2 data are re-encrypted under fresh device-local keys. If any apply step fails, the previous local store is rolled back.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                    Text("${inspection.activeMediaCount} active AV streams · ${inspection.sensitiveRecordCount} Tier-2 rows · ${inspection.attachmentCount} attachments · ${inspection.rfIqFileCount} RF IQ files")
+                    Text("This replaces the live database and retained attachment/AV/RF files. Portable AV and Tier-2 data are re-encrypted under fresh device-local keys. If any apply step fails, the previous local store is rolled back.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                 }
             },
             confirmButton = {
@@ -2977,7 +3020,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
                             result.onSuccess {
                                 selected.bundle.delete()
                                 pendingRestore = null
-                                onMessage("Restore complete · ${it.observationCount} observations · ${it.restoredMediaCount} AV streams")
+                                onMessage("Restore complete · ${it.observationCount} observations · ${it.restoredMediaCount} AV streams · ${it.restoredAttachmentCount} attachments")
                                 activity.recreate()
                             }.onFailure { onMessage("Restore failed and prior store was recovered: ${it.message ?: "unknown error"}") }
                         }
@@ -3013,8 +3056,8 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete all local data?") },
-            text = { Text("This permanently removes observations, hypotheses, controls, rolling samples, ordinary context, encrypted Tier-2 contents, encrypted AV media, and AV keys from this device.") },
-            confirmButton = { Button(onClick = { scope.launch { withContext(Dispatchers.IO) { MediaRetentionManager(activity).scrubAll(); repo.db().deleteAllData() }; confirmDelete = false; mediaAssets = emptyList(); purgeLedger = emptyList(); onMessage("All local data and retained AV media deleted") } }) { Text("Delete") } },
+            text = { Text("This permanently removes observations, inbound share attachments, hypotheses, controls, rolling samples, ordinary context, encrypted Tier-2 contents, encrypted AV media, and AV keys from this device.") },
+            confirmButton = { Button(onClick = { scope.launch { withContext(Dispatchers.IO) { MediaRetentionManager(activity).scrubAll(); ObservationAttachmentStore(activity, repo.db()).deleteAll(); repo.db().deleteAllData() }; confirmDelete = false; mediaAssets = emptyList(); purgeLedger = emptyList(); onMessage("All local data, inbound attachments, and retained AV media deleted") } }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
         )
     }
@@ -3025,7 +3068,11 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             title = { Text("Enable ${gate.name}?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("This gate captures protected contents at event and control windows and encrypts them on-device before storage.")
+                    Text(
+                        if (gate == HardwareGates.Gate.LIVE_TASKER_CAPTURE || gate == HardwareGates.Gate.LIVE_TASKER_EXPORT)
+                            "This gate accepts explicit external automation intents. Capture freezes local context at receipt time; export only opens Apophenia's reviewed preview flow and never routes in the background."
+                        else "This gate captures protected contents at event and control windows and encrypts them on-device before storage."
+                    )
                     OutlinedTextField(
                         value = deliberateGateInput,
                         onValueChange = { deliberateGateInput = it },

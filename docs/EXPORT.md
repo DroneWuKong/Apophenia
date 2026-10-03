@@ -25,6 +25,7 @@ The bundle contains `data/apophenia-data.json` with:
 - hypotheses and immutable evaluation snapshots;
 - drive/flight session metadata and session events;
 - raw-media inventory and the purge ledger.
+- inbound share-attachment inventory (name, MIME, size, SHA-256), never the attachment bytes.
 
 It never reads `sensitive_context`, never decrypts raw AV, and does not include Tier-2 contents. Device identifiers remain the locally keyed hashes already stored in SQLite.
 
@@ -35,7 +36,7 @@ Full evidence requires two deliberate confirmations:
 1. confirm that a plaintext evidence package should be built locally;
 2. review its manifest, then choose **Share** or **Save as**.
 
-In addition to the data-only payload, it contains every retained AV asset and Tier-2 record available at preparation time plus `inventories/omniprobe.json`, the per-event planned-channel/value/`capture_id`/gap accounting shown by Omniprobe. Audio is exported as mono PCM WAV. Video is exported as per-stream JPEG frames plus an index. Tier-2 records are decrypted into `tier2/contents.json`.
+In addition to the data-only payload, it contains every retained AV asset, Tier-2 record, and inbound text/image attachment available at preparation time plus `inventories/omniprobe.json`, the per-event planned-channel/value/`capture_id`/gap accounting shown by Omniprobe. Audio is exported as mono PCM WAV. Video is exported as per-stream JPEG frames plus an index. Tier-2 records are decrypted into `tier2/contents.json`. Attachment bytes are hash-checked and indexed under `attachments/`; source content URIs are never exported because they are never stored.
 
 Omniprobe gap reasons reflect gate, permission, platform, and hardware state visible at export time. They explain the locally knowable gap but do not retroactively prove what physical hardware was present at the historical event.
 
@@ -43,7 +44,7 @@ The event Keystore keys are deliberately non-exportable Android keys. The full e
 
 ### Raw SQLite snapshot
 
-The raw route creates `apophenia-sqlite-<timestamp>.db`. Before copying, the app runs `PRAGMA wal_checkpoint(FULL)`, refuses a busy checkpoint, copies the main database, reopens the copy read-only, requires `PRAGMA integrity_check=ok`, requires schema version 10, and checks the required table set. The preview shows schema version, row counts, byte size, and SHA-256 before Share or Save. No separate `-wal` file is needed because committed WAL pages were checkpointed into the copied database.
+The raw route creates `apophenia-sqlite-<timestamp>.db`. Before copying, the app runs `PRAGMA wal_checkpoint(FULL)`, refuses a busy checkpoint, copies the main database, reopens the copy read-only, requires `PRAGMA integrity_check=ok`, requires schema version 11, and checks the required table set. The preview shows schema version, row counts, byte size, and SHA-256 before Share or Save. No separate `-wal` file is needed because committed WAL pages were checkpointed into the copied database.
 
 The `.db` contains ciphertext and metadata exactly as stored. It does not contain the app-private AV/RF files and is not, by itself, a complete restore bundle. The stable schema is documented in [SCHEMA.md](SCHEMA.md).
 
@@ -52,17 +53,17 @@ The `.db` contains ciphertext and metadata exactly as stored. It does not contai
 The full backup is a verified outer ZIP containing:
 
 - `database/apophenia.db`, checkpointed and integrity-checked;
-- `database/schema.json`, declaring schema version 10 and the checkpoint contract;
+- `database/schema.json`, declaring schema version 11 and the checkpoint contract;
 - `portable/full-evidence.zip`, a separately verified full-evidence bundle used to recreate device-bound protected data;
 - retained `rf/*.iq` windows present at backup time.
 
 The outer manifest hashes every file. Because Android Keystore keys cannot be exported, retained AV and Tier-2 contents inside the nested portable evidence bundle are plaintext. Integrity hashes are not encryption.
 
-Restore verifies the outer manifest, every nested manifest, SQLite integrity and required tables, schema version, protected-row counts, each active AV asset's portable sidecar/frame inventory, and RF file naming before isolating or mutating the live store. It then imports all application tables transactionally, re-encrypts portable AV and Tier-2 contents under fresh device-local keys, and restores RF files. A failed apply rolls back the prior database and AV/RF directories. Capture sessions must be disarmed before selection and are checked again at confirmation.
+Restore verifies the outer manifest, every nested manifest, SQLite integrity and required tables, schema version, protected-row/attachment counts, each active AV asset's portable sidecar/frame inventory, every attachment hash, and RF file naming before isolating or mutating the live store. It then imports all application tables transactionally, re-encrypts portable AV and Tier-2 contents under fresh device-local keys, and restores attachment/RF files. A failed apply rolls back the prior database and AV/RF/attachment directories. Capture sessions must be disarmed before selection and are checked again at confirmation.
 
 ### Single-event dossier
 
-A dossier scopes the evidence package to one selected live observation. It includes the observation and VIBE/egress fields, ordinary context, joined session events, event-specific Omniprobe inventory, context CSV, descriptive summary, derived-metric SVG, retained AV, Tier-2 contents, and retained RF IQ referenced by that event. RF bytes are checked against the SHA-256 recorded in context; expired/missing windows remain named in the RF inventory.
+A dossier scopes the evidence package to one selected live observation. It includes the observation and VIBE/egress fields, ordinary context, joined session events, event-specific Omniprobe inventory, context CSV, descriptive summary, derived-metric SVG, inbound share attachments, retained AV, Tier-2 contents, and retained RF IQ referenced by that event. Attachment and RF bytes are checked against stored SHA-256 values; expired/missing RF windows remain named in the RF inventory.
 
 Because retained AV and Tier-2 contents are portable plaintext, preparation requires the deliberate evidence warning and routing still requires the manifest-preview confirmation. See [REPORTS.md](REPORTS.md).
 
@@ -76,7 +77,7 @@ Report selection is not a new causal analysis. When no eligible stored evaluatio
 
 A global seal applies to every export. A per-event seal applies to dossiers/reports containing that event; all-data bundles and EJECT also honor every event seal. Routing sealed evidence requires typing **RELEASE SEALED EVIDENCE** for that one route. The seal remains active afterward. Removing a seal separately requires typing **UNSEAL**.
 
-An event dossier with raw AV or Tier-2 content offers **Scrub copy before share**. The verified replacement removes raw AV and plaintext Tier-2 payloads, redacts protected values from the Omniprobe inventory while retaining counts/gaps, gets a fresh manifest/hash, and leaves the original local evidence untouched.
+An event dossier with raw AV, Tier-2 content, or inbound attachments offers **Scrub copy before share**. The verified replacement removes raw AV, plaintext Tier-2 payloads, and attachment bytes; redacts protected values from the Omniprobe inventory while retaining counts/gaps; gets a fresh manifest/hash; and leaves the original local evidence untouched.
 
 ## Durable export audit
 
@@ -91,9 +92,9 @@ None of these outcomes claims destination durability or exactly-once delivery. O
 
 ## EJECT
 
-EJECT builds a verified full-evidence package for **last hour**, **last 6 hours**, **last 24 hours**, or **all local evidence**. It includes selected observations/context/controls/sessions/hypotheses, Omniprobe inventories, protected contents, retained AV, referenced hash-checked RF IQ, prior purge receipts, seals, and the export log as it existed at preparation time.
+EJECT builds a verified full-evidence package for **last hour**, **last 6 hours**, **last 24 hours**, or **all local evidence**. It includes selected observations/context/controls/sessions/hypotheses, Omniprobe inventories, protected contents, inbound attachments, retained AV, referenced hash-checked RF IQ, prior purge receipts, seals, and the export log as it existed at preparation time.
 
-Confirmation 1 builds and previews the package. Confirmation 2 requires typing **EJECT AND WIPE** before selecting SAF or using configured LAN. Sharesheet is unavailable because opening a chooser is not proof of a completed transfer. Capture sessions must remain disarmed. Immediately before deletion, the app re-verifies the bundle and then requires every retained AV artifact/key purge and RF-directory deletion to succeed before clearing observations, context, protected contents, hypotheses, sessions, media inventory, and seals. Export and purge receipts remain locally.
+Confirmation 1 builds and previews the package. Confirmation 2 requires typing **EJECT AND WIPE** before selecting SAF or using configured LAN. Sharesheet is unavailable because opening a chooser is not proof of a completed transfer. Capture sessions must remain disarmed. Immediately before deletion, the app re-verifies the bundle and then requires every retained AV artifact/key purge plus attachment/RF-directory deletion to succeed before clearing observations, context, protected contents, hypotheses, sessions, inventories, and seals. Export and purge receipts remain locally.
 
 Choosing a partial EJECT window still wipes the **entire** local evidence store; the UI states this before preparation and again before routing. The audit entry added after a route cannot be inside the already-transferred package, but remains in the local receipt-only store.
 
@@ -117,4 +118,4 @@ Cancelling a preview deletes the prepared ZIP. A successful SAF copy deletes the
 
 Demo fixtures are structurally excluded: `ExportManager` refuses `apophenia-demo.db`, and the Settings export surface always reads the canonical live database even while the UI is in demo mode.
 
-Inbound share-to-log and Tasker intent hooks remain step 23. A manifest preview proves only the prepared bytes; the audit uses bounded outcome names and never upgrades a handoff/acknowledgement into destination-retention proof.
+Inbound share-to-log and deliberate Tasker/intent hooks are implemented as step 23. See [AUTOMATION.md](AUTOMATION.md). A manifest preview proves only the prepared bytes; the audit uses bounded outcome names and never upgrades a handoff/acknowledgement into destination-retention proof.

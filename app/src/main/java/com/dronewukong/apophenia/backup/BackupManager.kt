@@ -14,6 +14,7 @@ import com.dronewukong.apophenia.export.ExportPayload
 import com.dronewukong.apophenia.export.ExportTier
 import com.dronewukong.apophenia.export.PreparedExport
 import com.dronewukong.apophenia.media.MediaRetentionManager
+import com.dronewukong.apophenia.ingest.ObservationAttachmentStore
 import com.dronewukong.apophenia.phone.SensitiveContentCipher
 import com.dronewukong.apophenia.phone.SensitiveContextProvider
 import com.dronewukong.apophenia.video.VideoArtifactStore
@@ -33,14 +34,16 @@ data class BackupInspection(
     val sensitiveRecordCount: Int,
     val rfIqFileCount: Int,
     val containsRawAv: Boolean,
-    val containsTier2Contents: Boolean
+    val containsTier2Contents: Boolean,
+    val attachmentCount: Int = 0
 )
 
 data class RestoreResult(
     val observationCount: Int,
     val restoredMediaCount: Int,
     val restoredSensitiveCount: Int,
-    val restoredRfIqCount: Int
+    val restoredRfIqCount: Int,
+    val restoredAttachmentCount: Int = 0
 )
 
 data class RawDatabaseSnapshot(
@@ -143,16 +146,21 @@ class BackupManager(
         val rollbackDb = File(rollback, "apophenia.db")
         val currentAv = File(app.filesDir, "av")
         val currentRf = File(app.filesDir, "rf-survey")
+        val currentAttachments = File(app.filesDir, ObservationAttachmentStore.DIRECTORY)
         val rollbackAv = File(rollback, "av")
         val rollbackRf = File(rollback, "rf-survey")
+        val rollbackAttachments = File(rollback, ObservationAttachmentStore.DIRECTORY)
         val oldAliases = db.mediaAssets(includePurged = true, limit = 100_000).map { it.keyAlias }.filter(String::isNotBlank).toSet()
         val createdAliases = mutableSetOf<String>()
         try {
             checkpointAndCopy(db, rollbackDb)
             moveDirectoryAside(currentAv, rollbackAv)
             moveDirectoryAside(currentRf, rollbackRf)
+            moveDirectoryAside(currentAttachments, rollbackAttachments)
             replaceDatabaseContents(db, verified.database)
             val restored = protectedRestorer.restore(db, verified.evidence, createdAliases)
+            val attachments = db.observationAttachments(limit = 100_000)
+            ObservationAttachmentStore(app, db).restoreFromEvidence(verified.evidence, attachments)
             val rfCount = restoreRf(verified.bundle)
             require(integrityCheck(db.writableDatabase) == "ok") { "Restored database failed integrity_check" }
             val newAliases = db.mediaAssets(includePurged = true, limit = 100_000).map { it.keyAlias }.filter(String::isNotBlank).toSet()
@@ -162,14 +170,17 @@ class BackupManager(
                 observationCount = db.observations(100_000).size,
                 restoredMediaCount = restored.first,
                 restoredSensitiveCount = restored.second,
-                restoredRfIqCount = rfCount
+                restoredRfIqCount = rfCount,
+                restoredAttachmentCount = attachments.size
             )
         } catch (error: Throwable) {
             runCatching { replaceDatabaseContents(db, rollbackDb) }
             File(app.filesDir, "av").deleteRecursively()
             File(app.filesDir, "rf-survey").deleteRecursively()
+            File(app.filesDir, ObservationAttachmentStore.DIRECTORY).deleteRecursively()
             restoreDirectory(rollbackAv, File(app.filesDir, "av"))
             restoreDirectory(rollbackRf, File(app.filesDir, "rf-survey"))
+            restoreDirectory(rollbackAttachments, File(app.filesDir, ObservationAttachmentStore.DIRECTORY))
             (createdAliases - oldAliases).forEach(::deleteKey)
             throw error
         } finally {
@@ -184,10 +195,12 @@ class BackupManager(
         val contextCount: Int,
         val activeMediaCount: Int,
         val sensitiveCount: Int,
-        val activeMedia: List<BackupMedia>
+        val activeMedia: List<BackupMedia>,
+        val attachments: List<BackupAttachment>
     )
 
     private data class BackupMedia(val id: String, val observationId: Long, val type: MediaType)
+    private data class BackupAttachment(val id: String, val observationId: Long, val relativePath: String, val sha256: String, val sizeBytes: Long)
 
     private data class VerifiedBackup(
         val directory: File,
@@ -237,7 +250,8 @@ class BackupManager(
                     sensitiveRecordCount = databaseInfo.sensitiveCount,
                     rfIqFileCount = rfCount,
                     containsRawAv = evidenceManifest.containsRawAv,
-                    containsTier2Contents = evidenceManifest.containsTier2Contents
+                    containsTier2Contents = evidenceManifest.containsTier2Contents,
+                    attachmentCount = databaseInfo.attachments.size
                 )
             )
         } catch (error: Throwable) {
@@ -284,6 +298,12 @@ class BackupManager(
                             add(BackupMedia(cursor.getString(0), cursor.getLong(1), MediaType.valueOf(cursor.getString(2))))
                         }
                     }
+                },
+                attachments = it.rawQuery(
+                    "SELECT id,observation_id,relative_path,sha256,size_bytes FROM observation_attachments ORDER BY created_at_ms,id",
+                    null
+                ).use { cursor ->
+                    buildList { while (cursor.moveToNext()) add(BackupAttachment(cursor.getString(0), cursor.getLong(1), cursor.getString(2), cursor.getString(3), cursor.getLong(4))) }
                 }
             )
         }
@@ -328,6 +348,28 @@ class BackupManager(
                             require(frameName.isNotBlank() && '/' !in frameName && '\\' !in frameName) { "Unsafe video frame name" }
                             require("$base/$frameName" in names) { "Backup evidence is missing a frame for ${asset.id}" }
                         }
+                    }
+                }
+            }
+            if (info.attachments.isNotEmpty()) {
+                val indexEntry = zip.getEntry("attachments/index.json") ?: error("Backup evidence is missing attachments/index.json")
+                val root = JSONObject(zip.getInputStream(indexEntry).bufferedReader().use { it.readText() })
+                require(root.getString("schema") == "apophenia.observation-attachments.v1") { "Unsupported attachment evidence schema" }
+                val rows = root.getJSONArray("attachments")
+                val descriptors = buildMap<String, JSONObject> {
+                    repeat(rows.length()) { index -> rows.getJSONObject(index).also { put(it.getString("id"), it) } }
+                }
+                require(descriptors.keys == info.attachments.map { it.id }.toSet()) { "Attachment evidence count does not match SQLite" }
+                info.attachments.forEach { attachment ->
+                    val descriptor = requireNotNull(descriptors[attachment.id])
+                    require(descriptor.getLong("observationId") == attachment.observationId) { "Attachment observation mismatch" }
+                    require(descriptor.getString("relativePath") == attachment.relativePath) { "Attachment path mismatch" }
+                    require(descriptor.getString("sha256") == attachment.sha256 && descriptor.getLong("sizeBytes") == attachment.sizeBytes) { "Attachment metadata mismatch" }
+                    val payloadPath = descriptor.getString("payloadPath")
+                    require(payloadPath in names) { "Backup evidence is missing attachment ${attachment.id}" }
+                    val bytes = zip.getInputStream(zip.getEntry(payloadPath)).use { it.readBytes() }
+                    require(bytes.size.toLong() == attachment.sizeBytes && sha256(bytes) == attachment.sha256) {
+                        "Attachment payload failed verification for ${attachment.id}"
                     }
                 }
             }
@@ -398,6 +440,8 @@ class BackupManager(
         }
         digest.digest().joinToString("") { "%02x".format(it) }
     }
+    private fun sha256(bytes: ByteArray): String = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(bytes).joinToString("") { "%02x".format(it) }
     private fun deleteKey(alias: String) = runCatching { KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias) }.getOrNull()
 
     companion object {
@@ -405,16 +449,16 @@ class BackupManager(
         private val requiredTables = setOf(
             "observations", "context_samples", "rolling_samples", "hypotheses", "sensitive_context",
             "capture_sessions", "session_events", "media_assets", "purge_ledger", "hypothesis_evaluations", "analysis_views",
-            "evidence_seals", "export_audit_log"
+            "evidence_seals", "export_audit_log", "observation_attachments"
         )
         private val deleteOrder = listOf(
             "sensitive_context", "session_events", "context_samples", "rolling_samples", "hypothesis_evaluations",
-            "analysis_views", "evidence_seals", "purge_ledger", "media_assets", "hypotheses", "observations", "capture_sessions",
+            "analysis_views", "evidence_seals", "purge_ledger", "media_assets", "observation_attachments", "hypotheses", "observations", "capture_sessions",
             "export_audit_log"
         )
         private val insertOrder = listOf(
             "observations", "evidence_seals", "hypotheses", "capture_sessions", "context_samples", "rolling_samples", "sensitive_context",
-            "session_events", "media_assets", "hypothesis_evaluations", "analysis_views", "purge_ledger", "export_audit_log"
+            "session_events", "media_assets", "observation_attachments", "hypothesis_evaluations", "analysis_views", "purge_ledger", "export_audit_log"
         )
     }
 }

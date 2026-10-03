@@ -35,6 +35,17 @@ data class ExportAuditEntry(
     val detail: String
 )
 
+data class ObservationAttachment(
+    val id: String,
+    val observationId: Long,
+    val createdAtMs: Long,
+    val mimeType: String,
+    val displayName: String,
+    val relativePath: String,
+    val sha256: String,
+    val sizeBytes: Long
+)
+
 data class MediaAsset(
     val id: String,
     val observationId: Long,

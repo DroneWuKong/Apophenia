@@ -6,9 +6,16 @@ import com.dronewukong.apophenia.data.ExportOutcome
 import com.dronewukong.apophenia.data.ExportRoute
 import com.dronewukong.apophenia.data.ObservationDb
 import com.dronewukong.apophenia.media.MediaRetentionManager
+import com.dronewukong.apophenia.ingest.ObservationAttachmentStore
 import java.io.File
 
-data class EjectWipeResult(val purgedMediaCount: Int, val deletedRfFileCount: Int, val deletedRfBytes: Long)
+data class EjectWipeResult(
+    val purgedMediaCount: Int,
+    val deletedRfFileCount: Int,
+    val deletedRfBytes: Long,
+    val deletedAttachmentFileCount: Int = 0,
+    val deletedAttachmentBytes: Long = 0
+)
 
 class EjectWiper(context: Context) {
     private val app = context.applicationContext
@@ -35,6 +42,7 @@ class EjectWiper(context: Context) {
         val purgedMedia = MediaRetentionManager(app, db).scrubAll("EJECT_AFTER_VERIFIED_EXPORT")
         require(purgedMedia == activeMedia) { "Could not delete every retained AV artifact; local evidence was not wiped" }
         val (rfFiles, rfBytes) = deleteRfEvidence()
+        val (attachmentFiles, attachmentBytes) = ObservationAttachmentStore(app, db).deleteAll()
         db.wipeEvidenceForEject()
         db.insertExportAudit(
             ExportAuditEntry(
@@ -49,10 +57,10 @@ class EjectWiper(context: Context) {
                 containsRawAv = prepared.manifest.containsRawAv,
                 containsTier2Contents = prepared.manifest.containsTier2Contents,
                 scope = "local-evidence-store",
-                detail = "AV purge receipts retained=$purgedMedia; RF files deleted=$rfFiles; RF bytes deleted=$rfBytes"
+                detail = "AV purge receipts retained=$purgedMedia; RF files deleted=$rfFiles; RF bytes deleted=$rfBytes; attachments deleted=$attachmentFiles; attachment bytes deleted=$attachmentBytes"
             )
         )
-        return EjectWipeResult(purgedMedia, rfFiles, rfBytes)
+        return EjectWipeResult(purgedMedia, rfFiles, rfBytes, attachmentFiles, attachmentBytes)
     }
 
     private fun deleteRfEvidence(): Pair<Int, Long> {

@@ -97,6 +97,7 @@ class MainActivitySmokeTest {
             "Encrypted evidence media",
             "Octopod observer",
             "Evidence seals + export audit",
+            "Tasker + intent hooks",
             "Explicit LAN export"
         ).forEach(::scrollSettingsTo)
     }
@@ -159,7 +160,7 @@ class MainActivitySmokeTest {
         compose.waitUntil(timeoutMillis = 15_000) {
             compose.onAllNodesWithText("Raw SQLite preview").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("schema_version 10", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("schema_version 11", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Cancel + delete").performClick()
     }
 

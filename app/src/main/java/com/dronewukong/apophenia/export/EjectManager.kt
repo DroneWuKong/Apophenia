@@ -3,6 +3,7 @@ package com.dronewukong.apophenia.export
 import android.content.Context
 import com.dronewukong.apophenia.data.ContextSample
 import com.dronewukong.apophenia.data.ObservationDb
+import com.dronewukong.apophenia.ingest.ObservationAttachmentStore
 import java.io.File
 import java.security.MessageDigest
 import org.json.JSONArray
@@ -40,6 +41,7 @@ class EjectManager(
             row.timestampMs in fromMs..nowMs || (row.observationId != null && row.observationId in observationIds)
         }
         val media = observationIds.flatMap { db.mediaAssets(it, includePurged = false, limit = 10_000) }
+        val attachments = observationIds.flatMap { db.observationAttachments(it, limit = 10_000) }
         val payloads = mutableListOf(
             ExportPayload("eject/window.json", windowJson(db, window, fromMs, nowMs, observations, context).toString(2).toByteArray()),
             ExportInventoryMaterializer(app, db).payloadForEvents(observationIds, "eject/omniprobe-window.json")
@@ -50,6 +52,7 @@ class EjectManager(
         require(media.isEmpty() || mediaPayloads.any { it.containsRawAv }) { "EJECT did not materialize selected retained AV" }
         payloads += sensitivePayloads.map { it.copy(path = "eject/${it.path}") }
         payloads += mediaPayloads.map { it.copy(path = "eject/${it.path}") }
+        payloads += ObservationAttachmentStore(app, db).exportPayloads(attachments, prefix = "eject/attachments")
         payloads += rfPayloads(context)
         return ExportManager.preparePayloadBundle(ExportTier.EJECT, dir, nowMs, payloads, observationIds)
     }
@@ -99,6 +102,11 @@ class EjectManager(
                 rows.put(JSONObject().put("id", asset.id).put("observationId", asset.observationId).put("mediaType", asset.mediaType.name)
                     .put("streamId", asset.streamId).put("status", asset.status.name).put("retentionUntilMs", asset.retentionUntilMs)
                     .put("keepForever", asset.keepForever).put("ciphertextSha256", asset.ciphertextSha256).put("sizeBytes", asset.sizeBytes))
+            } } })
+            .put("attachmentInventory", JSONArray().also { rows -> observations.forEach { observation -> db.observationAttachments(observation.id, limit = 10_000).forEach { attachment ->
+                rows.put(JSONObject().put("id", attachment.id).put("observationId", attachment.observationId)
+                    .put("mimeType", attachment.mimeType).put("displayName", attachment.displayName)
+                    .put("sha256", attachment.sha256).put("sizeBytes", attachment.sizeBytes))
             } } })
             .put("purgeLedger", JSONArray().also { rows -> db.purgeLedger(100_000).forEach { entry ->
                 rows.put(JSONObject().put("mediaId", entry.mediaId).put("observationId", entry.observationId).put("mediaType", entry.mediaType.name)

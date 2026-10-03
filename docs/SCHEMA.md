@@ -1,6 +1,6 @@
 # SQLite schema contract
 
-Apophenia's live database is `apophenia.db`. The current `PRAGMA user_version` is **10** and is also exposed as `ObservationDb.SCHEMA_VERSION`. Raw snapshots contain one checkpointed SQLite file; committed WAL pages are folded into it with `PRAGMA wal_checkpoint(FULL)` before copying.
+Apophenia's live database is `apophenia.db`. The current `PRAGMA user_version` is **11** and is also exposed as `ObservationDb.SCHEMA_VERSION`. Raw snapshots contain one checkpointed SQLite file; committed WAL pages are folded into it with `PRAGMA wal_checkpoint(FULL)` before copying.
 
 ## Tables
 
@@ -19,6 +19,7 @@ Apophenia's live database is `apophenia.db`. The current `PRAGMA user_version` i
 | `purge_ledger` | Durable deletion receipt for raw media; records reason, time, bytes, and that derived metrics remain. |
 | `evidence_seals` | Current global/per-event deliberate-release flags with timestamp and event join where applicable. A seal changes confirmation, not capability. |
 | `export_audit_log` | Append-only route outcomes: tier, route, observable outcome, bundle SHA-256/name, payload counts/flags, scope, and bounded detail. |
+| `observation_attachments` | Inbound shared-text/image attachment inventory: owning event, receipt timestamp, MIME/name, app-private relative path, SHA-256, and byte count. The incoming content URI is never persisted. |
 
 SQLite's internal `sqlite_sequence` is copied during verified restore so autoincrement identities continue beyond restored rows.
 
@@ -33,9 +34,10 @@ SQLite's internal `sqlite_sequence` is copied during verified restore so autoinc
 - v8: media inventory and purge ledger.
 - v9: pre-registration cohort/window/lock fields, evaluations, and analysis-view ledger.
 - v10: global/per-event evidence seals and durable export/EJECT route audit.
+- v11: app-private inbound share attachments joined to observations.
 
 ## Backup and restore compatibility
 
-Restore accepts schema version 10 only. It refuses missing tables, failed SQLite integrity checks, corrupted or undeclared ZIP entries, mismatched protected-evidence counts, incomplete active AV payloads, and unexpected RF payloads before changing the live store. This strictness prevents a superficially valid but incomplete backup from becoming the new authority.
+Restore accepts schema version 11 only. It refuses missing tables, failed SQLite integrity checks, corrupted or undeclared ZIP entries, mismatched protected-evidence/attachment counts, incomplete active AV or attachment payloads, and unexpected RF payloads before changing the live store. This strictness prevents a superficially valid but incomplete backup from becoming the new authority.
 
 The schema documents stored software state. Rows produced by SIMULATION are not physical-device, deployment, field, or flight proof, and live demo fixtures reside in a different database that cannot enter live exports.

@@ -11,6 +11,8 @@ import com.dronewukong.apophenia.data.Observation
 import com.dronewukong.apophenia.data.ObservationDb
 import com.dronewukong.apophenia.data.ObservationKind
 import com.dronewukong.apophenia.data.SensitiveContextRecord
+import com.dronewukong.apophenia.ingest.IncomingAttachment
+import com.dronewukong.apophenia.ingest.ObservationAttachmentStore
 import java.io.File
 import java.util.zip.ZipFile
 import org.json.JSONObject
@@ -39,6 +41,7 @@ class EjectManagerTest {
         db = ObservationDb(context, "eject-test.db")
         output = File(context.cacheDir, "eject-test").apply { deleteRecursively(); mkdirs() }
         File(context.filesDir, "rf-survey").deleteRecursively()
+        File(context.filesDir, ObservationAttachmentStore.DIRECTORY).deleteRecursively()
     }
 
     @After
@@ -47,6 +50,7 @@ class EjectManagerTest {
         context.deleteDatabase("eject-test.db")
         output.deleteRecursively()
         File(context.filesDir, "rf-survey").deleteRecursively()
+        File(context.filesDir, ObservationAttachmentStore.DIRECTORY).deleteRecursively()
         File(context.filesDir, "av/undeletable-media").deleteRecursively()
         File(context.filesDir, "av/undeletable-manifest").deleteRecursively()
     }
@@ -79,7 +83,8 @@ class EjectManagerTest {
 
     @Test
     fun verifiedCompletedRouteWipesEvidenceButRetainsAuditAndPurgeReceipts() {
-        db.insertObservation(Observation(timestampMs = 1_000, kind = ObservationKind.WEIRD, label = "Evidence"))
+        val observationId = db.insertObservation(Observation(timestampMs = 1_000, kind = ObservationKind.WEIRD, label = "Evidence"))
+        ObservationAttachmentStore(context, db).store(observationId, IncomingAttachment.Text("eject attachment"), 1_000)
         val prepared = EjectManager(context, object : ExportEvidenceMaterializer {
             override fun sensitivePayloads(records: List<SensitiveContextRecord>) = emptyList<ExportPayload>()
             override fun mediaPayloads(assets: List<MediaAsset>) = emptyList<ExportPayload>()
@@ -94,6 +99,8 @@ class EjectManagerTest {
         assertTrue(db.observations().isEmpty())
         assertFalse(rfDir.exists())
         assertEquals(1, result.deletedRfFileCount)
+        assertEquals(1, result.deletedAttachmentFileCount)
+        assertTrue(db.observationAttachments().isEmpty())
         assertEquals(listOf(ExportOutcome.WIPE_COMPLETED, ExportOutcome.WRITE_COMPLETED), db.exportAuditLog().map { it.outcome })
     }
 

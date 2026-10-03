@@ -136,7 +136,9 @@ class HardwareGatesTest {
                 HardwareGates.Gate.LIVE_VIDEO_CAPTURE,
                 HardwareGates.Gate.LIVE_VIDEO_SELFCAPTURE,
                 HardwareGates.Gate.LIVE_MULTICAM_CAPTURE,
-                HardwareGates.Gate.LIVE_SCREENRECORD_CAPTURE
+                HardwareGates.Gate.LIVE_SCREENRECORD_CAPTURE,
+                HardwareGates.Gate.LIVE_TASKER_CAPTURE,
+                HardwareGates.Gate.LIVE_TASKER_EXPORT
             ),
             deliberate
         )

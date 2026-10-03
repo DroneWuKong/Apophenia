@@ -79,10 +79,11 @@ class EvidencePresetManagerTest {
         )
 
         assertFalse(result.rejected)
-        HardwareGates.Gate.entries.filter { it != HardwareGates.Gate.LIVE_EXPORT_LAN }.forEach {
+        HardwareGates.Gate.entries.filter { it != HardwareGates.Gate.LIVE_EXPORT_LAN && it != HardwareGates.Gate.LIVE_TASKER_EXPORT }.forEach {
             assertTrue("Expected $it to be armed", HardwareGates.isAuthorized(context, it))
         }
         assertFalse(HardwareGates.isAuthorized(context, HardwareGates.Gate.LIVE_EXPORT_LAN))
+        assertFalse(HardwareGates.isAuthorized(context, HardwareGates.Gate.LIVE_TASKER_EXPORT))
         assertEquals(microphoneBefore, ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO))
         assertEquals(PackageManager.PERMISSION_DENIED, microphoneBefore)
         assertTrue(EvidencePresetManager.state.value.totalEvidenceActive)

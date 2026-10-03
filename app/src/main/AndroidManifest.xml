@@ -82,6 +82,23 @@
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="com.dronewukong.apophenia.AUTOMATION_EXPORT_DATA" />
+                <action android:name="com.dronewukong.apophenia.AUTOMATION_EXPORT_FULL" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.ShareToApopheniaActivity"
+            android:exported="true"
+            android:label="Log to Apophenia">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
         </activity>
 
         <activity-alias
@@ -102,6 +119,10 @@
 
         <receiver android:name=".ingest.ObservationReceiver" android:exported="true" android:permission="com.dronewukong.apophenia.permission.INGEST">
             <intent-filter><action android:name="com.dronewukong.apophenia.LOG_OBSERVATION" /></intent-filter>
+        </receiver>
+
+        <receiver android:name=".ingest.TaskerAutomationReceiver" android:exported="true">
+            <intent-filter><action android:name="com.dronewukong.apophenia.TASKER_LOG_OBSERVATION" /></intent-filter>
         </receiver>
 
         <service android:name=".tile.WeirdTileService" android:exported="true" android:icon="@drawable/ic_weird" android:label="That Was Weird" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">

@@ -136,7 +136,7 @@ object EvidencePresetManager {
         )
         EvidencePreset.EVERYTHING -> HardwareGates.Gate.entries.filterTo(linkedSetOf()) {
             // Capture modes never authorize a route that can move data off-device.
-            it != HardwareGates.Gate.LIVE_EXPORT_LAN
+            it != HardwareGates.Gate.LIVE_EXPORT_LAN && it != HardwareGates.Gate.LIVE_TASKER_EXPORT
         }
     }
 

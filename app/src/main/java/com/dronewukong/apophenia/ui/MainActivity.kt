@@ -29,9 +29,11 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.export.ExportRoutes
+import com.dronewukong.apophenia.export.ExportTier
 import com.dronewukong.apophenia.export.LanExportSettings
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import com.dronewukong.apophenia.hardware.HardwareGates
+import com.dronewukong.apophenia.ingest.TaskerAutomationContract
 import com.dronewukong.apophenia.mavlink.UsbMavlinkDevice
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -57,8 +59,12 @@ class MainActivity : ComponentActivity() {
     private var safExportResult: ((Boolean, String) -> Unit)? = null
     private var lanTreeResult: ((Boolean, String) -> Unit)? = null
     private var backupImportResult: ((Result<File>) -> Unit)? = null
+    private var pendingAutomationExportTier: ExportTier? = null
+    private var pendingAutomationMessage: String? = null
 
     var permissionRevision by mutableIntStateOf(0)
+        private set
+    var automationRevision by mutableIntStateOf(0)
         private set
 
     private val locationPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -241,7 +247,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         GarminBridge.initialize(this)
+        handleAutomationIntent(intent)
         setContent { ApopheniaScreen(this) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAutomationIntent(intent)
     }
 
     override fun onResume() {
@@ -590,6 +603,28 @@ class MainActivity : ComponentActivity() {
         check(backupImportResult == null) { "A restore selection is already pending" }
         backupImportResult = onResult
         openBackupDocument.launch(arrayOf("application/zip", "application/octet-stream"))
+    }
+
+    fun peekAutomationExportRequest(): ExportTier? = pendingAutomationExportTier
+
+    fun consumeAutomationExportRequest(): ExportTier? = pendingAutomationExportTier.also {
+        pendingAutomationExportTier = null
+    }
+
+    fun consumeAutomationMessage(): String? = pendingAutomationMessage.also {
+        pendingAutomationMessage = null
+    }
+
+    private fun handleAutomationIntent(intent: Intent?) {
+        val tier = TaskerAutomationContract.exportTier(intent?.action) ?: return
+        if (!HardwareGates.isCaptureEnabled(this, HardwareGates.Gate.LIVE_TASKER_EXPORT)) {
+            pendingAutomationMessage = "Automation export request blocked: enable LIVE_TASKER_EXPORT with its deliberate confirmation."
+            pendingAutomationExportTier = null
+        } else {
+            pendingAutomationMessage = "Automation requested a ${tier.displayName} preview. Nothing has left the device."
+            pendingAutomationExportTier = tier
+        }
+        automationRevision++
     }
 
     companion object {

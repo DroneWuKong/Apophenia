@@ -12,7 +12,7 @@ Disabling any gate is immediate. All new v0.3 gates default off. The four pre-ex
 
 Current capability gap reasons are `GATE_OFF`, `PERMISSION_DENIED`, `PLATFORM_RESTRICTED`, `HARDWARE_ABSENT`, `LOCKED_BY_STATUTE`, `BUILD_DISABLED`, and `SIMULATION_MODE`. Omniprobe renders them and adds `NO_SAMPLE_IN_WINDOW` plus `NO_ACTIVE_SESSION` for authorized channels whose absence does not prove a capability failure. See [OMNIPROBE.md](OMNIPROBE.md).
 
-FIELD, DRIVE, HOME, EVERYTHING, and TOTAL_EVIDENCE use a measured 1.5-second hold as deliberate bulk authorization. They never grant an Android permission or start a device/session. Every capture preset excludes `LIVE_EXPORT_LAN`, so capture arming cannot become data movement. See [TOTAL_EVIDENCE.md](TOTAL_EVIDENCE.md).
+FIELD, DRIVE, HOME, EVERYTHING, and TOTAL_EVIDENCE use a measured 1.5-second hold as deliberate bulk authorization. They never grant an Android permission or start a device/session. Every capture preset excludes `LIVE_EXPORT_LAN` and `LIVE_TASKER_EXPORT`, so capture arming cannot become data movement. See [TOTAL_EVIDENCE.md](TOTAL_EVIDENCE.md).
 
 Demo mode forces `SIMULATION` and switches to a separate database. Gate state and simulated values remain visible, but no fixture is a live-channel or hardware claim. See [DEMO_MODE.md](DEMO_MODE.md).
 
@@ -51,6 +51,8 @@ Demo mode forces `SIMULATION` and switches to a separate database. Gate state an
 - `LIVE_VIDEO_SELFCAPTURE`
 - `LIVE_MULTICAM_CAPTURE`
 - `LIVE_SCREENRECORD_CAPTURE`
+- `LIVE_TASKER_CAPTURE`
+- `LIVE_TASKER_EXPORT`
 
 ## Tier 3 — capability-conditional
 

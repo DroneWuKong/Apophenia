@@ -12,6 +12,7 @@ import com.dronewukong.apophenia.data.Observation
 import com.dronewukong.apophenia.data.ObservationDb
 import com.dronewukong.apophenia.data.ObservationKind
 import com.dronewukong.apophenia.media.MediaEvidenceReader
+import com.dronewukong.apophenia.ingest.ObservationAttachmentStore
 import com.dronewukong.apophenia.omniprobe.OmniprobeChannel
 import com.dronewukong.apophenia.omniprobe.OmniprobeInspector
 import com.dronewukong.apophenia.omniprobe.OmniprobeSnapshot
@@ -61,6 +62,10 @@ class EventReportManager(
         )
         payloads += evidenceMaterializer.sensitivePayloads(db.sensitiveContextForObservation(observationId))
         payloads += evidenceMaterializer.mediaPayloads(db.mediaAssets(observationId, includePurged = false, limit = 10_000))
+        payloads += ObservationAttachmentStore(app, db).exportPayloads(
+            db.observationAttachments(observationId, limit = 10_000),
+            prefix = "attachments"
+        )
         payloads += rfPayloads(context)
         return ExportManager.preparePayloadBundle(ExportTier.SINGLE_EVENT_DOSSIER, dir, nowMs, payloads, setOf(observationId))
     }
@@ -119,12 +124,17 @@ class EventReportManager(
                     .put("retentionUntilMs", asset.retentionUntilMs).put("keepForever", asset.keepForever)
                     .put("ciphertextSha256", asset.ciphertextSha256).put("sizeBytes", asset.sizeBytes))
             } })
+            .put("attachmentInventory", JSONArray().also { rows -> db.observationAttachments(observation.id, limit = 10_000).forEach { attachment ->
+                rows.put(JSONObject().put("id", attachment.id).put("mimeType", attachment.mimeType)
+                    .put("displayName", attachment.displayName).put("sha256", attachment.sha256).put("sizeBytes", attachment.sizeBytes))
+            } })
     }
 
     private fun dossierSummary(db: ObservationDb, observation: Observation, context: List<ContextSample>): String {
         val sources = context.map { it.source }.distinct().sorted()
         val media = db.mediaAssets(observation.id, includePurged = true, limit = 10_000)
         val protected = db.sensitiveContextForObservation(observation.id).size
+        val attachments = db.observationAttachments(observation.id, limit = 10_000).size
         val vibe = if (observation.kind == ObservationKind.VIBE) {
             " Vibe rating ${observation.vibeRating}${if (observation.egress) "; egress was logged" else ""}."
         } else ""
@@ -133,7 +143,7 @@ class EventReportManager(
             appendLine("Event #${observation.id}: ${observation.label}")
             appendLine("Logged at ${Instant.ofEpochMilli(observation.timestampMs)}.$vibe")
             appendLine("${context.size} ordinary context values across ${sources.size} sources: ${sources.joinToString().ifBlank { "none" }}.")
-            appendLine("${media.size} raw-media inventory rows and $protected Tier-2 content rows were associated with this event.")
+            appendLine("${media.size} raw-media inventory rows, $protected Tier-2 content rows, and $attachments inbound attachments were associated with this event.")
             appendLine("The ZIP manifest states which raw AV/Tier-2 payloads were actually available at export time.")
             appendLine()
             appendLine("Evidence boundary: this is a descriptive snapshot. Correlation is not causation; post-event values are retained for reconstruction but excluded from predictor calculations. Missing channels are explained in the Omniprobe inventory and are not silently treated as normal values.")

@@ -33,7 +33,7 @@ Disarming the mode clears the preset/master state and returns the future audio p
 
 The existing Octopod endpoint is not a `HardwareGates` entry and remains separately configured. Presets do not invent a future home-automation gate.
 
-`EVERYTHING` and `TOTAL_EVIDENCE` exclude `LIVE_EXPORT_LAN`. A capture preset cannot authorize data movement. The later LAN export step retains its own standard gate, destination configuration, preview, and explicit push action.
+`EVERYTHING` and `TOTAL_EVIDENCE` exclude `LIVE_EXPORT_LAN` and `LIVE_TASKER_EXPORT`. A capture preset cannot authorize data movement. LAN and automation export retain their own gate, preview, confirmation, and explicit route boundaries.
 
 ## TOTAL_EVIDENCE
 

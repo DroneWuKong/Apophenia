@@ -63,6 +63,7 @@ object DossierScrubber {
                 val bytes = zip.getInputStream(zip.getEntry(entry.path)).use { it.readBytes() }
                 when {
                     entry.path.startsWith("tier2/") -> Unit
+                    entry.path.startsWith("attachments/") -> Unit
                     entry.containsTier2Contents && entry.path.contains("omniprobe") -> payloads += ExportPayload(entry.path, redactInventory(bytes))
                     entry.containsTier2Contents -> Unit
                     else -> payloads += ExportPayload(entry.path, bytes)
