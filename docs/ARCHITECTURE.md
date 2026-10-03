@@ -56,7 +56,9 @@ UI / widget / tile / external intent / Garmin
 | `AssociationEngine` | Matched event/control summaries, robust spread, effect interval, seeded permutation, persistence, and FDR-adjusted results |
 | `HardwareGates` | Compile/runtime boundary for phone sensors, location, weather, and Garmin |
 | `HealthConnectProvider` | Optional read-only historical wearable context |
-| `GarminBridge` | Connect IQ discovery, connection state, messages, parsing, deduplication, and app launch |
+| `ObservationStore` | Application-scoped owner of the canonical repository/database pair used by UI and external ingest paths |
+| `GarminBridge` | Connect IQ discovery, observable connection/diagnostic state, callback registration, and app launch |
+| `GarminEventIngestor` | Pure, injectable packet-to-observation boundary with timestamp preservation, metric attachment, diagnostics, and replay handling |
 
 ## Rolling black box
 
@@ -83,7 +85,7 @@ Health Connect is optional and read-only. Permission absence, provider absence, 
 
 ### Garmin
 
-The watch captures its timestamp and available watch context, then transmits through Garmin Connect's companion channel. Android preserves that watch timestamp and treats the phone receive time as transport timing, not event timing. See [GARMIN_EPIX_PRO.md](GARMIN_EPIX_PRO.md).
+The watch captures its timestamp and available watch context, then transmits through Garmin Connect's companion channel. Android preserves that watch timestamp and treats the phone receive time as transport timing, not event timing. A missing or invalid watch timestamp is explicitly diagnosed before the receive time is used as a fallback. Malformed messages and duplicate retries are also surfaced through the bridge's observable diagnostic state. See [GARMIN_EPIX_PRO.md](GARMIN_EPIX_PRO.md).
 
 ## Statistical boundary
 

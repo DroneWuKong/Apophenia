@@ -44,5 +44,20 @@ class GarminPacketParserTest {
     @Test
     fun rejectsNonObservationMessages() {
         assertNull(GarminPacketParser.parse(mapOf("type" to "ping")))
+        val detailed = GarminPacketParser.parseDetailed(mapOf("type" to "ping"))
+        assertTrue(detailed is GarminParseResult.Rejected)
+        assertTrue((detailed as GarminParseResult.Rejected).reason.contains("unsupported type"))
+    }
+
+    @Test
+    fun reportsTimestampAndKindFallbacks() {
+        val detailed = GarminPacketParser.parseDetailed(
+            mapOf("type" to "observation", "ts_ms" to -1L, "kind" to "NOT_A_KIND"),
+            receivedAtMs = 1234L
+        ) as GarminParseResult.Accepted
+
+        assertEquals(1234L, detailed.event.timestampMs)
+        assertEquals(ObservationKind.OBSERVATION, detailed.event.kind)
+        assertEquals(2, detailed.warnings.size)
     }
 }

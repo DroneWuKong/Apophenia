@@ -76,7 +76,7 @@ private val appTypography = Typography(
 
 @Composable
 fun ApopheniaScreen(activity: MainActivity) {
-    val repo = remember { ObservationRepository(activity) }
+    val repo = remember { ObservationStore.repository(activity) }
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var tab by remember { mutableStateOf(Tab.LOG) }
@@ -423,8 +423,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
     var simulation by remember { mutableStateOf(HardwareGates.runtimeMode == HardwareGates.RuntimeMode.SIMULATION) }
     var rolling by remember { mutableStateOf(RollingRecorderState.isEnabled(activity)) }
     var promptedCheckIns by remember { mutableStateOf(PromptedCheckInState.isEnabled(activity)) }
-    var garminStatus by remember { mutableStateOf(GarminBridge.statusText) }
-    var garminDevice by remember { mutableStateOf(GarminBridge.deviceText) }
+    val garminBridge by GarminBridge.state.collectAsState()
     var rollingSummary by remember { mutableStateOf("No samples yet") }
     var healthStatus by remember { mutableStateOf("Checking…") }
     var locationAllowed by remember { mutableStateOf(activity.hasLocationPermission()) }
@@ -550,11 +549,14 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
 
         item { SectionLabel("Watch") }
         item {
-            SettingsCard(Icons.Default.Watch, "Garmin Epix Pro (Gen 2)", garminDevice) {
-                Text(garminStatus, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SettingsCard(Icons.Default.Watch, "Garmin Epix Pro (Gen 2)", garminBridge.deviceText) {
+                Text(garminBridge.statusText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                garminBridge.lastDiagnostic?.let {
+                    Text("Last diagnostic · $it", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp))
+                }
                 Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { GarminBridge.refresh(activity); garminStatus = GarminBridge.statusText; garminDevice = GarminBridge.deviceText; onMessage(garminStatus) }, modifier = Modifier.weight(1f)) { Text("Refresh") }
-                    Button(onClick = { GarminBridge.openWatchLogger(activity); garminStatus = GarminBridge.statusText; garminDevice = GarminBridge.deviceText; onMessage(garminStatus) }, modifier = Modifier.weight(1f)) { Text("Open logger") }
+                    OutlinedButton(onClick = { GarminBridge.refresh(activity); onMessage(GarminBridge.statusText) }, modifier = Modifier.weight(1f)) { Text("Refresh") }
+                    Button(onClick = { GarminBridge.openWatchLogger(activity); onMessage(GarminBridge.statusText) }, modifier = Modifier.weight(1f)) { Text("Open logger") }
                 }
             }
         }

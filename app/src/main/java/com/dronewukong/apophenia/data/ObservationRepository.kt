@@ -95,6 +95,7 @@ class ObservationRepository(context: Context) {
 
     fun observations(limit: Int = 250): List<Observation> = db.observations(limit)
     fun hypotheses(limit: Int = 250): List<Hypothesis> = db.hypotheses(limit)
+    fun insertContext(samples: List<ContextSample>) = db.insertContext(samples)
     fun db(): ObservationDb = db
 
     companion object {

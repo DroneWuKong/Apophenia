@@ -20,7 +20,7 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.dronewukong.apophenia.data.ObservationKind
 import com.dronewukong.apophenia.data.ObservationOrigin
-import com.dronewukong.apophenia.data.ObservationRepository
+import com.dronewukong.apophenia.data.ObservationStore
 import com.dronewukong.apophenia.garmin.GarminBridge
 import com.dronewukong.apophenia.health.HealthConnectAccess
 import kotlinx.coroutines.launch
@@ -178,7 +178,7 @@ class MainActivity : ComponentActivity() {
             val label = uri.getQueryParameter("label") ?: "External observation"
             val note = uri.getQueryParameter("note") ?: ""
             val capturedAt = System.currentTimeMillis()
-            ObservationRepository(this).log(ObservationKind.OBSERVATION, label, note, timestampMs = capturedAt, origin = ObservationOrigin.EXTERNAL)
+            ObservationStore.repository(this).log(ObservationKind.OBSERVATION, label, note, timestampMs = capturedAt, origin = ObservationOrigin.EXTERNAL)
         }
     }
 

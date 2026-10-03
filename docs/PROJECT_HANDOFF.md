@@ -30,6 +30,7 @@ The system should record evidence neutrally and test patterns instead of reinfor
 - optional, permission-gated Health Connect reads
 - first-run context onboarding with visible location, notification, weather, and Health Connect status
 - database schema v3 with observation origin, external-event deduplication, and explicit context phase
+- application-scoped observation repository shared by UI, widget, tile, external intent, and Garmin ingest
 
 ## Garmin Epix Pro (Gen 2)
 
@@ -51,6 +52,8 @@ The watch sends:
 A bounded watch-side pending queue preserves events during temporary disconnects.
 
 Watch protocol v3 adds a persistent installation/sequence event ID. Android uses the Garmin origin plus this ID to suppress replay duplicates while retaining the original watch timestamp. Legacy v2 packets remain readable but cannot provide the same replay guarantee.
+
+The bridge exposes connection and diagnostic state as a `StateFlow`, and Compose observes it directly. Packet parsing/ingest is separated from the Garmin SDK callback behind an injectable store, with unit coverage for timestamp preservation, metric attachment, malformed packets, and disconnected/replayed event deduplication.
 
 The Android Garmin bridge uses app id:
 `4f4d0f7b3d6f4b36b3e88b91129c70a2`
@@ -105,7 +108,7 @@ Garmin compilation requires Connect IQ SDK / Monkey C and a developer signing ke
 ## Validation status — 2026-10-02
 
 - `./gradlew.bat testDebugUnitTest lintDebug :app:assembleDebug`: passed locally on JDK 17.
-- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v3 migration, rolling pre/post separation, control grouping and matching, prompted neutral controls, hypothesis separation, JSON export, association statistics, Garmin packet parsing, and the full simulation enrichment/database path.
+- Unit coverage includes observation timestamp preservation and deduplication, v2-to-v3 migration, rolling pre/post separation, control grouping and matching, prompted neutral controls, hypothesis separation, JSON export, association statistics, Garmin packet parsing/ingest/retry behavior, and the full simulation enrichment/database path.
 - `./gradlew.bat connectedDebugAndroidTest`: two tests passed on an API 36.1 Android emulator; they cover the refined logging surface, **THAT WAS WEIRD**, the timeline entry, and the optional-context settings surface.
 - Native Android location and notification permission prompts were exercised on the emulator. Weather returned a live Open-Meteo result after location approval.
 - Health Connect's permission controller was exercised end-to-end on the emulator, including the required privacy-rationale declaration, six read permissions, and optional background access. The app returned to a connected state.
