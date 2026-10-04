@@ -47,7 +47,7 @@ class EventReportManagerTest {
 
     @Test
     fun dossierContainsOneEventSummaryChartInventoryAndProtectedEvidence() {
-        val eventId = insertEvent("Fucky", 5, egress = true)
+        val eventId = insertEvent("Janky", 5, egress = true)
         val otherId = insertEvent("Other", null, egress = false)
         insertContext(eventId)
         insertContext(otherId)

@@ -2,6 +2,10 @@
 
 Step 11 adds deliberate main-camera, front-camera, multicam, and screen-record gates plus the capability-conditional call-audio gate. Authorization, Android permission/consent, and an armed foreground service remain separate states.
 
+## Follow local recording laws
+
+Recording, privacy, wiretap, workplace, and traffic rules vary by place and situation. Some places require every person being recorded to consent, often described as two-party or all-party consent. Apophenia cannot determine the operator's jurisdiction, decide whether a particular recording is lawful, or provide legal authority. Obtain any required consent before arming a microphone, camera, screen, or call-audio channel.
+
 ## Camera frame rings
 
 The camera service captures a bounded two-frame-per-second JPEG stream for each active camera ID. Each stream has its own 15-second in-memory ring, lens tag, event artifact, Keystore AES-256-GCM key, ciphertext hash, and 14-day default retention deadline. Logging an observation freezes each pre-event ring at tap time and collects ten seconds of post-event frames. Delayed watch/import timestamps are not mislabeled as current phone video.

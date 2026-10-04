@@ -225,6 +225,11 @@ def build_docx() -> None:
         "It can be maximum invasive when everything is authorized and armed. That is the capability ceiling, not the default. There is no account, analytics SDK, automatic cloud sync, or background uploader. Data stays local until an export is built, verified, previewed, and deliberately routed.",
         bold_lead="The privacy bargain. "
     )
+    add_body(
+        doc,
+        "Recording, privacy, wiretap, workplace, traffic, and RF rules vary by place and situation. Some places require every person being recorded to consent, often described as two-party or all-party consent. Apophenia cannot determine your jurisdiction or give you legal authority. Obtain any required consent before recording.",
+        bold_lead="Follow local recording laws. "
+    )
     add_figure(
         doc,
         "apophenia-home-v03.png",
@@ -252,6 +257,7 @@ def build_docx() -> None:
         bold_lead="Evidence boundary. "
     )
 
+    page_break(doc)
     doc.add_heading("Capture a moment", level=1)
     add_figure(
         doc,
@@ -263,7 +269,7 @@ def build_docx() -> None:
     add_bullets(doc, [
         "THAT WAS WEIRD saves the tap time first and enriches it with authorized context afterward.",
         "VIBE records a one-tap ordinal state from 1 through 5; holding opens an optional note without moving the event time.",
-        "FUCK THIS, I'M OUT records VIBE 5 with egress=true, preserving the difference between leaving and staying.",
+        "NOPE, I'M OUT records VIBE 5 with egress=true, preserving the difference between leaving and staying.",
         "The status strip distinguishes authorized gate count from AV rings that are actually live.",
     ])
 
@@ -274,7 +280,7 @@ def build_docx() -> None:
         "apophenia-settings-annotated-v03.png",
         "TOTAL_EVIDENCE and presets change named gate authorization. Permissions and hardware starts remain separate.",
         "Annotated Settings screen with arrows to TOTAL_EVIDENCE, the permission boundary, and the FIELD preset",
-        6.7,
+        3.4,
     )
     add_table(doc, ["Control", "Does", "Does not"], [
         ["Named gate", "Authorizes one channel", "Bypass Android or invent hardware"],
@@ -313,6 +319,7 @@ def build_docx() -> None:
         "Settings export actions for data-only full evidence raw SQLite backup and restore",
         3.85,
     )
+    doc.add_heading("Choose an export format", level=2)
     add_table(doc, ["Export", "Human-readable", "Machine-readable"], [
         ["Data-only", "Analysis README and CSV tables", "Canonical JSON CSV and JSON data dictionary"],
         ["Raw SQLite", "Schema documentation", "Checkpointed integrity-checked database"],
@@ -386,6 +393,7 @@ figure{{margin:28px 0;background:var(--panel);border:1px solid var(--line)}}figu
 <p class="lead">What the app records, how authorization works, what stays local, and how to export for people and machines.</p>
 <p>Apophenia is a personal Android and Garmin black box for reconstructing the circumstances around a timestamped event. It can be <strong>maximum invasive</strong> when everything is deliberately authorized and armed. That is the capability ceiling, not the default.</p>
 <p><span class="boundary">The privacy bargain:</span> no account, analytics SDK, automatic cloud sync, or background uploader. Data stays local until an export is built, verified, previewed, and deliberately routed.</p>
+<p><span class="boundary">Follow local recording laws:</span> recording, privacy, wiretap, workplace, traffic, and RF rules vary by place and situation. Some places require every person being recorded to consent, often described as two-party or all-party consent. Apophenia cannot determine your jurisdiction or give you legal authority. Obtain any required consent before recording.</p>
 <h2>Capture the moment</h2><figure><img alt="Annotated capture screen" src="{capture}"><figcaption>Timestamp first, authorized context second. Egress is a distinct event class.</figcaption></figure>
 <h2>Choose how invasive the session should be</h2><figure><img alt="Annotated TOTAL EVIDENCE and preset settings" src="{settings}"><figcaption>Gates, Android permissions, and live hardware starts remain separate.</figcaption></figure>
 <p>TOTAL_EVIDENCE and presets arm named capture gates. They do not grant OS permissions, accept screen-record consent, start OBD/UAS/RF sessions, or open an export route.</p>

@@ -65,13 +65,13 @@ class MainActivitySmokeTest {
         dismissContextIntroIfPresent()
 
         compose.onNodeWithText("Bad 🙁").performScrollTo().assertIsDisplayed().performClick()
-        compose.onNodeWithText("FUCK THIS, I'M OUT").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithText("NOPE, I'M OUT").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithText("Timeline").performClick()
 
         compose.waitUntil(timeoutMillis = 10_000) {
             runCatching {
                 compose.onNodeWithText("Bad 🙁").assertIsDisplayed()
-                compose.onNodeWithText("FUCK THIS, I'M OUT").assertIsDisplayed()
+                compose.onNodeWithText("NOPE, I'M OUT").assertIsDisplayed()
                 true
             }.getOrDefault(false)
         }
@@ -87,6 +87,7 @@ class MainActivitySmokeTest {
         listOf(
             "Health Connect",
             "Total evidence + presets",
+            "Follow local recording laws",
             "Bluetooth presence",
             "Wi-Fi presence",
             "Network state",
@@ -128,7 +129,7 @@ class MainActivitySmokeTest {
         dismissContextIntroIfPresent()
         compose.onNodeWithText("Settings").performClick()
         scrollSettingsTo("Demo mode")
-        compose.onNodeWithContentDescription("Toggle demo mode").performClick()
+        compose.onNodeWithContentDescription("Toggle demo mode").performScrollTo().assertIsDisplayed().performClick()
         compose.waitUntil(timeoutMillis = 30_000) {
             compose.onAllNodesWithText("DEMO DATA", substring = true).fetchSemanticsNodes().isNotEmpty()
         }

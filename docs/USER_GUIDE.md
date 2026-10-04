@@ -4,6 +4,8 @@ Apophenia is a personal, local-first total-capture instrument. It is built for a
 
 The app is capable of being **maximum invasive**. That means the capability ceiling includes audio, video from every camera Android can expose, screen contents, notifications, messages, calendar, contacts, location, physiology, nearby radios, vehicle telemetry, aircraft telemetry, control-link statistics, and bounded RF-receiver windows. It does not mean those channels run automatically.
 
+**Follow local recording laws.** Recording, privacy, wiretap, workplace, traffic, and RF rules vary by place and situation. Some places require every person being recorded to consent, often described as two-party or all-party consent. Apophenia cannot determine your jurisdiction or give you legal authority. Obtain any required consent before recording.
+
 Four boundaries remain separate:
 
 1. A named Apophenia gate must be enabled.
@@ -17,7 +19,7 @@ Four boundaries remain separate:
 
 - **THAT WAS WEIRD** records the tap time first, then captures available context.
 - **VIBE** is a one-tap 1-5 graded state. Holding an option opens the app with the timestamp already stamped so a note can be added without changing the event time.
-- **FUCK THIS, I'M OUT** is not just a high VIBE score. It records `VIBE=5` plus `egress=true`, so analysis can distinguish leaving from feeling bad and staying.
+- **NOPE, I'M OUT** is not just a high VIBE score. It records `VIBE=5` plus `egress=true`, so analysis can distinguish leaving from feeling bad and staying.
 - The top strip reports the armed-gate count and whether AV rings are actually live. A gate count is not a claim that its hardware, permission, or service is available.
 
 ## Choose how invasive the next session should be

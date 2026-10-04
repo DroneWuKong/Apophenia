@@ -165,12 +165,12 @@ class ObservationDbTest {
                 "Vibe good 🙂",
                 "Tolerable 😐",
                 "Bad 🙁",
-                "Fucked 😖",
-                "Fucky 😵‍💫"
+                "SNAFU 😖",
+                "Janky 😵‍💫"
             ),
             (1..5).map { VibeGrade.fromRating(it).renderedLabel }
         )
-        assertEquals("FUCK THIS, I'M OUT", VibeGrade.EGRESS_LABEL)
+        assertEquals("NOPE, I'M OUT", VibeGrade.EGRESS_LABEL)
     }
 
     @Test
@@ -197,8 +197,8 @@ class ObservationDbTest {
             Observation(
                 timestampMs = 500,
                 kind = ObservationKind.VIBE,
-                label = VibeGrade.FUCKED.renderedLabel,
-                vibeRating = VibeGrade.FUCKED.rating
+                label = VibeGrade.SNAFU.renderedLabel,
+                vibeRating = VibeGrade.SNAFU.rating
             )
         )
         db.insertSession(
@@ -310,7 +310,7 @@ class ObservationDbTest {
     @Test
     fun egressAndBadStayedAreSeparateAnalysisCohorts() {
         val egressId = db.insertObservation(Observation(timestampMs = 1_000, kind = ObservationKind.VIBE, label = VibeGrade.EGRESS_LABEL, vibeRating = 5, egress = true))
-        val stayedId = db.insertObservation(Observation(timestampMs = 2_000, kind = ObservationKind.VIBE, label = VibeGrade.FUCKED.renderedLabel, vibeRating = 4))
+        val stayedId = db.insertObservation(Observation(timestampMs = 2_000, kind = ObservationKind.VIBE, label = VibeGrade.SNAFU.renderedLabel, vibeRating = 4))
         db.insertContext(listOf(
             sample(1_000, 10.0).copy(observationId = egressId),
             sample(2_000, 20.0).copy(observationId = stayedId)
