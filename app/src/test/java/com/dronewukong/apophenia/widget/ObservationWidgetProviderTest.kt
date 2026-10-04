@@ -75,7 +75,7 @@ class ObservationWidgetProviderTest {
         )
 
         val stored = awaitObservation()
-        assertEquals("FUCK THIS, I'M OUT", stored.label)
+        assertEquals("NOPE, I'M OUT", stored.label)
         assertEquals(5, stored.vibeRating)
         assertTrue(stored.egress)
     }

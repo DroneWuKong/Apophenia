@@ -2,6 +2,10 @@
 
 `LIVE_AUDIO_CAPTURE` is a deliberate Tier-2 gate. Authorizing the gate does not silently grant Android microphone access and does not start capture after reboot. The operator must arm the ring from the foreground. While armed, Android runs a microphone foreground service and Apophenia posts a persistent **Audio ring buffering live** indicator with a disarm action.
 
+## Follow local recording laws
+
+Microphone laws vary by place and situation. Some places require every person being recorded to consent, often described as two-party or all-party consent. Apophenia cannot determine the operator's jurisdiction or provide legal authority. Obtain any required consent before arming the microphone ring.
+
 ## Window contract
 
 - mono 16 kHz PCM16 little-endian;

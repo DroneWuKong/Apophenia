@@ -4,6 +4,10 @@ Apophenia is a local-first personal total-capture instrument. It is capable of b
 
 Basic logging needs none of those invasive channels. Named gates, deliberate confirmations, Android permissions, screen-capture consent, and live session starts remain separate controls. A gate records authorization; it is not proof that its hardware exists or that capture is active. Persistent indicators show active AV rings and drive, flight, or control-link sessions.
 
+## Follow local recording laws
+
+Recording, privacy, wiretap, workplace, traffic, and RF rules vary by place and situation. Some places require every person being recorded to consent, often described as two-party or all-party consent. Apophenia cannot determine the operator's jurisdiction, decide whether a particular recording is lawful, or create legal authority. The operator must obtain any required consent and use each capture channel lawfully.
+
 All retained evidence is local unless the operator builds an export, reviews its manifest, and deliberately chooses a route. Apophenia has no account, advertising SDK, analytics SDK, automatic cloud sync, background uploader, or background export retry worker.
 
 Stored locally: manual observations, phone context, rolling black-box samples, random controls, Garmin event context delivered through the paired-phone companion channel, optional aggregate home-state counts, and explicitly enabled radio/presence metrics. Deliberately enabled notification, calendar, contacts, and message-metadata contents are encrypted before entering their separate SQLite table.

@@ -91,11 +91,11 @@ enum class VibeGrade(val rating: Int, val renderedLabel: String) {
     GOOD(1, "Vibe good 🙂"),
     TOLERABLE(2, "Tolerable 😐"),
     BAD(3, "Bad 🙁"),
-    FUCKED(4, "Fucked 😖"),
-    FUCKY(5, "Fucky 😵‍💫");
+    SNAFU(4, "SNAFU 😖"),
+    JANKY(5, "Janky 😵‍💫");
 
     companion object {
-        const val EGRESS_LABEL = "FUCK THIS, I'M OUT"
+        const val EGRESS_LABEL = "NOPE, I'M OUT"
 
         fun fromRating(rating: Int): VibeGrade = entries.firstOrNull { it.rating == rating }
             ?: throw IllegalArgumentException("Vibe rating must be between 1 and 5")
