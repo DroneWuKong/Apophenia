@@ -87,6 +87,7 @@ class MainActivitySmokeTest {
         listOf(
             "Health Connect",
             "Total evidence + presets",
+            "Follow local recording laws",
             "Bluetooth presence",
             "Wi-Fi presence",
             "Network state",
@@ -128,7 +129,7 @@ class MainActivitySmokeTest {
         dismissContextIntroIfPresent()
         compose.onNodeWithText("Settings").performClick()
         scrollSettingsTo("Demo mode")
-        compose.onNodeWithContentDescription("Toggle demo mode").performClick()
+        compose.onNodeWithContentDescription("Toggle demo mode").performScrollTo().assertIsDisplayed().performClick()
         compose.waitUntil(timeoutMillis = 30_000) {
             compose.onAllNodesWithText("DEMO DATA", substring = true).fetchSemanticsNodes().isNotEmpty()
         }

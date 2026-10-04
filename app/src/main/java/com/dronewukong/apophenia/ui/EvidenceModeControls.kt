@@ -103,6 +103,7 @@ internal fun EvidencePresetControls(activity: MainActivity, onMessage: (String) 
         )
     }
     Text("Presets change gate authorization only. They never grant Android permissions, start OBD/UAS/RF sessions, accept screen-record consent, or open an export route.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+    Text(LocalLawNotice.BODY, color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         EvidencePreset.entries.forEach { preset ->
             HoldToArmButton(
@@ -126,6 +127,7 @@ internal fun EvidencePresetControls(activity: MainActivity, onMessage: (String) 
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("This deliberately authorizes every capture gate, including Tier-2 contents and capability-conditional channels. It excludes LIVE_EXPORT_LAN, requests no Android permission, starts no hardware session, and exports nothing.")
+                    Text(LocalLawNotice.BODY, color = MaterialTheme.colorScheme.error)
                     HoldToArmButton(
                         label = "Hold to arm TOTAL_EVIDENCE",
                         detail = "Keep holding for 1.5 seconds",
