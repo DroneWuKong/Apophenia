@@ -7,9 +7,9 @@ The five VIBE grades and the egress event are descriptive evidence. A single tap
 | 1 | Vibe good 🙂 | false |
 | 2 | Tolerable 😐 | false |
 | 3 | Bad 🙁 | false |
-| 4 | Fucked 😖 | false |
-| 5 | Fucky 😵‍💫 | false |
-| 5 | FUCK THIS, I'M OUT | true |
+| 4 | SNAFU 😖 | false |
+| 5 | Janky 😵‍💫 | false |
+| 5 | NOPE, I'M OUT | true |
 
 In the app, press and hold any option to stamp the time first and then add an optional note. Canceling that dialog discards the pending entry.
 

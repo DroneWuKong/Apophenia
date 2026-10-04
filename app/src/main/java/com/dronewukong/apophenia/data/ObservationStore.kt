@@ -22,6 +22,7 @@ object ObservationStore {
     /** Test-only lifecycle hook for Robolectric process reuse. */
     @Synchronized
     internal fun resetForTests() {
+        ObservationRepository.awaitIdleForTests()
         liveInstance?.db()?.close()
         demoInstance?.db()?.close()
         liveInstance = null

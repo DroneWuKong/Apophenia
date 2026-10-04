@@ -17,7 +17,7 @@ Four boundaries remain separate:
 
 - **THAT WAS WEIRD** records the tap time first, then captures available context.
 - **VIBE** is a one-tap 1-5 graded state. Holding an option opens the app with the timestamp already stamped so a note can be added without changing the event time.
-- **FUCK THIS, I'M OUT** is not just a high VIBE score. It records `VIBE=5` plus `egress=true`, so analysis can distinguish leaving from feeling bad and staying.
+- **NOPE, I'M OUT** is not just a high VIBE score. It records `VIBE=5` plus `egress=true`, so analysis can distinguish leaving from feeling bad and staying.
 - The top strip reports the armed-gate count and whether AV rings are actually live. A gate count is not a claim that its hardware, permission, or service is available.
 
 ## Choose how invasive the next session should be

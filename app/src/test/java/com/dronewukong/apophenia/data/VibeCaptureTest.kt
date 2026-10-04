@@ -26,13 +26,13 @@ class VibeCaptureTest {
     @Test
     fun egressIsAlwaysDistinctVibeFiveEvidence() {
         val request = VibeCapture.request(
-            grade = VibeGrade.FUCKY,
+            grade = VibeGrade.JANKY,
             timestampMs = 42,
             note = "Left by the west door",
             egress = true
         )
 
-        assertEquals("FUCK THIS, I'M OUT", request.label)
+        assertEquals("NOPE, I'M OUT", request.label)
         assertEquals(5, request.vibeRating)
         assertTrue(request.egress)
         assertEquals("Left by the west door", request.note)
@@ -41,7 +41,7 @@ class VibeCaptureTest {
     @Test
     fun egressCannotBeAttachedToLowerRating() {
         assertThrows(IllegalArgumentException::class.java) {
-            VibeCapture.request(VibeGrade.FUCKED, timestampMs = 1, egress = true)
+            VibeCapture.request(VibeGrade.SNAFU, timestampMs = 1, egress = true)
         }
     }
 }
