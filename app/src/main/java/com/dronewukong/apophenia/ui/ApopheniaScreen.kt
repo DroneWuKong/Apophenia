@@ -213,7 +213,11 @@ fun ApopheniaScreen(activity: MainActivity) {
                 icon = { Icon(Icons.Default.Sensors, null) },
                 title = { Text("Choose your context") },
                 text = {
-                    Text("Phone sensors work without a permission prompt. Location and weather, recorder notifications, and Health Connect are optional and stay off until you choose them.")
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Phone sensors work without a permission prompt. Location and weather, recorder notifications, and Health Connect are optional and stay off until you choose them.")
+                        Text(LocalLawNotice.TITLE, fontWeight = FontWeight.SemiBold)
+                        Text(LocalLawNotice.BODY)
+                    }
                 },
                 confirmButton = {
                     Button(onClick = {
@@ -2203,6 +2207,15 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
 
         item { SectionLabel("Audio/video evidence") }
         item {
+            SettingsCard(
+                Icons.Default.Warning,
+                LocalLawNotice.TITLE,
+                "Apophenia cannot determine your jurisdiction or give you legal authority."
+            ) {
+                Text(LocalLawNotice.BODY, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            }
+        }
+        item {
             SettingsCard(Icons.Default.Mic, "Audio evidence ring", "Tier 2 · persistent 60-second encrypted pre-event ring plus 30 seconds post-event when armed.") {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -3238,6 +3251,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("When armed, Apophenia continuously holds the most recent 60 seconds of microphone PCM in memory. Logging any observation freezes that pre-event sound and 30 post-event seconds into a per-event encrypted artifact. Android shows a persistent recording indicator.")
+                    Text(LocalLawNotice.BODY, color = MaterialTheme.colorScheme.error)
                     Text("Type LIVE_AUDIO_CAPTURE to authorize this deliberate gate.", fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(value = audioGateInput, onValueChange = { audioGateInput = it }, singleLine = true, label = { Text("Gate name") })
                 }
@@ -3268,6 +3282,7 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("This deliberate gate permits an armed foreground ring for that camera/screen channel. Enabling the gate does not bypass Android camera, concurrency, or MediaProjection controls.")
+                    Text(LocalLawNotice.BODY, color = MaterialTheme.colorScheme.error)
                     Text("Type ${gate.name} exactly.", fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(value = videoGateInput, onValueChange = { videoGateInput = it }, singleLine = true, label = { Text("Gate name") })
                 }
@@ -3295,7 +3310,12 @@ private fun SettingsTab(activity: MainActivity, repo: ObservationRepository, sco
         AlertDialog(
             onDismissRequest = { confirmCallAudio = false },
             title = { Text("Authorize per-call audio capability?") },
-            text = { Text("The gate records your intent but cannot create a platform API or legal authority. Each call would still require a separate opt-in and capability check. ${CallAudioCapability.explanation(activity)}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(LocalLawNotice.BODY, color = MaterialTheme.colorScheme.error)
+                    Text("The gate records your intent but cannot create a platform API or legal authority. Each call would still require a separate opt-in and capability check. ${CallAudioCapability.explanation(activity)}")
+                }
+            },
             confirmButton = {
                 Button(onClick = {
                     callAudioEnabled = HardwareGates.setAuthorized(activity, HardwareGates.Gate.LIVE_CALL_AUDIO_CAPTURE, true, HardwareGates.ConsentProof.CapabilityConditionalConfirmation) == HardwareGates.AuthorizationResult.ENABLED

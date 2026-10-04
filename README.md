@@ -33,6 +33,8 @@ It can also log how you felt with one tap, from **Vibe good 🙂** through **Jan
 > [!IMPORTANT]
 > Apophenia is maximum-invasive **by capability**, but opt-in **by operation**. If you deliberately enable everything, it can record microphone audio, every camera Android can expose, the screen, notifications, calendar, contacts, message metadata, location, physiology, nearby devices, vehicle and aircraft telemetry, and signals received by your own attached hardware.
 
+> **Follow local recording laws.** Recording, privacy, wiretap, workplace, traffic, and RF rules vary by place and situation. Some places require every person being recorded to consent—often called two-party or all-party consent. Apophenia cannot determine your jurisdiction or give you legal authority. Obtain any required consent before recording.
+
 That capability is not hidden or silently enabled:
 
 - Basic event logging works without granting the invasive permissions.
