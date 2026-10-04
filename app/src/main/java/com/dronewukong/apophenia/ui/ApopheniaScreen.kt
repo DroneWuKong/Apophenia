@@ -338,8 +338,8 @@ private fun LogTab(repo: ObservationRepository, onSaved: () -> Unit, onOpenSetti
         }
         item {
             EgressCaptureButton(
-                onCapture = { captureVibe(VibeGrade.FUCKY, egress = true) },
-                onNote = { openVibeNote(VibeGrade.FUCKY, egress = true) }
+                onCapture = { captureVibe(VibeGrade.JANKY, egress = true) },
+                onNote = { openVibeNote(VibeGrade.JANKY, egress = true) }
             )
         }
 

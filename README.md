@@ -26,7 +26,7 @@ The core idea is:
 
 > **You record the event. The software records the circumstances you authorized.**
 
-It can also log how you felt with one tap, from **Vibe good 🙂** through **Fucky 😵‍💫**. **FUCK THIS, I'M OUT** records that you left, so “felt bad and stayed” and “felt bad and bailed” remain different kinds of events.
+It can also log how you felt with one tap, from **Vibe good 🙂** through **Janky 😵‍💫**. **NOPE, I'M OUT** records that you left, so “felt bad and stayed” and “felt bad and bailed” remain different kinds of events.
 
 ## Yes, it can be extremely invasive
 

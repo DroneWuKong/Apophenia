@@ -252,6 +252,7 @@ def build_docx() -> None:
         bold_lead="Evidence boundary. "
     )
 
+    page_break(doc)
     doc.add_heading("Capture a moment", level=1)
     add_figure(
         doc,
@@ -263,7 +264,7 @@ def build_docx() -> None:
     add_bullets(doc, [
         "THAT WAS WEIRD saves the tap time first and enriches it with authorized context afterward.",
         "VIBE records a one-tap ordinal state from 1 through 5; holding opens an optional note without moving the event time.",
-        "FUCK THIS, I'M OUT records VIBE 5 with egress=true, preserving the difference between leaving and staying.",
+        "NOPE, I'M OUT records VIBE 5 with egress=true, preserving the difference between leaving and staying.",
         "The status strip distinguishes authorized gate count from AV rings that are actually live.",
     ])
 
@@ -313,6 +314,7 @@ def build_docx() -> None:
         "Settings export actions for data-only full evidence raw SQLite backup and restore",
         3.85,
     )
+    doc.add_heading("Choose an export format", level=2)
     add_table(doc, ["Export", "Human-readable", "Machine-readable"], [
         ["Data-only", "Analysis README and CSV tables", "Canonical JSON CSV and JSON data dictionary"],
         ["Raw SQLite", "Schema documentation", "Checkpointed integrity-checked database"],
