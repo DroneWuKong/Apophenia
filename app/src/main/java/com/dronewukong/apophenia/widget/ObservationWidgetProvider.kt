@@ -27,7 +27,7 @@ class ObservationWidgetProvider : AppWidgetProvider() {
             VibeGrade.fromRating(intent.getIntExtra(EXTRA_VIBE_RATING, 0))
         }.getOrNull() ?: return
         val egress = intent.getBooleanExtra(EXTRA_EGRESS, false)
-        if (egress && grade != VibeGrade.FUCKY) return
+        if (egress && grade != VibeGrade.JANKY) return
 
         val pending = goAsync()
         ObservationStore.repository(context).log(
@@ -45,11 +45,11 @@ class ObservationWidgetProvider : AppWidgetProvider() {
         setOnClickPendingIntent(R.id.widget_vibe_1, vibeBroadcast(context, VibeGrade.GOOD, 201))
         setOnClickPendingIntent(R.id.widget_vibe_2, vibeBroadcast(context, VibeGrade.TOLERABLE, 202))
         setOnClickPendingIntent(R.id.widget_vibe_3, vibeBroadcast(context, VibeGrade.BAD, 203))
-        setOnClickPendingIntent(R.id.widget_vibe_4, vibeBroadcast(context, VibeGrade.FUCKED, 204))
-        setOnClickPendingIntent(R.id.widget_vibe_5, vibeBroadcast(context, VibeGrade.FUCKY, 205))
+        setOnClickPendingIntent(R.id.widget_vibe_4, vibeBroadcast(context, VibeGrade.SNAFU, 204))
+        setOnClickPendingIntent(R.id.widget_vibe_5, vibeBroadcast(context, VibeGrade.JANKY, 205))
         setOnClickPendingIntent(
             R.id.widget_egress,
-            vibeBroadcast(context, VibeGrade.FUCKY, 206, egress = true)
+            vibeBroadcast(context, VibeGrade.JANKY, 206, egress = true)
         )
         setOnClickPendingIntent(
             R.id.widget_open,
