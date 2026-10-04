@@ -38,6 +38,11 @@ Notable project changes are recorded here. The format is based on [Keep a Change
 
 ## [Unreleased]
 
+### Changed
+
+- Added a plain-language local-law warning to first-run onboarding, sensitive capture settings and confirmations, TOTAL_EVIDENCE, the README, and maintained user guides. The warning explains that some jurisdictions require every recorded person to consent and that Apophenia cannot determine or confer legal authority.
+- Replaced the profane VIBE labels with the friendlier `SNAFU 😖`, `Janky 😵‍💫`, and `NOPE, I'M OUT` wording without changing ratings or egress semantics.
+
 ### Added
 
 - Total Circumstances gate inventory with standard, deliberate, and capability-conditional consent contracts plus explicit runtime gap reasons.

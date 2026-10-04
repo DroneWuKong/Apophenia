@@ -12,6 +12,7 @@ import com.dronewukong.apophenia.video.VideoRingCaptureManager
 import com.dronewukong.apophenia.rolling.RollingRecorderConfig
 import com.dronewukong.apophenia.work.EventEnrichmentWorker
 import com.dronewukong.apophenia.work.PostEventWindowWorker
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -136,5 +137,13 @@ class ObservationRepository(context: Context, databaseName: String = "apophenia.
 
     companion object {
         private val executor = Executors.newSingleThreadExecutor()
+
+        internal fun awaitIdleForTests(timeoutMs: Long = 5_000L) {
+            val idle = CountDownLatch(1)
+            executor.execute { idle.countDown() }
+            check(idle.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+                "Observation repository executor did not become idle"
+            }
+        }
     }
 }

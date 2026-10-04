@@ -8,7 +8,7 @@ object VibeCapture {
         egress: Boolean = false,
         origin: ObservationOrigin = ObservationOrigin.ANDROID
     ): ObservationCaptureRequest {
-        require(!egress || grade == VibeGrade.FUCKY) { "Egress requires VIBE=5" }
+        require(!egress || grade == VibeGrade.JANKY) { "Egress requires VIBE=5" }
         return ObservationCaptureRequest(
             timestampMs = timestampMs,
             kind = ObservationKind.VIBE,
